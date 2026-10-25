@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-harness-starter"
+version = "0.1.0"
+description = "A local, reusable development harness setup CLI for Claude Code projects"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "typer>=0.15,<1",
+  "rich>=13,<15",
+  "pydantic>=2,<3",
+  "jinja2>=3.1,<4",
+  "PyYAML>=6,<7",
+]
+
+[project.scripts]
+harness = "agent_harness.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1", "build>=1,<2", "hatchling>=1.26,<2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_harness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

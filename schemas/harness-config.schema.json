@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": 1,
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "harness_version": {
+      "const": "0.1.0",
+      "default": "0.1.0",
+      "title": "Harness Version",
+      "type": "string"
+    },
+    "project_name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Project Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Description",
+      "type": "string"
+    },
+    "adapter": {
+      "const": "claude-code",
+      "default": "claude-code",
+      "title": "Adapter",
+      "type": "string"
+    },
+    "technologies": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Technologies",
+      "type": "array"
+    }
+  },
+  "required": [
+    "project_name"
+  ],
+  "title": "HarnessConfig",
+  "type": "object"
+}

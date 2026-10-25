@@ -1,0 +1,7 @@
+schema_version: 1
+harness_version: 0.1.0
+project_name: AgentHarnessStarterKit
+description: Projeye ajan rolleri, skills ve kalıcı görev hafızası kuran Python CLI
+adapter: claude-code
+technologies:
+- Python

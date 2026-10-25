@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "harness_version": "0.1.0",
+  "files": {
+    "AGENTS.md": "94d32e80831cb1075acb656a3453732bb9723992e01711538bdafc13d17e28df",
+    "CLAUDE.md": "71392dfda01b3cbde7fc574c3c1e54944f48a03e292187617a0a3795119c29a6",
+    ".claude/agents/lead.md": "a6d4be445da4e434a99614e9bfe440727e07129fd629505124023c421f56b78d",
+    ".claude/agents/developer.md": "202bb60e39a2bf17a150f8e638b038efa2769c039a459646be5451c34b5ea1fe",
+    ".claude/agents/reviewer.md": "0e391f8fe3fa4e3f390639953fe37a2f9c9bd2401bd92bb5074575ee689ba3d8",
+    ".claude/skills/development/SKILL.md": "f5bc221e1a40f6b0cd49d8f013a03a045e97ec03ccdf025944d29f65a9f621c0",
+    ".claude/rules/verification.md": "65032a8d984764202ca88479268df10ac625c1ab15fe865b27a7b7f626235953",
+    ".harness/state/TASK.md": "b2844e0aa736c25399b9bb4d4dcb608b3be4440dbb3601a08a4f0118ca179c3e",
+    ".harness/state/PROGRESS.md": "88e06d623525df7cfb052e2de990d52a3943e3376d44eaca5c847d182e50a56c",
+    ".harness/state/EVIDENCE.md": "962cff95e74b600e54ee86712dfb6efd4f83225d99e4bd572b17e96cf74dc2d6",
+    ".harness/state/HANDOFF.md": "93ab2ebe5b94a7e3da9eba7b58e3e2e6ce36fdea199f6b5c9c268f509afeb603",
+    "docs/architecture/README.md": "664ecb0cd95a071c8a3c766e287df35853f6b9dd0f4fa8fb463c13c726e12392",
+    "docs/decisions/README.md": "ed5195fcaad30d9632b5d15e33129c3c9cfc93879ef409b190631888e0e8e52d",
+    "docs/plans/README.md": "6c14f2c2f90fea37a2beb8aa9888e38b33c19a47c606e79af510968e43acca9d",
+    ".harness/config.yaml": "482e587a162a95b2186190957b7c5d4b8475d022ed0cf125245519c843d2842b"
+  }
+}
