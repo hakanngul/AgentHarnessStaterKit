@@ -78,7 +78,9 @@ Tüm komutlar `--json` destekler; `harness --version` sürümü gösterir.
 
 Her görev `.harness/tasks/<ID>.yaml` (ör. `T-1`), kullanıcının vermesi gereken her
 ürün kararı `.harness/decisions/DEC-<n>.yaml` dosyasıdır. Şemalar:
-`schemas/task.schema.json`, `schemas/decision.schema.json`.
+`schemas/task.schema.json`, `schemas/decision.schema.json`. Şemalar alan yapısını
+tanımlar; alanlar arası kurallar (kanıt türüne göre zorunlu alanlar, `DEC-` önekinin
+görevlerde yasak olması, karar durumu) yalnız `harness check` ile denetlenir.
 
 ```bash
 harness check /path/to/project --json

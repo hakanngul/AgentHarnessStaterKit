@@ -2,7 +2,7 @@ schema_version: 1
 id: T-1
 title: "Faz 1: structured task/decision ledger and harness check"
 owner: developer
-status: DONE
+status: IN_REVIEW
 goal: >-
   Stack-independent ledger for tasks, evidence and user decisions, validated by
   `harness check` without executing commands. Plan: docs/plans/team-system.md.
@@ -53,8 +53,9 @@ evidence:
     command: uv run --frozen pytest -q
     exit_code: 0
     summary: >-
-      169 passed (86 existing + 83 ledger tests). Regression tests for review findings
-      fail on the code before each fix (11 on a3ce0a9, 2 on f477ce6) and pass now.
+      182 passed (86 existing + 96 ledger tests). Regression tests for review findings
+      fail on the code before each fix (11 on a3ce0a9, 2 on f477ce6, 11 on c5a45a0)
+      and pass now.
     output: .harness/evidence/T-1/pytest.txt
     recorded_at: 2026-11-09
   - id: E4
@@ -85,14 +86,10 @@ evidence:
     output: .harness/evidence/T-1/harness-check.txt
     recorded_at: 2026-11-09
 review:
-  status: approved
-  by: reviewer
-  notes: >-
-    Read-only reviewer subagent in the same session; read code only and could not run
-    commands. Two rounds: 9 findings, then 1 blocking (invalid YAML date). All fixed
-    with regression tests; final verdict APPROVED with no blocking items.
+  status: pending
 log:
   - "2026-11-09 reviewer agent: 1 high, 4 medium, 4 low findings; all fixed with tests"
   - "2026-11-09 re-review: all findings resolved; blocking: invalid YAML date crashed check"
   - "2026-11-09 fixed by catching ValueError per file; 2 regression tests added"
   - "2026-11-09 final re-review: APPROVED; status DONE"
+  - "2026-11-09 Sourcery PR review on a3ce0a9: 6 new real findings fixed after approval; back to IN_REVIEW"

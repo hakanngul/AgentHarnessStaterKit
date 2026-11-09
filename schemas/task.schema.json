@@ -11,6 +11,7 @@
         "text": {
           "maxLength": 4000,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Text",
           "type": "string"
         },
@@ -198,12 +199,14 @@
     "title": {
       "maxLength": 120,
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Title",
       "type": "string"
     },
     "owner": {
       "maxLength": 120,
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Owner",
       "type": "string"
     },

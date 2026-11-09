@@ -4,6 +4,7 @@
 rerun commands, so it cannot prove that recorded evidence is truthful.
 """
 
+from itertools import islice
 from pathlib import Path
 from typing import TypeVar
 
@@ -16,8 +17,28 @@ from agent_harness.models import Decision, LedgerReport, Task
 TASKS_DIR = ".harness/tasks"
 DECISIONS_DIR = ".harness/decisions"
 MAX_LEDGER_FILES = 5000
+MAX_LEDGER_BYTES = 32 * 1_048_576  # aggregate cap per ledger directory
 ACTIVE = {"READY", "IN_PROGRESS", "IN_REVIEW", "DONE"}
 M = TypeVar("M", Task, Decision)
+
+
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """SafeLoader that rejects repeated mapping keys instead of keeping the last one."""
+
+    def construct_mapping(self, node, deep=False):
+        seen = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in seen
+            except TypeError:
+                continue  # unhashable keys are rejected later by the base constructor
+            if duplicate:
+                raise yaml.constructor.ConstructorError(
+                    None, None, f"duplicate key {key!r}", key_node.start_mark
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
 
 
 def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -> dict[str, M]:
@@ -29,13 +50,14 @@ def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -
         if not directory.is_dir():
             report.errors.append(f"{relative_dir} is not a directory")
             return items
-        entries = sorted(directory.iterdir())
+        entries = sorted(islice(directory.iterdir(), MAX_LEDGER_FILES + 1))
     except OSError as exc:
         report.errors.append(f"{relative_dir}: cannot be listed: {exc}")
         return items
     if len(entries) > MAX_LEDGER_FILES:
         report.errors.append(f"{relative_dir} has more than {MAX_LEDGER_FILES} entries")
         return items
+    total_bytes = 0
     for entry in entries:
         relative = f"{relative_dir}/{entry.name}"
         try:
@@ -47,7 +69,11 @@ def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -
                     f"{relative}: ignored (only *.yaml files are ledger entries)"
                 )
                 continue
-            item = model.model_validate(yaml.safe_load(read_text(entry)))
+            total_bytes += entry.stat().st_size
+            if total_bytes > MAX_LEDGER_BYTES:
+                report.errors.append(f"{relative_dir} exceeds {MAX_LEDGER_BYTES} bytes in total")
+                return items
+            item = model.model_validate(yaml.load(read_text(entry), Loader=_UniqueKeyLoader))
         except ValidationError as exc:
             for error in exc.errors(include_input=False):
                 location = ".".join(str(part) for part in error["loc"]) or "<root>"
@@ -108,12 +134,12 @@ def _check_task(
             )
 
     for item in task.evidence:
-        if item.output is None:
-            continue
         try:
-            if not managed_path(root, item.output).is_file():
+            if item.cwd != "." and not managed_path(root, item.cwd).is_dir():
+                errors.append(f"{where}: evidence {item.id} cwd not found: {item.cwd}")
+            if item.output is not None and not managed_path(root, item.output).is_file():
                 errors.append(f"{where}: evidence {item.id} output not found: {item.output}")
-        except (HarnessError, OSError) as exc:
+        except (OSError, ValueError) as exc:  # ValueError includes HarnessError and NUL bytes
             errors.append(f"{where}: evidence {item.id}: {exc}")
 
     for criterion in task.acceptance:

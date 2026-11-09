@@ -44,8 +44,9 @@ class Manifest(BaseModel):
 
 
 LedgerVersion = Annotated[int, Field(strict=True, ge=1, le=1)]
-Text = Annotated[str, Field(min_length=1, max_length=4000)]
-Name = Annotated[str, Field(min_length=1, max_length=120)]
+# pattern \S: at least one non-whitespace character (search semantics in Pydantic and JSON Schema).
+Text = Annotated[str, Field(min_length=1, max_length=4000, pattern=r"\S")]
+Name = Annotated[str, Field(min_length=1, max_length=120, pattern=r"\S")]
 TaskId = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9]*-[1-9][0-9]*$", max_length=40)]
 DecisionId = Annotated[str, Field(pattern=r"^DEC-[1-9][0-9]*$", max_length=40)]
 Reference = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9]*-[1-9][0-9]*$", max_length=40)]

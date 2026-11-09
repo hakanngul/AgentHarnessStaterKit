@@ -463,3 +463,94 @@ def test_values_yaml_cannot_build_are_reported(tmp_path, line):
     code, report = run_check(tmp_path)
     assert code == 1
     assert report["errors"][0].startswith(f"{TASKS_DIR}/T-1.yaml: ")
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        ({"owner": "   ", "review": {"status": "approved", "by": "someone"}}, "owner"),
+        ({"acceptance": [{"id": "AC1", "text": "  ", "verified_by": ["E1"]}]}, "acceptance"),
+        ({"title": "\t"}, "title"),
+    ],
+)
+def test_whitespace_only_names_and_text_are_rejected(tmp_path, overrides, expected):
+    errors = errors_for(tmp_path, done_task(**overrides))
+    assert any(f": {expected}" in error and "pattern" in error for error in errors), errors
+
+
+@pytest.mark.parametrize(
+    ("cwd", "expected"),
+    [
+        ("/etc", "Unsafe managed path"),
+        ("../elsewhere", "Unsafe managed path"),
+        ("missing-dir", "cwd not found"),
+    ],
+)
+def test_evidence_cwd_must_be_a_project_directory(tmp_path, cwd, expected):
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "cwd": cwd}]
+    errors = errors_for(tmp_path, done_task(evidence=evidence))
+    assert any(expected in error for error in errors), errors
+
+
+def test_evidence_cwd_subdirectory_is_accepted(tmp_path):
+    (tmp_path / "app").mkdir()
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "cwd": "app"}]
+    assert errors_for(tmp_path, done_task(evidence=evidence)) == []
+
+
+def test_symlinked_evidence_cwd_is_rejected(tmp_path):
+    (tmp_path / "real").mkdir()
+    (tmp_path / "link").symlink_to(tmp_path / "real")
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "cwd": "link"}]
+    errors = errors_for(tmp_path, done_task(evidence=evidence))
+    assert any("Symlinked managed path" in error for error in errors)
+
+
+def test_nul_byte_in_evidence_path_is_reported(tmp_path):
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "output": "a\x00b"}]
+    errors = errors_for(tmp_path, done_task(evidence=evidence))
+    assert any("evidence E1" in error for error in errors), errors
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "id: T-1\ntitle: x\nowner: d\nstatus: DONE\nstatus: BACKLOG\n",
+        "id: T-1\ntitle: x\nowner: d\nstatus: BACKLOG\n"
+        "review: {status: approved, status: pending}\n",
+    ],
+)
+def test_duplicate_yaml_keys_are_rejected(tmp_path, text):
+    target = tmp_path / TASKS_DIR / "T-1.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text(text)
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert "duplicate key 'status'" in report["errors"][0]
+
+
+def test_ledger_byte_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_harness.check.MAX_LEDGER_BYTES", 600)
+    for number in range(1, 4):
+        write(tmp_path, TASKS_DIR, done_task(id=f"T-{number}"))
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert any("exceeds 600 bytes" in error for error in report["errors"])
+
+
+def test_entry_cap_stops_enumeration_early(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_harness.check.MAX_LEDGER_FILES", 2)
+    calls = []
+    original = Path.iterdir
+
+    def counting(self):
+        for entry in original(self):
+            calls.append(entry)
+            yield entry
+
+    for number in range(1, 10):
+        write(tmp_path, TASKS_DIR, done_task(id=f"T-{number}"))
+    monkeypatch.setattr(Path, "iterdir", counting)
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert len(calls) == 3
