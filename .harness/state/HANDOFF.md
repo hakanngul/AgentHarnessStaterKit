@@ -21,7 +21,7 @@ where mistakes cannot be hidden. Faz 1 added the task/decision ledger and
 
 ## Remaining work
 
-Faz 2 is in PR #2 under review. Then Faz 3 (stack packs) and Faz 4 (upgrade) per the
+Faz 2 is DONE in PR #2 (awaiting merge). Then Faz 3 (stack packs) and Faz 4 (upgrade) per the
 plan. Do not claim stack packs, upgrade or a sandbox exist. The hook does not see Bash.
 
 ## Resume

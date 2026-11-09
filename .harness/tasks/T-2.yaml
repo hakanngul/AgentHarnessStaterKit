@@ -2,7 +2,7 @@ schema_version: 1
 id: T-2
 title: 'Faz 2a: harness evidence run records evidence by running the command'
 owner: developer
-status: IN_REVIEW
+status: DONE
 goal: 'Close the self-reported evidence gap: the CLI runs the given argv, stores the output
   and records exit code, commit and output hash. Plan: docs/plans/team-system.md.'
 acceptance:
@@ -10,16 +10,15 @@ acceptance:
   text: Runs argv without a shell; writes output and evidence; records failures and exits
     1.
   verified_by:
-  - E3
+  - E6
 - id: AC2
   text: check verifies the output hash of harness-recorded evidence.
   verified_by:
-  - E3
+  - E6
 - id: AC6
   text: Existing 0.1.0 installs and Faz 1 ledgers keep passing validate and check.
   verified_by:
-  - E3
-  - E5
+  - E6
 evidence:
 - id: E1
   kind: command
@@ -76,5 +75,25 @@ evidence:
   output_sha256: 5fafe5054d62e741abcdba42b9d5425f073d4420fe93f03f15c6be21f9ee870a
   recorded_at: '2026-11-09'
   recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 322 passed in 12.42s
+  commit: dd1bf1c498e4588e74175e7be4cf04c8c5b2bfaf
+  output: .harness/evidence/T-2/E6.txt
+  output_sha256: 22a52f47928c0b0ae3382f78af94ead1140ed1ea006b10158d3b0f40eec49dbe
+  recorded_at: '2026-11-09'
+  recorded_by: harness
 log:
 - 2026-11-09 evidence for T-2 recorded with harness evidence run itself (E1-E5)
+- 2026-11-10 final-tree evidence E6 at dd1bf1c; review approved; DONE
+review:
+  status: approved
+  by: reviewer
+  notes: 'Independent read-only reviewer subagent in this session; read code only, ran no
+    commands. Rounds: 3 medium + 9 low findings, then 1 blocking (leftover processes writing
+    into evidence), plus Sourcery''s PR review (11 new real findings) and SonarCloud S2612/S3516;
+    all fixed with regression tests that fail on the previous code. Final verdict on dd1bf1c:
+    APPROVED.'

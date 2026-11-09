@@ -1,43 +1,41 @@
 # Evidence
 
-Structured evidence for Faz 1 lives in `.harness/tasks/T-1.yaml`; raw outputs are
-in `.harness/evidence/T-1/`. Environment: managed cloud container, Python 3.12,
-repository root as working directory, 2026-11-09.
+Structured evidence lives in `.harness/tasks/T-*.yaml`; raw outputs are in
+`.harness/evidence/<task>/`. Since Faz 2, command evidence is recorded by
+`harness evidence run` itself (`recorded_by: harness`, output hash, commit).
+
+## Faz 2 (T-2, T-3, T-4) — final tree dd1bf1c, 2026-11-10
 
 | Check | Result |
 | --- | --- |
-| uv run --frozen ruff check . | exit 0 |
-| uv run --frozen ruff format --check . | exit 0 |
-| uv run --frozen pytest -q | exit 0; 187 passed, none skipped |
-| uv run --frozen python -m build --no-isolation | exit 0; sdist and wheel |
-| uv run --frozen harness validate . --json | exit 0; edited generated files are warnings |
-| uv run --frozen harness check . --json | exit 0; 1 task checked |
-| Wheel in fresh venv outside checkout | init/validate/check 0; bad ledger made check exit 1 |
+| uv run --frozen pytest -q (T-2 E6, T-3 E6, T-4 E7) | exit 0; 322 passed |
+| uv run --frozen ruff check . (T-4 E8) | exit 0 |
+| uv run --frozen ruff format --check . (T-4 E9) | exit 0 |
+| uv run --frozen python -m build --no-isolation (T-4 E10) | exit 0 |
+| uv run --frozen harness validate . --json (T-4 E11) | exit 0; edited generated files are warnings |
+| Wheel in fresh venv outside checkout (T-4 E12, manual) | hook denies .claude and .CLAUDE, allows src; evidence redacts; check/validate 0 |
+| uv run --frozen harness check . | exit 0 |
 
-Mutation check: four rules deliberately broken (review status, dependency state,
-failing evidence, cycle reporting); tests caught all four. Regression tests for the
-review findings fail on the code before each fix (11 on a3ce0a9, 2 on f477ce6,
-11 on c5a45a0, 5 on 31cbb17)
-and pass after the fixes.
+Mutation checks broke hash verification, output cleanup, deny ordering, symlink
+rejection, agent_type gating, the deny decision and install idempotency; tests caught
+each. Every review finding has a regression test that fails on the code before its fix.
 
-## Independent review
+## Independent review (Faz 2)
 
-A read-only reviewer agent (no command execution) reported 1 high, 4 medium and
-4 low findings: missing self-ledger and evidence (H1); uncaught OSError for long
-paths and unlistable directories, RecursionError for deep YAML and long dependency
-chains (M1–M4); case-sensitive self-approval, template example contradicting its
-own rule, numeric dates accepted, duplicate dependencies (L1–L4). All were fixed
-with tests. Re-review found one more crash (invalid YAML date, oversized integer);
-fixed with tests. Sourcery's PR review then found 6 more real issues (blank names,
-evidence cwd, duplicate YAML keys, NUL paths, entry and byte caps); fixed with tests,
-and one regression it caused (YAML merge keys) was caught and fixed. Final verdict
-on 3c92c6f: APPROVED, no blocking items. The reviewer read code
-only and did not rerun the checks above.
+Read-only reviewer subagent, code reading only. Round 1: 3 medium (oversized input
+bypass, case-variant bypass, evidence data loss) and 9 low findings. Round 2: approved
+with follow-ups. Round 3 (post-approval delta): 1 blocking — leftover child processes
+could write into recorded evidence after hashing; fixed by streaming into a private
+unlinked temp file and killing the process group on timeout. Final verdict on dd1bf1c:
+APPROVED. PR bots: Sourcery (24 findings on an older commit; real ones fixed, 4 threads
+left for the maintainer), SonarCloud (S3516, S2612; fixed, gate green).
 
-## Not tested
+## Not tested / limits
 
-Python 3.11 and 3.13 run only in CI. Real Claude Code sessions are not tested.
-`check` does not verify that commits exist or that recorded commands really ran.
-Reviewer identity in `review.by` is self-declared text.
+- Python 3.11 and 3.13 run only in CI. Windows is not tested; process-group kill is POSIX.
+- Real Claude Code sessions are not tested; whether subagent events carry agent_type is
+  not confirmed by docs. The hook does not see Bash writes.
+- Evidence is produced locally: the hash detects later edits, not fabrication.
+  Redaction is heuristic. Reviewer identity in `review.by` is self-declared.
 
-Earlier 0.1.0 evidence (2026-10-25, 86 tests) is in Git history.
+Faz 1 evidence (T-1, 187 tests) and 0.1.0 evidence are in Git history and T-1.yaml.

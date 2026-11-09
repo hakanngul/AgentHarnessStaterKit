@@ -1,6 +1,6 @@
 # Current task
 
-Status: Faz 2 implemented (T-2, T-3, T-4); independent review in progress.
+Status: Faz 2 DONE (T-2, T-3, T-4); review approved; PR #2 awaits merge.
 Structured status lives in `.harness/tasks/T-2.yaml` .. `T-4.yaml`.
 
 ## Goal and scope
@@ -22,4 +22,4 @@ validate . --json. Then `harness check .`.
 ## Product decisions and blockers
 
 No hook is installed in this repository: the session must not edit its own Claude
-settings. T-4 stays BLOCKED until T-3 is DONE.
+settings. Open for the maintainer: three PR threads listed in PROGRESS.md.

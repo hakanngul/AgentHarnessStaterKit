@@ -20,7 +20,7 @@ olarak taşınır.
 | Faz | İçerik | Durum |
 | --- | --- | --- |
 | 1 | Görev/kanıt/karar şemaları + `harness check` | uygulandı, review onaylı (T-1) |
-| 2 | Kanıt kaydeden komut, config'te rol + yazma kapsamı, testli hook | uygulanıyor (T-2..T-4) |
+| 2 | Kanıt kaydeden komut, config'te rol + yazma kapsamı, testli hook | uygulandı, review onaylı (T-2..T-4) |
 | 3 | Stack pack mekanizması: generic + 2 pack | planlandı |
 | 4 | `upgrade` / `sync`, kullanıcı değişikliklerini koruyarak | planlandı |
 | 5 | Opsiyonel roller, sürüm sabitli dış skill'ler | ihtiyaca göre |
