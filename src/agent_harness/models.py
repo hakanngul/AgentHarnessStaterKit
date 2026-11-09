@@ -90,7 +90,10 @@ class Evidence(BaseModel):
     summary: Annotated[str, Field(max_length=4000)] = ""
     commit: Annotated[str, Field(pattern=r"^[0-9a-f]{7,40}$")] | None = None
     output: Annotated[str, Field(min_length=1, max_length=500)] | None = None
+    output_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] | None = None
     recorded_at: LooseDate | None = None
+    # "harness" means `harness evidence run` executed the command and wrote the output.
+    recorded_by: Literal["agent", "harness"] = "agent"
 
     @model_validator(mode="after")
     def check_kind(self) -> "Evidence":
@@ -104,6 +107,10 @@ class Evidence(BaseModel):
                 raise ValueError("manual evidence requires result and summary")
             if self.exit_code is not None:
                 raise ValueError("manual evidence uses result, not exit_code")
+        if self.recorded_by == "harness" and (
+            self.kind != "command" or self.output is None or self.output_sha256 is None
+        ):
+            raise ValueError("harness-recorded evidence needs kind command, output and hash")
         return self
 
     @property

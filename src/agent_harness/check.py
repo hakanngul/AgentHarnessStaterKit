@@ -11,7 +11,13 @@ from typing import TypeVar
 import yaml
 from pydantic import ValidationError
 
-from agent_harness.filesystem import HarnessError, managed_path, project_root, read_text
+from agent_harness.filesystem import (
+    HarnessError,
+    managed_path,
+    project_root,
+    read_text,
+    sha256_file,
+)
 from agent_harness.models import Decision, LedgerReport, Task
 
 TASKS_DIR = ".harness/tasks"
@@ -140,8 +146,15 @@ def _check_task(
             cwd = PurePosixPath(item.cwd).as_posix()  # accept "./src", "src/" and "./"
             if cwd != "." and not managed_path(root, cwd).is_dir():
                 errors.append(f"{where}: evidence {item.id} cwd not found: {item.cwd}")
-            if item.output is not None and not managed_path(root, item.output).is_file():
-                errors.append(f"{where}: evidence {item.id} output not found: {item.output}")
+            if item.output is not None:
+                output = managed_path(root, item.output)
+                if not output.is_file():
+                    errors.append(f"{where}: evidence {item.id} output not found: {item.output}")
+                elif item.output_sha256 and sha256_file(output) != item.output_sha256:
+                    errors.append(
+                        f"{where}: evidence {item.id} output changed after it was recorded "
+                        f"(sha256 mismatch): {item.output}"
+                    )
         except (OSError, ValueError) as exc:  # ValueError includes HarnessError and NUL bytes
             errors.append(f"{where}: evidence {item.id}: {exc}")
 

@@ -1,0 +1,80 @@
+schema_version: 1
+id: T-2
+title: 'Faz 2a: harness evidence run records evidence by running the command'
+owner: developer
+status: IN_REVIEW
+goal: 'Close the self-reported evidence gap: the CLI runs the given argv, stores the output
+  and records exit code, commit and output hash. Plan: docs/plans/team-system.md.'
+acceptance:
+- id: AC1
+  text: Runs argv without a shell; writes output and evidence; records failures and exits
+    1.
+  verified_by:
+  - E3
+- id: AC2
+  text: check verifies the output hash of harness-recorded evidence.
+  verified_by:
+  - E3
+- id: AC6
+  text: Existing 0.1.0 installs and Faz 1 ledgers keep passing validate and check.
+  verified_by:
+  - E3
+  - E5
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 2e348bd2153a74816a164efb9b7bf6cbb725efe7
+  output: .harness/evidence/T-2/E1.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 34 files already formatted
+  commit: 2e348bd2153a74816a164efb9b7bf6cbb725efe7
+  output: .harness/evidence/T-2/E2.txt
+  output_sha256: afe2cec83d28b9d1fd9b1c7b2f66a2581f48919ce6649182e0a05614cccaa31d
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 208 passed in 4.72s
+  commit: 2e348bd2153a74816a164efb9b7bf6cbb725efe7
+  output: .harness/evidence/T-2/E3.txt
+  output_sha256: db08ac54ff906647d1cbd864f87cccd7c81984dad1573cb5e5adfd0ca060fee4
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: 2e348bd2153a74816a164efb9b7bf6cbb725efe7
+  output: .harness/evidence/T-2/E4.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: '}'
+  commit: 2e348bd2153a74816a164efb9b7bf6cbb725efe7
+  output: .harness/evidence/T-2/E5.txt
+  output_sha256: 5fafe5054d62e741abcdba42b9d5425f073d4420fe93f03f15c6be21f9ee870a
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+log:
+- 2026-11-09 evidence for T-2 recorded with harness evidence run itself (E1-E5)

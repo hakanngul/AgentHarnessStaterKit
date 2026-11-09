@@ -12,6 +12,7 @@ from agent_harness import __version__
 from agent_harness.analyze import analyze as inspect_project
 from agent_harness.check import check as check_ledger
 from agent_harness.doctor import doctor as diagnose
+from agent_harness.evidence import run_evidence
 from agent_harness.filesystem import HarnessError
 from agent_harness.generate import initialize
 from agent_harness.models import Report
@@ -99,6 +100,47 @@ def validate(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> No
 def check(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> None:
     """Check the task and decision ledger for completeness; commands are not rerun."""
     report_result(check_ledger(path), output_json)
+
+
+evidence_app = typer.Typer(no_args_is_help=True, help="Record task evidence.")
+app.add_typer(evidence_app, name="evidence")
+
+
+@evidence_app.command("run")
+def evidence_run(
+    task: Annotated[str, typer.Argument(help="Task id, e.g. T-1.")],
+    command: Annotated[list[str], typer.Argument(help="Command to run, after `--`.")],
+    path: Annotated[Path, typer.Option("--path", help="Project directory.")] = Path("."),
+    evidence_id: Annotated[
+        str | None, typer.Option("--id", help="Evidence id; default next E<n>.")
+    ] = None,
+    cwd: Annotated[str, typer.Option(help="Working directory inside the project.")] = ".",
+    timeout: Annotated[float | None, typer.Option(help="Timeout in seconds.")] = None,
+    summary: Annotated[str | None, typer.Option(help="Summary; default last output line.")] = None,
+    output_json: JsonFlag = False,
+) -> None:
+    """Run a command without a shell and record its result as task evidence.
+
+    Exits 1 when the command fails; the failure is still recorded.
+    """
+    try:
+        item = run_evidence(
+            path,
+            task,
+            command,
+            evidence_id=evidence_id,
+            cwd=cwd,
+            timeout=timeout,
+            summary=summary,
+        )
+    except (HarnessError, OSError, UnicodeError, ValidationError) as exc:
+        fail(exc, output_json)
+    emit(
+        {"ok": item.passed, "evidence": item.model_dump(mode="json", exclude_none=True)},
+        output_json,
+    )
+    if not item.passed:
+        raise typer.Exit(1)
 
 
 @app.command()

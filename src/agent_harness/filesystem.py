@@ -1,5 +1,6 @@
 """Bounded local reads and conservative path checks for managed destinations."""
 
+import hashlib
 import os
 from pathlib import Path, PurePosixPath
 
@@ -50,3 +51,11 @@ def read_text(path: Path) -> str:
         raise HarnessError(f"File exceeds {MAX_FILE_BYTES} byte limit: {path}")
     with path.open(encoding="utf-8", newline="") as stream:
         return stream.read()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()

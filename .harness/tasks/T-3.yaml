@@ -1,0 +1,8 @@
+schema_version: 1
+id: T-3
+title: "Faz 2b: roles and write scopes in config; harness scope"
+owner: developer
+status: BACKLOG
+acceptance:
+  - id: AC3
+    text: Strict role/glob config; scope applies deny before allow; rejects outside and .. paths.

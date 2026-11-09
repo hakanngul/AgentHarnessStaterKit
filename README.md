@@ -86,6 +86,19 @@ görevlerde yasak olması, karar durumu) yalnız `harness check` ile denetlenir.
 harness check /path/to/project --json
 ```
 
+Kanıtı elle yazmak yerine komutu harness'a çalıştırtın:
+
+```bash
+harness evidence run T-1 -- uv run pytest -q
+harness evidence run T-1 --cwd app --timeout 600 -- npm test
+```
+
+Komut shell olmadan çalışır; çıktı `.harness/evidence/T-1/E<n>.txt`'ye yazılır, görev
+dosyasına çıkış kodu, commit, çıktı hash'i ve `recorded_by: harness` eklenir. Komut
+başarısızsa da kaydedilir ve 1 ile çıkılır. Görev dosyası yeniden yazılır (YAML
+yorumları korunmaz). `check` hash'i doğrulayarak sonradan değiştirilmiş çıktıyı
+yakalar; kanıtın yerelde uydurulmasını engellemez, güvenilir koşu CI'dır.
+
 `check` hata varsa 1 ile çıkar. Denetledikleri: şema ve dosya adı = id; DONE görevde
 her kabul kriterinin başarılı kanıta bağlı olması; review'un sahibinden farklı biri
 tarafından onaylanması ya da gerekçeli `unavailable`; bilinmeyen/döngüsel

@@ -8,8 +8,9 @@ description: Plan, implement, verify, and hand off a project task with persisten
    acceptance criteria, and dependencies. Identify real project checks.
 3. Analyze only context needed for the task. Load architecture and decisions on demand.
 4. Implement in small changes. Use specialist roles only when needed and authorized.
-5. Run relevant tests/builds. Add each run to the task's `evidence` with command,
-   working directory, exit code and counts; link criteria via `verified_by`.
+5. Run relevant tests/builds through `harness evidence run <ID> -- <command>`; it runs
+   the command, stores the output and records exit code and hash. Hand-written
+   evidence is only for checks it cannot run. Link criteria via `verified_by`.
 6. Seek independent review when available; record it in `review`. The owner never
    approves their own task. If no reviewer exists, use `unavailable` with notes.
 7. A product decision only the user can make goes in `.harness/decisions/DEC-<n>.yaml`

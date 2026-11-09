@@ -1,0 +1,11 @@
+schema_version: 1
+id: T-4
+title: "Faz 2c: PreToolUse hook and hooks install"
+owner: developer
+status: BACKLOG
+depends_on: [T-3]
+acceptance:
+  - id: AC4
+    text: Hook denies out-of-scope writes in Claude Code's documented format; unknown role is not blocked.
+  - id: AC5
+    text: hooks install preserves settings.json, is idempotent, writes nothing on invalid JSON.
