@@ -7,8 +7,8 @@ depends_on:
 - T-3
 acceptance:
 - id: AC4
-  text: Hook denies out-of-scope writes in Claude Code's documented format; unknown role is
-    not blocked.
+  text: Hook denies out-of-scope writes in Claude Code's documented format; no detectable
+    role is not blocked, an unconfigured HARNESS_ROLE is denied.
   verified_by:
   - E3
   - E6

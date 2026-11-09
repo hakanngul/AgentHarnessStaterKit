@@ -78,7 +78,8 @@ denetler; doğruluğunu kanıtlamaz.
 - AC3: Rol/glob config'i katı şemayla doğrulanır; `scope` deny'ı allow'dan önce uygular,
   proje dışı ve `..` yolları reddeder.
 - AC4: Hook kapsam dışı yazmayı Claude Code'un belgelenmiş biçimiyle reddeder; rol
-  bilinmiyorsa ya da config'te rol yoksa engellemez ve bunu belirtir.
+  belirlenemiyorsa ya da config'te rol yoksa engellemez ve bunu belirtir; config'te
+  olmayan bir `HARNESS_ROLE` reddedilir.
 - AC5: `hook install` mevcut settings.json içeriğini korur, tekrar çalıştırınca
   çoğaltmaz, geçersiz JSON'da hiçbir şey yazmaz.
 - AC6: Mevcut 0.1.0 kurulumları `validate` ve `check`'ten geçmeye devam eder.

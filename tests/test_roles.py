@@ -185,6 +185,8 @@ def test_init_writes_default_roles_that_scope_uses(tmp_path):
     assert set(config["roles"]) == {"lead", "developer", "reviewer"}
     assert runner.invoke(app, ["validate", str(tmp_path)]).exit_code == 0
     code, out = scope(tmp_path, "developer", "src/a.py", ".claude/agents/lead.md")
+    assert code == 1
     assert [d["allowed"] for d in out["decisions"]] == [True, False]
     code, out = scope(tmp_path, "lead", "src/a.py", ".harness/tasks/T-1.yaml")
+    assert code == 1
     assert [d["allowed"] for d in out["decisions"]] == [False, True]

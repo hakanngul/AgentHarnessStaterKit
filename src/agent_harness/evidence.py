@@ -6,6 +6,7 @@ caller's machine: the stored hash detects later edits to the output, not fabrica
 """
 
 import datetime as dt
+import math
 import os
 import re
 import shlex
@@ -35,6 +36,22 @@ TASK_ID = re.compile(r"^[A-Z][A-Z0-9]*-[1-9][0-9]*$")
 EVIDENCE_ID = re.compile(r"^E[1-9][0-9]*$")
 TIMEOUT_EXIT_CODE = 124
 MAX_SUMMARY = 200
+MAX_COMMAND = 2000
+DEFAULT_TIMEOUT = 3600.0
+REDACTED = "[REDACTED]"
+# Heuristic only: well-known token formats and KEY=value / "Authorization:" pairs.
+SECRET_PATTERNS = [
+    re.compile(
+        rb"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|ACCESS_?KEY|"
+        rb"PRIVATE_?KEY|CREDENTIALS?)[A-Z0-9_]*)(\s*[=:]\s*)(\S+)"
+    ),
+    re.compile(rb"(?i)(authorization:\s*(?:bearer|basic|token)\s+)(\S+)"),
+    re.compile(
+        rb"\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
+        rb"sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|"
+        rb"AIza[0-9A-Za-z_-]{35})\b"
+    ),
+]
 LOCK_WAIT_SECONDS = 30.0
 
 
@@ -63,12 +80,32 @@ def _commit(root: Path) -> str | None:
     return sha if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
+def redact(data: bytes) -> bytes:
+    """Mask common credential shapes. A heuristic, not a guarantee."""
+    data = SECRET_PATTERNS[0].sub(lambda m: m.group(1) + m.group(2) + REDACTED.encode(), data)
+    data = SECRET_PATTERNS[1].sub(lambda m: m.group(1) + REDACTED.encode(), data)
+    return SECRET_PATTERNS[2].sub(REDACTED.encode(), data)
+
+
 def _bounded(output: bytes) -> bytes:
     if len(output) <= MAX_FILE_BYTES:
         return output
     keep = MAX_FILE_BYTES - 200
     header = f"[harness: output truncated to the last {keep} bytes]\n".encode()
     return header + output[-keep:]
+
+
+def _tail(path: Path) -> bytes:
+    """Read at most the last MAX_FILE_BYTES (+ slack for redaction) of a file."""
+    limit = MAX_FILE_BYTES * 2
+    with path.open("rb") as stream:
+        stream.seek(0, os.SEEK_END)
+        size = stream.tell()
+        stream.seek(max(0, size - limit))
+        data = stream.read()
+    if size > limit:
+        data = b"[harness: earlier output dropped]\n" + data
+    return data
 
 
 def _summary(output: bytes) -> str:
@@ -135,7 +172,7 @@ def run_evidence(
     *,
     evidence_id: str | None = None,
     cwd: str = ".",
-    timeout: float | None = None,
+    timeout: float | None = DEFAULT_TIMEOUT,
     summary: str | None = None,
 ) -> Evidence:
     """Run argv, store its combined output and append harness-recorded evidence."""
@@ -145,8 +182,11 @@ def run_evidence(
         raise HarnessError(f"Invalid task id: {task_id!r}")
     if evidence_id is not None and not EVIDENCE_ID.fullmatch(evidence_id):
         raise HarnessError(f"Invalid evidence id: {evidence_id!r}")
-    if timeout is not None and timeout <= 0:
-        raise HarnessError("Timeout must be positive")
+    if timeout is not None and (not math.isfinite(timeout) or timeout <= 0):
+        raise HarnessError("Timeout must be a positive finite number of seconds")
+    command = redact(shlex.join(argv).encode()).decode()
+    if len(command) > MAX_COMMAND:
+        raise HarnessError(f"Command is longer than {MAX_COMMAND} characters; use a script")
 
     root = project_root(path)
     task_path = managed_path(root, f"{TASKS_DIR}/{task_id}.yaml")
@@ -166,32 +206,35 @@ def run_evidence(
     try:
         evidence_id, reserved = _reserve(root, task_id, task, evidence_id)
         output_rel = f"{EVIDENCE_DIR}/{task_id}/{evidence_id}.txt"
+        commit = _commit(root)  # the revision the command starts from
         try:
-            completed = subprocess.run(
-                argv,
-                cwd=workdir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                timeout=timeout,
-                check=False,
-            )
-            exit_code, raw = completed.returncode, completed.stdout or b""
-            default_summary = _summary(raw)
-        except subprocess.TimeoutExpired as exc:
-            exit_code, raw = TIMEOUT_EXIT_CODE, exc.output or b""
-            default_summary = f"timed out after {timeout:g}s"
+            # Stream to the reserved file: a noisy command must not fill memory.
+            with reserved.open("wb") as sink:
+                completed = subprocess.run(
+                    argv,
+                    cwd=workdir,
+                    stdout=sink,
+                    stderr=subprocess.STDOUT,
+                    timeout=timeout,
+                    check=False,
+                )
+            exit_code, timed_out = completed.returncode, False
+        except subprocess.TimeoutExpired:
+            exit_code, timed_out = TIMEOUT_EXIT_CODE, True
         except OSError as exc:
             raise HarnessError(f"Could not start command {argv[0]!r}: {exc}") from exc
-        with reserved.open("wb") as stream:
-            stream.write(_bounded(raw))
+        raw = _tail(reserved)
+        stored = _bounded(redact(raw))
+        reserved.write_bytes(stored)
+        default_summary = f"timed out after {timeout:g}s" if timed_out else _summary(stored)
         evidence = Evidence(
             id=evidence_id,
             kind="command",
-            command=shlex.join(argv)[:2000],
+            command=command,
             cwd=cwd,
             exit_code=exit_code,
             summary=(summary if summary is not None else default_summary)[:4000],
-            commit=_commit(root),
+            commit=commit,
             output=output_rel,
             output_sha256=sha256_file(reserved),
             recorded_at=dt.date.today(),
@@ -209,6 +252,8 @@ def run_evidence(
                 evidence.model_dump(mode="json", exclude_none=True),
             ]
             text = yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=88)
+            if len(text.encode()) > MAX_FILE_BYTES:
+                raise HarnessError(f"{task_path.name} would exceed {MAX_FILE_BYTES} bytes")
             Task.model_validate(yaml.safe_load(text))  # never write an invalid task
             _write_atomic(task_path, text)
     except BaseException:

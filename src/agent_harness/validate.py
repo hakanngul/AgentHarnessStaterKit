@@ -5,7 +5,13 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from agent_harness.filesystem import HarnessError, managed_path, project_root, read_text
+from agent_harness.filesystem import (
+    HarnessError,
+    load_yaml,
+    managed_path,
+    project_root,
+    read_text,
+)
 from agent_harness.generate import CONFIG_PATH, EXPECTED_FILES, MANIFEST_PATH, sha256
 from agent_harness.models import HarnessConfig, Manifest, Report
 
@@ -19,7 +25,7 @@ def validate(path: Path) -> Report:
         return report
     try:
         raw = read_text(managed_path(root, CONFIG_PATH))
-        HarnessConfig.model_validate(yaml.safe_load(raw))
+        HarnessConfig.model_validate(load_yaml(raw))
         report.checks.append("Configuration schema is valid")
     except (HarnessError, OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
         message = (

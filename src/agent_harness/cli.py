@@ -118,7 +118,9 @@ def evidence_run(
         str | None, typer.Option("--id", help="Evidence id; default next E<n>.")
     ] = None,
     cwd: Annotated[str, typer.Option(help="Working directory inside the project.")] = ".",
-    timeout: Annotated[float | None, typer.Option(help="Timeout in seconds.")] = None,
+    timeout: Annotated[
+        float, typer.Option(help="Timeout in seconds; the run is recorded as exit 124.")
+    ] = 3600.0,
     summary: Annotated[str | None, typer.Option(help="Summary; default last output line.")] = None,
     output_json: JsonFlag = False,
 ) -> None:
@@ -138,8 +140,13 @@ def evidence_run(
         )
     except (HarnessError, OSError, UnicodeError, ValidationError) as exc:
         fail(exc, output_json)
+    warnings = [] if item.commit else ["No git commit recorded (not a Git checkout?)"]
     emit(
-        {"ok": item.passed, "evidence": item.model_dump(mode="json", exclude_none=True)},
+        {
+            "ok": item.passed,
+            "evidence": item.model_dump(mode="json", exclude_none=True),
+            "warnings": warnings,
+        },
         output_json,
     )
     if not item.passed:

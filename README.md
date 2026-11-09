@@ -93,10 +93,18 @@ harness evidence run T-1 -- uv run pytest -q
 harness evidence run T-1 --cwd app --timeout 600 -- npm test
 ```
 
-Komut shell olmadan çalışır; çıktı `.harness/evidence/T-1/E<n>.txt`'ye yazılır, görev
-dosyasına çıkış kodu, commit, çıktı hash'i ve `recorded_by: harness` eklenir. Komut
-başarısızsa da kaydedilir ve 1 ile çıkılır. Görev dosyası yeniden yazılır (YAML
-yorumları korunmaz). `check` hash'i doğrulayarak sonradan değiştirilmiş çıktıyı
+Komut shell olmadan çalışır; çıktı diske akıtılarak `.harness/evidence/T-1/E<n>.txt`'ye
+yazılır (son 1 MiB tutulur), görev dosyasına çıkış kodu, komut başlamadan önceki
+commit, çıktı hash'i ve `recorded_by: harness` eklenir. Komut başarısızsa da kaydedilir
+ve 1 ile çıkılır; varsayılan zaman aşımı 3600 sn'dir (`--timeout`), aşılırsa çıkış kodu
+124 kaydedilir. Görev dosyası komut bittikten sonra kilit altında yeniden okunup
+birleştirilir, böylece arada yapılan düzenlemeler korunur; dosya yeniden yazıldığı
+için YAML yorumları korunmaz. Git yoksa commit boş kalır ve uyarı verilir.
+
+Bilinen token biçimleri (GitHub, OpenAI, Slack, AWS, Google), `...TOKEN=`/`PASSWORD:`
+gibi atamalar ve `Authorization:` başlıkları komutta ve çıktıda `[REDACTED]` ile
+maskelenir. Bu sezgiseldir; her gizli bilgiyi yakalamaz. Kanıt dosyaları commit
+edildiği için gizli bilgiyi argümanla vermeyin ve çıktıya yazdırmayın. `check` hash'i doğrulayarak sonradan değiştirilmiş çıktıyı
 yakalar; kanıtın yerelde uydurulmasını engellemez, güvenilir koşu CI'dır.
 
 `check` hata varsa 1 ile çıkar. Denetledikleri: şema ve dosya adı = id; DONE görevde
@@ -125,7 +133,9 @@ roles:
 Glob: `*` tek segment, `?` tek karakter, `**` sıfır veya daha fazla segment, sonda `/`
 dizinin tamamı. `deny` önce uygulanır; hiçbirine uymayan yol reddedilir. Eşleştirme
 büyük/küçük harf ve Unicode normalleştirme farkını yok sayar (macOS ve Windows dosya
-sistemleri de öyle yapar). Proje dışı yollar, `..` içeren hedefler ve proje içinde
+sistemleri de öyle yapar). Bunun bedeli: Linux'ta `docs/**` izni `DOCS/x` gibi ayrı bir
+dizine yazmaya da izin verir; `deny` kuralları da aynı şekilde katlandığı için korunan
+yollar etkilenmez. Proje dışı yollar, `..` içeren hedefler ve proje içinde
 symlink'ten geçen yollar reddedilir; proje kökünün kendisi symlink altındaysa gerçek
 yolu kullanılır.
 
@@ -143,14 +153,19 @@ harness hook install . --dry-run                     # sonucu göster
 harness hook install . --command "uv run harness"    # .claude/settings.json'a ekle
 ```
 
-`install`, mevcut `.claude/settings.json` içeriğini korur, ikinci kez çalıştırınca
-çoğaltmaz, geçersiz JSON'da hiçbir şey yazmaz (JSON biçimlendirmesi yeniden yazılır).
+`install`, mevcut `.claude/settings.json` içeriğini korur, aynı matcher ve harness
+komutuyla kayıt varsa çoğaltmaz, geçersiz JSON ya da beklenmeyen yapıda hiçbir şey
+yazmaz (JSON biçimlendirmesi yeniden yazılır). Aynı anda başka bir yazarla
+çalıştırılmamalıdır; dosya kilitlenmez.
 Hook, Write/Edit/MultiEdit/NotebookEdit çağrılarında rolün kapsamı dışındaki yazmayı
 Claude Code'a `permissionDecision: deny` ile bildirir. Rol, hook girdisindeki
 `agent_type` tanımlı bir rolse ondan (subagent veya `claude --agent`), yoksa
-`HARNESS_ROLE` ortam değişkeninden alınır. Rol bilinmiyorsa, config'te rol yoksa ya
-da girdi okunamıyorsa engellemez ve nedenini stderr'e yazar. Denetlenemeyecek kadar
-büyük girdi (64 MiB üstü) roller tanımlıysa reddedilir.
+`HARNESS_ROLE` ortam değişkeninden alınır. Hiç rol belirlenemiyorsa, config ya da
+config'te rol yoksa, girdide dosya yolu yoksa ya da girdi okunamıyorsa engellemez ve
+nedenini stderr'e yazar. `HARNESS_ROLE` config'te tanımlı olmayan bir ada
+ayarlanmışsa (yazım hatası) yazma reddedilir. Denetlenemeyecek kadar büyük girdi
+(64 MiB üstü) roller tanımlıysa reddedilir. `CLAUDE_PROJECT_DIR` yoksa proje kökü
+olay `cwd`'sinden yukarı doğru `.harness/config.yaml` aranarak bulunur.
 
 Bu bir guardrail'dir, sandbox değil: Bash ile yazma görülmez; asıl kapı CI'daki
 `harness check`'tir. Hook zaman aşımında Claude Code varsayılan olarak çağrıyı

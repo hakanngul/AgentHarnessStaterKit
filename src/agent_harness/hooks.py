@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from agent_harness.filesystem import (
+    MAX_FILE_BYTES,
     HarnessError,
     atomic_write,
     managed_path,
@@ -42,6 +43,12 @@ def _deny(reason: str) -> dict[str, Any]:
 def _project(directory: str) -> tuple[Path, tuple[Path, ...], Any]:
     """Real project root, its other spelling (if symlinked) and the config, or raise."""
     raw = Path(os.path.abspath(os.path.expanduser(directory)))
+    # Without CLAUDE_PROJECT_DIR the event cwd may be a subdirectory: use the nearest
+    # ancestor that has a harness config.
+    for candidate in (raw, *raw.parents):
+        if (candidate / CONFIG_PATH).is_file():
+            raw = candidate
+            break
     root = project_root(Path(os.path.realpath(raw)))
     aliases = (raw,) if raw != root else ()
     if not managed_path(root, CONFIG_PATH).exists():
@@ -52,11 +59,13 @@ def _project(directory: str) -> tuple[Path, tuple[Path, ...], Any]:
 def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | None, str]:
     """Return (stdout JSON or None to allow, stderr note)."""
     tool_input = payload.get("tool_input")
-    if not isinstance(tool_input, dict):
-        return None, ""
-    target = tool_input.get("file_path") or tool_input.get("notebook_path")
+    target = (
+        tool_input.get("file_path") or tool_input.get("notebook_path")
+        if isinstance(tool_input, dict)
+        else None
+    )
     if not isinstance(target, str) or not target:
-        return None, ""
+        return None, "harness hook: no file path in tool input; not enforcing"
     project = environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
     if not isinstance(project, str) or not project:
         return None, "harness hook: no project directory; not enforcing"
@@ -64,8 +73,10 @@ def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | N
         root, aliases, config = _project(project)
     except (HarnessError, OSError) as exc:
         return None, f"harness hook: {exc}; not enforcing"
-    if config is None or not config.roles:
-        return None, ""
+    if config is None:
+        return None, f"harness hook: no {CONFIG_PATH}; not enforcing"
+    if not config.roles:
+        return None, f"harness hook: no roles in {CONFIG_PATH}; not enforcing"
 
     # The runtime's agent name is more specific than a session-wide HARNESS_ROLE,
     # so a configured agent_type (a subagent or `claude --agent`) wins.
@@ -80,6 +91,8 @@ def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | N
 
     cwd = payload.get("cwd")
     base = Path(cwd) if isinstance(cwd, str) and cwd else root
+    if ".." in base.parts:
+        return _deny("[harness] The event cwd contains '..'; refusing to resolve the target."), ""
     decision = decide(config, role, root, target, base, aliases)
     if decision.allowed:
         return None, ""
@@ -125,11 +138,18 @@ def run_pre_tool_use(stdin: TextIO, stdout: TextIO, stderr: TextIO, environ=None
         stdout.write(json.dumps(output, ensure_ascii=False) + "\n")
 
 
-def _is_ours(hook: Any) -> bool:
-    return (
+def _is_ours(entry: dict[str, Any]) -> bool:
+    """An existing entry counts only with our matcher and a harness hook command."""
+    hooks = entry.get("hooks")
+    if entry.get("matcher") != MATCHER or not isinstance(hooks, list):
+        return False
+    return any(
         isinstance(hook, dict)
+        and hook.get("type") == "command"
         and isinstance(hook.get("command"), str)
-        and hook["command"].rstrip().endswith(HOOK_SUFFIX)
+        and hook["command"].split()[-2:] == HOOK_SUFFIX.split()
+        and "harness" in hook["command"]
+        for hook in hooks
     )
 
 
@@ -153,8 +173,12 @@ def install(path: Path, *, command: str = "harness", dry_run: bool = False) -> d
     entries = hooks.setdefault("PreToolUse", [])
     if not isinstance(entries, list):
         raise HarnessError(f"{SETTINGS_PATH}: 'hooks.PreToolUse' must be a list")
-    for entry in entries:
-        if isinstance(entry, dict) and any(_is_ours(h) for h in entry.get("hooks") or []):
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict) or not isinstance(entry.get("hooks", []), list):
+            raise HarnessError(
+                f"{SETTINGS_PATH}: hooks.PreToolUse[{index}] must be an object with a 'hooks' list"
+            )
+        if _is_ours(entry):
             return {"changed": False, "path": SETTINGS_PATH, "settings": settings}
     entries.append(
         {
@@ -167,5 +191,8 @@ def install(path: Path, *, command: str = "harness", dry_run: bool = False) -> d
     if not dry_run:
         if not target.parent.exists():
             target.parent.mkdir()
-        atomic_write(target, json.dumps(settings, indent=2, ensure_ascii=False) + "\n")
+        text = json.dumps(settings, indent=2, ensure_ascii=False) + "\n"
+        if len(text.encode()) > MAX_FILE_BYTES:
+            raise HarnessError(f"{SETTINGS_PATH} would exceed {MAX_FILE_BYTES} bytes")
+        atomic_write(target, text)
     return {"changed": True, "dry_run": dry_run, "path": SETTINGS_PATH, "settings": settings}

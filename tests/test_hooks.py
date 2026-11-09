@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -9,7 +10,7 @@ import yaml
 from typer.testing import CliRunner
 
 from agent_harness.cli import app
-from agent_harness.hooks import run_pre_tool_use
+from agent_harness.hooks import MATCHER, run_pre_tool_use
 
 runner = CliRunner()
 ROLES = {
@@ -123,14 +124,14 @@ def test_claude_project_dir_wins_over_cwd(tmp_path):
 @pytest.mark.parametrize(
     ("setup", "payload", "note"),
     [
-        ("no-roles", None, None),
-        ("no-config", None, None),
+        ("no-roles", None, "no roles in .harness/config.yaml"),
+        ("no-config", None, "no .harness/config.yaml"),
         ("bad-config", None, "Invalid configuration"),
         ("ok", "not json", "unreadable input (JSONDecodeError)"),
         ("ok", '{"a":' * 100_000, "unreadable input (RecursionError)"),
         ("ok", "[1, 2]", "not a JSON object"),
-        ("ok", {"tool_name": "Write"}, None),
-        ("ok", {"tool_input": {"content": "x"}}, None),
+        ("ok", {"tool_name": "Write"}, "no file path"),
+        ("ok", {"tool_input": {"content": "x"}}, "no file path"),
     ],
 )
 def test_non_enforcing_cases_do_not_block(tmp_path, setup, payload, note):
@@ -311,3 +312,53 @@ def test_install_rejects_bad_command_and_symlinked_settings(tmp_path):
     (tmp_path / ".claude").symlink_to(tmp_path / "real")
     code, out = install(tmp_path)
     assert code == 1 and "Symlinked" in out["errors"][0]
+
+
+def test_subdirectory_cwd_finds_project_without_env(tmp_path):
+    root = project(tmp_path)
+    (root / "src/pkg").mkdir(parents=True)
+    payload = event(root, str(root / "docs/x.md"))
+    payload["cwd"] = str(root / "src/pkg")
+    assert "may not write docs/x.md" in denied(hook(payload, {"HARNESS_ROLE": "developer"}))
+
+
+def test_dotdot_in_event_cwd_is_denied(tmp_path):
+    root = project(tmp_path)
+    payload = event(root, "a.py")
+    payload["cwd"] = f"{root}/src/../.claude"
+    env = {"HARNESS_ROLE": "developer", "CLAUDE_PROJECT_DIR": str(root)}
+    assert "cwd contains '..'" in denied(hook(payload, env))
+
+
+def test_install_ignores_lookalike_entries_and_adds_ours(tmp_path):
+    lookalikes = [
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "harness hook pre-tool-use"}]},
+        {"matcher": MATCHER, "hooks": [{"type": "command", "command": "other hook pre-tool-use"}]},
+    ]
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude/settings.json").write_text(
+        json.dumps({"hooks": {"PreToolUse": lookalikes}})
+    )
+    code, out = install(tmp_path)
+    assert code == 0 and out["changed"] is True
+    entries = json.loads((tmp_path / ".claude/settings.json").read_text())["hooks"]["PreToolUse"]
+    assert entries[:2] == lookalikes and len(entries) == 3
+
+
+@pytest.mark.parametrize("entry", ["text", {"hooks": 5}, {"hooks": "x"}])
+def test_install_refuses_malformed_entries(tmp_path, entry):
+    (tmp_path / ".claude").mkdir()
+    target = tmp_path / ".claude/settings.json"
+    target.write_text(json.dumps({"hooks": {"PreToolUse": [entry]}}))
+    before = target.read_text()
+    code, out = install(tmp_path)
+    assert code == 1 and "must be an object with a 'hooks' list" in out["errors"][0]
+    assert target.read_text() == before
+
+
+def test_new_settings_file_uses_umask_mode(tmp_path):
+    install(tmp_path)
+    mode = (tmp_path / ".claude/settings.json").stat().st_mode & 0o777
+    umask = os.umask(0)
+    os.umask(umask)
+    assert mode == 0o666 & ~umask

@@ -130,7 +130,10 @@ def test_large_output_is_truncated_and_still_hashed(tmp_path):
         (["T-1", "--id", "X1", "--", PY, "-c", "pass"], "Invalid evidence id"),
         (["T-1", "--cwd", "../out", "--", PY, "-c", "pass"], "Unsafe managed path"),
         (["T-1", "--cwd", "nope", "--", PY, "-c", "pass"], "Working directory not found"),
-        (["T-1", "--timeout", "0", "--", PY, "-c", "pass"], "Timeout must be positive"),
+        (["T-1", "--timeout", "0", "--", PY, "-c", "pass"], "positive finite"),
+        (["T-1", "--timeout", "nan", "--", PY, "-c", "pass"], "positive finite"),
+        (["T-1", "--timeout", "inf", "--", PY, "-c", "pass"], "positive finite"),
+        (["T-1", "--", PY, "-c", "x" * 2100], "longer than 2000"),
     ],
 )
 def test_errors_write_nothing(tmp_path, args, expected):
@@ -263,3 +266,64 @@ def test_harness_evidence_requires_output_and_hash(tmp_path, evidence):
     code, report = check(tmp_path)
     assert code == 1
     assert any("needs kind command, output and hash" in e for e in report["errors"])
+
+
+def test_commit_is_read_before_the_command_runs(tmp_path, monkeypatch):
+    make_task(tmp_path)
+    calls = []
+    monkeypatch.setattr(
+        "agent_harness.evidence._commit", lambda root: calls.append("commit") or None
+    )
+    original = __import__("subprocess").run
+
+    def tracking(*args, **kwargs):
+        calls.append("run")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr("agent_harness.evidence.subprocess.run", tracking)
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", "pass")
+    assert calls == ["commit", "run"]
+    assert out["warnings"] == ["No git commit recorded (not a Git checkout?)"]
+
+
+@pytest.mark.parametrize(
+    ("printed", "secret"),
+    [
+        ("GITHUB_TOKEN=ghp_" + "a" * 36, "ghp_" + "a" * 36),
+        ("password: hunter2-secret", "hunter2-secret"),
+        ("Authorization: Bearer abc.def.ghi", "abc.def.ghi"),
+        ("key sk-" + "b" * 40, "sk-" + "b" * 40),
+        ("aws AKIA" + "C" * 16, "AKIA" + "C" * 16),
+    ],
+)
+def test_common_secrets_are_redacted(tmp_path, printed, secret):
+    make_task(tmp_path)
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", f"print({printed!r})", printed)
+    text = (tmp_path / out["evidence"]["output"]).read_text()
+    assert secret not in text and "[REDACTED]" in text
+    assert secret not in out["evidence"]["command"]
+    assert secret not in (tmp_path / TASKS_DIR / "T-1.yaml").read_text()
+    assert check(tmp_path)[0] == 0
+
+
+def test_output_is_streamed_not_buffered(tmp_path, monkeypatch):
+    make_task(tmp_path)
+    seen = {}
+    original = __import__("subprocess").run
+
+    def tracking(*args, **kwargs):
+        seen["stdout"] = kwargs.get("stdout")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr("agent_harness.evidence.subprocess.run", tracking)
+    run(tmp_path, "T-1", "--", PY, "-c", "print('x')")
+    assert hasattr(seen["stdout"], "write")  # a file, not subprocess.PIPE
+
+
+def test_task_file_size_limit(tmp_path, monkeypatch):
+    task = make_task(tmp_path)
+    monkeypatch.setattr("agent_harness.evidence.MAX_FILE_BYTES", 150)
+    before = task.read_text()
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", "pass")
+    assert code == 1 and "would exceed 150 bytes" in out["errors"][0]
+    assert task.read_text() == before

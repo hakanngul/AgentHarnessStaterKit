@@ -98,6 +98,10 @@ def atomic_write(path: Path, text: str) -> None:
             stream.write(text)
         if path.exists():
             os.chmod(temporary, path.stat().st_mode & 0o7777)
+        else:  # mkstemp creates 0600; use the usual umask-based mode instead
+            umask = os.umask(0)
+            os.umask(umask)
+            os.chmod(temporary, 0o666 & ~umask)
         os.replace(temporary, path)
     except BaseException:
         Path(temporary).unlink(missing_ok=True)
