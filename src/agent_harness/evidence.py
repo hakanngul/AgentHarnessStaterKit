@@ -10,7 +10,9 @@ import math
 import os
 import re
 import shlex
+import signal
 import subprocess
+import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
@@ -41,9 +43,11 @@ DEFAULT_TIMEOUT = 3600.0
 REDACTED = "[REDACTED]"
 # Heuristic only: well-known token formats and KEY=value / "Authorization:" pairs.
 SECRET_PATTERNS = [
+    # Lookahead finds the keyword, the possessive `*+` takes the whole key name without
+    # backtracking, so long runs of keyword-like text stay linear.
     re.compile(
-        rb"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|ACCESS_?KEY|"
-        rb"PRIVATE_?KEY|CREDENTIALS?)[A-Z0-9_]*)(\s*[=:]\s*)(\S+)"
+        rb"(?i)\b(?=[A-Z0-9_]*?(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|ACCESS_?KEY|"
+        rb"PRIVATE_?KEY|CREDENTIALS?))([A-Z0-9_]*+)(\s*[=:]\s*)(\S+)"
     ),
     re.compile(rb"(?i)(authorization:\s*(?:bearer|basic|token)\s+)(\S+)"),
     re.compile(
@@ -95,14 +99,45 @@ def _bounded(output: bytes) -> bytes:
     return header + output[-keep:]
 
 
-def _tail(path: Path) -> bytes:
-    """Read at most the last MAX_FILE_BYTES (+ slack for redaction) of a file."""
+def _run(argv: list[str], workdir: Path, sink, timeout: float | None) -> tuple[int, bool]:
+    """Run argv with output to sink; on timeout kill its whole process group (POSIX)."""
+    posix = os.name == "posix"
+    try:
+        process = subprocess.Popen(
+            argv,
+            cwd=workdir,
+            stdin=subprocess.DEVNULL,
+            stdout=sink,
+            stderr=subprocess.STDOUT,
+            start_new_session=posix,
+        )
+    except OSError as exc:
+        raise HarnessError(f"Could not start command {argv[0]!r}: {exc}") from exc
+    try:
+        return process.wait(timeout=timeout), False
+    except subprocess.TimeoutExpired:
+        if posix:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        process.kill()
+        process.wait()
+        return TIMEOUT_EXIT_CODE, True
+    except BaseException:
+        process.kill()
+        process.wait()
+        raise
+
+
+def _tail(stream) -> bytes:
+    """Read at most the last MAX_FILE_BYTES (+ slack for redaction) of an open file."""
     limit = MAX_FILE_BYTES * 2
-    with path.open("rb") as stream:
-        stream.seek(0, os.SEEK_END)
-        size = stream.tell()
-        stream.seek(max(0, size - limit))
-        data = stream.read()
+    stream.flush()
+    stream.seek(0, os.SEEK_END)
+    size = stream.tell()
+    stream.seek(max(0, size - limit))
+    data = stream.read()
     if size > limit:
         data = b"[harness: earlier output dropped]\n" + data
     return data
@@ -207,23 +242,12 @@ def run_evidence(
         evidence_id, reserved = _reserve(root, task_id, task, evidence_id)
         output_rel = f"{EVIDENCE_DIR}/{task_id}/{evidence_id}.txt"
         commit = _commit(root)  # the revision the command starts from
-        try:
-            # Stream to the reserved file: a noisy command must not fill memory.
-            with reserved.open("wb") as sink:
-                completed = subprocess.run(
-                    argv,
-                    cwd=workdir,
-                    stdout=sink,
-                    stderr=subprocess.STDOUT,
-                    timeout=timeout,
-                    check=False,
-                )
-            exit_code, timed_out = completed.returncode, False
-        except subprocess.TimeoutExpired:
-            exit_code, timed_out = TIMEOUT_EXIT_CODE, True
-        except OSError as exc:
-            raise HarnessError(f"Could not start command {argv[0]!r}: {exc}") from exc
-        raw = _tail(reserved)
+        # Stream into a private, already-unlinked temporary file: a noisy command does not
+        # fill memory, and processes the command leaves behind can only write to that
+        # file, never to the recorded evidence.
+        with tempfile.TemporaryFile() as sink:
+            exit_code, timed_out = _run(argv, workdir, sink, timeout)
+            raw = _tail(sink)
         stored = _bounded(redact(raw))
         reserved.write_bytes(stored)
         default_summary = f"timed out after {timeout:g}s" if timed_out else _summary(stored)

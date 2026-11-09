@@ -372,3 +372,12 @@ def test_existing_settings_mode_is_preserved(tmp_path):
     install(tmp_path)
     assert target.stat().st_mode & 0o777 == 0o640
     assert not list((tmp_path / ".claude").glob("*.tmp"))
+
+
+def test_env_project_dir_is_not_searched_upward(tmp_path):
+    project(tmp_path)  # a config in the parent directory
+    child = tmp_path / "child"
+    child.mkdir()
+    payload = event(child, str(child / "docs/x.md"))
+    env = {"HARNESS_ROLE": "developer", "CLAUDE_PROJECT_DIR": str(child)}
+    assert "no .harness/config.yaml" in allowed(hook(payload, env))

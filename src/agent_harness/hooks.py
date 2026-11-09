@@ -40,15 +40,18 @@ def _deny(reason: str) -> dict[str, Any]:
     }
 
 
-def _project(directory: str) -> tuple[Path, tuple[Path, ...], Any]:
-    """Real project root, its other spelling (if symlinked) and the config, or raise."""
+def _project(directory: str, search_up: bool = False) -> tuple[Path, tuple[Path, ...], Any]:
+    """Real project root, its other spelling (if symlinked) and the config, or raise.
+
+    `search_up` is only for the event-cwd fallback: CLAUDE_PROJECT_DIR is used exactly,
+    so a config in some ancestor directory never governs the project.
+    """
     raw = Path(os.path.abspath(os.path.expanduser(directory)))
-    # Without CLAUDE_PROJECT_DIR the event cwd may be a subdirectory: use the nearest
-    # ancestor that has a harness config.
-    for candidate in (raw, *raw.parents):
-        if (candidate / CONFIG_PATH).is_file():
-            raw = candidate
-            break
+    if search_up:
+        for candidate in (raw, *raw.parents):
+            if (candidate / CONFIG_PATH).is_file():
+                raw = candidate
+                break
     root = project_root(Path(os.path.realpath(raw)))
     aliases = (raw,) if raw != root else ()
     if not managed_path(root, CONFIG_PATH).exists():
@@ -66,11 +69,12 @@ def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | N
     )
     if not isinstance(target, str) or not target:
         return None, "harness hook: no file path in tool input; not enforcing"
-    project = environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+    env_project = environ.get("CLAUDE_PROJECT_DIR")
+    project = env_project or payload.get("cwd")
     if not isinstance(project, str) or not project:
         return None, "harness hook: no project directory; not enforcing"
     try:
-        root, aliases, config = _project(project)
+        root, aliases, config = _project(project, search_up=not env_project)
     except (HarnessError, OSError) as exc:
         return None, f"harness hook: {exc}; not enforcing"
     if config is None:

@@ -1,6 +1,8 @@
 import json
 import shlex
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -274,13 +276,13 @@ def test_commit_is_read_before_the_command_runs(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "agent_harness.evidence._commit", lambda root: calls.append("commit") or None
     )
-    original = __import__("subprocess").run
+    original = subprocess.Popen
 
     def tracking(*args, **kwargs):
         calls.append("run")
         return original(*args, **kwargs)
 
-    monkeypatch.setattr("agent_harness.evidence.subprocess.run", tracking)
+    monkeypatch.setattr("agent_harness.evidence.subprocess.Popen", tracking)
     code, out = run(tmp_path, "T-1", "--", PY, "-c", "pass")
     assert calls == ["commit", "run"]
     assert out["warnings"] == ["No git commit recorded (not a Git checkout?)"]
@@ -306,18 +308,63 @@ def test_common_secrets_are_redacted(tmp_path, printed, secret):
     assert check(tmp_path)[0] == 0
 
 
-def test_output_is_streamed_not_buffered(tmp_path, monkeypatch):
+def test_output_is_streamed_to_a_private_file(tmp_path, monkeypatch):
     make_task(tmp_path)
     seen = {}
-    original = __import__("subprocess").run
+    original = subprocess.Popen
 
     def tracking(*args, **kwargs):
         seen["stdout"] = kwargs.get("stdout")
         return original(*args, **kwargs)
 
-    monkeypatch.setattr("agent_harness.evidence.subprocess.run", tracking)
-    run(tmp_path, "T-1", "--", PY, "-c", "print('x')")
+    monkeypatch.setattr("agent_harness.evidence.subprocess.Popen", tracking)
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", "print('x')")
     assert hasattr(seen["stdout"], "write")  # a file, not subprocess.PIPE
+    assert seen["stdout"].name != str(tmp_path / out["evidence"]["output"])
+
+
+LATE_WRITER = (
+    "import subprocess, sys;"
+    "subprocess.Popen([sys.executable, '-c',"
+    " 'import time; time.sleep(1.5); print(\"LATE password=supersecret\", flush=True)']);"
+    "print('done', flush=True)"
+)
+
+
+def test_leftover_child_cannot_change_recorded_output(tmp_path):
+    make_task(tmp_path)
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", LATE_WRITER)
+    assert code == 0, out
+    time.sleep(2.5)
+    output = (tmp_path / out["evidence"]["output"]).read_text()
+    assert "LATE" not in output and "supersecret" not in output
+    assert check(tmp_path)[0] == 0
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="process groups are POSIX")
+def test_timeout_kills_the_whole_process_group(tmp_path):
+    make_task(tmp_path)
+    marker = tmp_path / "survivor"
+    child = f"import time, pathlib; time.sleep(2); pathlib.Path({str(marker)!r}).touch()"
+    script = (
+        "import subprocess, sys, time;"
+        f"subprocess.Popen([sys.executable, '-c', {child!r}]);"
+        "time.sleep(30)"
+    )
+    code, out = run(tmp_path, "T-1", "--timeout", "0.5", "--", PY, "-c", script)
+    assert out["evidence"]["exit_code"] == 124
+    time.sleep(3)
+    assert not marker.exists()
+
+
+def test_redaction_is_linear_on_keyword_runs():
+    from agent_harness.evidence import redact
+
+    data = b"token" * 400_000  # 2 MB, keyword repeated, no '='
+    started = time.monotonic()
+    assert redact(data) == data
+    assert time.monotonic() - started < 5
+    assert redact(b"MY_API_KEY = abc123") == b"MY_API_KEY = [REDACTED]"
 
 
 def test_task_file_size_limit(tmp_path, monkeypatch):
