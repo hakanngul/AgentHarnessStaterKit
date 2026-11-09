@@ -5,13 +5,14 @@
 - 0.1.0: CLI init/analyze/validate/doctor, templates, manifest, 86 tests.
 - Faz 1 (unreleased): task/decision ledger models, JSON schemas, `harness check`,
   templates and docs, CI step, this repository's own ledger (T-1). 187 tests.
+- Faz 2 (unreleased, in review): `harness evidence run`, roles + `harness scope`,
+  PreToolUse hook + `harness hook install`.
 
 ## Current work
 
-T-1 DONE: review approved after four fix rounds. PR awaits CI and the user's merge.
-PR: hakanngul/AgentHarnessStaterKit#1.
+Faz 2 (PR #2): T-2 evidence run, T-3 role scopes, T-4 hook. 283 tests. T-2 and T-3
+IN_REVIEW, T-4 BLOCKED on T-3; independent review running.
 
 ## Next step
 
-Faz 2 (docs/plans/team-system.md): role and write-scope config, tested hooks, and a
-command that records evidence by running a check, so evidence stops being self-reported.
+Apply review results, mark T-2..T-4 DONE, then Faz 3 (stack packs).

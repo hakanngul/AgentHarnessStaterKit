@@ -1,23 +1,25 @@
 # Current task
 
-Status: Faz 1 implemented; see `.harness/tasks/T-1.yaml` for structured status.
+Status: Faz 2 implemented (T-2, T-3, T-4); independent review in progress.
+Structured status lives in `.harness/tasks/T-2.yaml` .. `T-4.yaml`.
 
 ## Goal and scope
 
-Faz 1 of docs/plans/team-system.md: structured task, evidence and decision ledger
-plus `harness check`. Out of scope: roles/hooks (Faz 2), stack packs (Faz 3),
-upgrade (Faz 4), version bump.
+Faz 2 of docs/plans/team-system.md: `harness evidence run`, role write scopes in
+config with `harness scope`, and a Claude Code PreToolUse hook with `harness hook
+install`. Out of scope: stack packs (Faz 3), upgrade (Faz 4), version bump.
 
 ## Acceptance criteria
 
-AC1–AC7 in docs/plans/team-system.md, mirrored in `.harness/tasks/T-1.yaml`.
+Faz 2 AC1–AC6 in docs/plans/team-system.md, mirrored in the T-2..T-4 task files.
 
 ## Required checks
 
-From repository root: uv run --frozen pytest; uv run --frozen ruff check .;
-uv run --frozen ruff format --check .; uv run --frozen python -m build --no-isolation;
-uv run --frozen harness check .; installed wheel smoke outside the checkout.
+Run through `harness evidence run <task> -- <command>`: uv run --frozen pytest -q;
+ruff check .; ruff format --check .; python -m build --no-isolation; harness
+validate . --json. Then `harness check .`.
 
 ## Product decisions and blockers
 
-Version stays 0.1.0 until upgrade exists (config pins harness_version). No blockers.
+No hook is installed in this repository: the session must not edit its own Claude
+settings. T-4 stays BLOCKED until T-3 is DONE.
