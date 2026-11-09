@@ -15,6 +15,8 @@ from agent_harness.doctor import doctor as diagnose
 from agent_harness.evidence import run_evidence
 from agent_harness.filesystem import HarnessError, project_root
 from agent_harness.generate import initialize
+from agent_harness.hooks import install as install_hook
+from agent_harness.hooks import run_pre_tool_use
 from agent_harness.models import Report
 from agent_harness.roles import decide, load_config
 from agent_harness.validate import validate as check_project
@@ -173,6 +175,36 @@ def scope(
     )
     if not allowed:
         raise typer.Exit(1)
+
+
+hook_app = typer.Typer(no_args_is_help=True, help="Claude Code hook integration.")
+app.add_typer(hook_app, name="hook")
+
+
+@hook_app.command("pre-tool-use")
+def hook_pre_tool_use() -> None:
+    """Read a Claude Code PreToolUse event on stdin; deny writes outside the role scope."""
+    import sys
+
+    raise typer.Exit(run_pre_tool_use(sys.stdin, sys.stdout, sys.stderr))
+
+
+@hook_app.command("install")
+def hook_install(
+    path: ProjectPath = Path("."),
+    command: Annotated[
+        str, typer.Option(help="How Claude Code should invoke harness, e.g. 'uv run harness'.")
+    ] = "harness",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the result without writing.")
+    ] = False,
+    output_json: JsonFlag = False,
+) -> None:
+    """Register the PreToolUse hook in .claude/settings.json, keeping existing settings."""
+    try:
+        emit({"ok": True, **install_hook(path, command=command, dry_run=dry_run)}, output_json)
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
 
 
 @app.command()

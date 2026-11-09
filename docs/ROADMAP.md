@@ -12,9 +12,13 @@
 - Şemalı görev, kanıt ve karar defteri; `harness check` tutarlılık denetimi.
   Ayrıntı: [plans/team-system.md](plans/team-system.md).
 
+## Yayımlanmamış — uygulanan (Faz 2)
+
+- `harness evidence run`, config'te roller ve `harness scope`, PreToolUse hook'u ve
+  `harness hook install`.
+
 ## Sonraki aşamalar — uygulanmadı
 
-- Rol ve yazma kapsamı config'i, testli hook'lar (Faz 2).
 - Stack pack: teknolojiye göre komut, kural ve klasör düzeni (Faz 3).
 - upgrade --dry-run / sync: kullanıcı değişikliklerini koruyan üç yönlü karşılaştırma.
 - Gerçek proje ihtiyaçlarına göre uzman rolü/skill seçimi ve üretimi.

@@ -11,6 +11,9 @@ flowchart TD
   Generate --> Memory[TASK, PROGRESS, EVIDENCE, HANDOFF]
   CLI --> Validate[validate.py: şema, dosyalar, değişiklikler]
   CLI --> Check[check.py: görev ve karar defteri]
+  CLI --> Evidence[evidence.py: komutu çalıştırıp kanıt kaydı]
+  CLI --> RoleScope[roles.py: rol yazma kapsamı]
+  RoleScope --> Hooks[hooks.py: PreToolUse hook ve kurulum]
   CLI --> Doctor[doctor.py: yerel gereksinimler]
   Doctor --> Validate
   Roles --> Runtime[Claude Code: geliştirme ve inceleme]
@@ -37,5 +40,6 @@ hash'leri değişiklik tespiti içindir; imza veya güvenlik onayı değildir. K
 
 Şu an sürüm 0.1.0 ve config şeması 1 desteklenir. Tanınmayan sürüm kabul edilmez;
 sürüm yükseltme migration'ları ayrı bir geliştirmedir. Metadata veri olarak tutulur;
-CLI hiçbir proje komutunu yürütmez. Claude bu veriyi okuyacağı için dış içerik yine
+CLI proje metadata'sındaki komutları yürütmez; yalnız `harness evidence run`
+kullanıcının ya da ajanın açıkça verdiği argv'yi shell olmadan çalıştırır. Claude bu veriyi okuyacağı için dış içerik yine
 ajan tarafından güvenilmeyen veri olarak ele alınmalıdır.

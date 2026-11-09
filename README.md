@@ -133,6 +133,25 @@ harness scope developer src/app.py .claude/agents/lead.md --json
 Roller tanımlıysa `check`, görev sahibinin (`owner`) tanımlı bir rol olmasını ister.
 `roles` olmayan eski config'ler geçerlidir; bu durumda sahip denetlenmez.
 
+### Claude Code hook'u (opsiyonel)
+
+```bash
+harness hook install . --dry-run                     # sonucu göster
+harness hook install . --command "uv run harness"    # .claude/settings.json'a ekle
+```
+
+`install`, mevcut `.claude/settings.json` içeriğini korur, ikinci kez çalıştırınca
+çoğaltmaz, geçersiz JSON'da hiçbir şey yazmaz (JSON biçimlendirmesi yeniden yazılır).
+Hook, Write/Edit/MultiEdit/NotebookEdit çağrılarında rolün kapsamı dışındaki yazmayı
+Claude Code'a `permissionDecision: deny` ile bildirir. Rol `HARNESS_ROLE` ortam
+değişkeninden, yoksa hook girdisindeki `agent_type` tanımlı bir rolse ondan alınır.
+Rol bilinmiyorsa, config'te rol yoksa ya da girdi okunamıyorsa engellemez ve
+nedenini stderr'e yazar.
+
+Bu bir guardrail'dir, sandbox değil: Bash ile yazma görülmez; asıl kapı CI'daki
+`harness check`'tir. Hook zaman aşımında Claude Code varsayılan olarak çağrıyı
+engellemez.
+
 ## Geliştirme döngüsü
 
 Hedef ve kabul kriterleri → plan → kod → bağımsız inceleme → gerçek testler →
