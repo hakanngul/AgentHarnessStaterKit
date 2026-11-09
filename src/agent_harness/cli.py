@@ -13,9 +13,10 @@ from agent_harness.analyze import analyze as inspect_project
 from agent_harness.check import check as check_ledger
 from agent_harness.doctor import doctor as diagnose
 from agent_harness.evidence import run_evidence
-from agent_harness.filesystem import HarnessError
+from agent_harness.filesystem import HarnessError, project_root
 from agent_harness.generate import initialize
 from agent_harness.models import Report
+from agent_harness.roles import decide, load_config
 from agent_harness.validate import validate as check_project
 
 app = typer.Typer(
@@ -140,6 +141,37 @@ def evidence_run(
         output_json,
     )
     if not item.passed:
+        raise typer.Exit(1)
+
+
+@app.command()
+def scope(
+    role: Annotated[str, typer.Argument(help="Role name from .harness/config.yaml.")],
+    targets: Annotated[list[str], typer.Argument(help="Paths to check.")],
+    path: Annotated[Path, typer.Option("--path", help="Project directory.")] = Path("."),
+    output_json: JsonFlag = False,
+) -> None:
+    """Report whether a role may write each path; exits 1 if any is denied."""
+    try:
+        root = project_root(path)
+        config = load_config(root)
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    if not config.roles:
+        fail(HarnessError("No roles are defined in .harness/config.yaml"), output_json)
+    decisions = [decide(config, role, root, target) for target in targets]
+    allowed = all(item.allowed for item in decisions)
+    emit(
+        {
+            "ok": allowed,
+            "role": role,
+            "decisions": [
+                {"path": d.path, "allowed": d.allowed, "reason": d.reason} for d in decisions
+            ],
+        },
+        output_json,
+    )
+    if not allowed:
         raise typer.Exit(1)
 
 

@@ -22,6 +22,7 @@ from agent_harness.models import Decision, LedgerReport, Task
 
 TASKS_DIR = ".harness/tasks"
 DECISIONS_DIR = ".harness/decisions"
+CONFIG_PATH = ".harness/config.yaml"
 MAX_LEDGER_FILES = 5000
 MAX_LEDGER_BYTES = 32 * 1_048_576  # aggregate cap per ledger directory
 ACTIVE = {"READY", "IN_PROGRESS", "IN_REVIEW", "DONE"}
@@ -219,6 +220,19 @@ def _cycles(tasks: dict[str, Task]) -> list[str]:
     return found
 
 
+def _configured_roles(root: Path, report: LedgerReport) -> set[str]:
+    """Role names from the config; empty when the project defines none."""
+    from agent_harness.roles import load_config
+
+    try:
+        if not managed_path(root, CONFIG_PATH).exists():
+            return set()
+        return set(load_config(root).roles)
+    except (HarnessError, OSError) as exc:
+        report.errors.append(f"{CONFIG_PATH}: {exc}")
+        return set()
+
+
 def check(path: Path) -> LedgerReport:
     report = LedgerReport()
     try:
@@ -229,8 +243,15 @@ def check(path: Path) -> LedgerReport:
         report.errors.append(str(exc))
         return report
 
+    roles = _configured_roles(root, report)
     for task_id in sorted(tasks):
         _check_task(tasks[task_id], tasks, decisions, root, report.errors)
+        owner = tasks[task_id].owner.strip()
+        if roles and owner not in roles:
+            report.errors.append(
+                f"{TASKS_DIR}/{task_id}.yaml: owner {owner!r} is not a role in "
+                f"{CONFIG_PATH} ({', '.join(sorted(roles))})"
+            )
     for cycle in _cycles(tasks):
         report.errors.append(f"dependency cycle: {cycle}")
 

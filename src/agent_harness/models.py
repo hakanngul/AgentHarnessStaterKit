@@ -17,6 +17,37 @@ from agent_harness import __version__
 SchemaVersion = Annotated[int, Field(strict=True, ge=1, le=1)]
 
 
+RoleName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9-]{0,39}$")]
+Glob = Annotated[str, Field(min_length=1, max_length=300)]
+
+
+class RoleConfig(BaseModel):
+    """Write scope for one role. Globs are project-relative; deny wins over write."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    description: Annotated[str, Field(max_length=500)] = ""
+    write: list[Glob] = Field(default_factory=list, max_length=200)
+    deny: list[Glob] = Field(default_factory=list, max_length=200)
+
+    @field_validator("write", "deny")
+    @classmethod
+    def check_globs(cls, values: list[str]) -> list[str]:
+        for value in values:
+            parts = value.split("/")
+            if (
+                value.startswith("/")
+                or "\\" in value
+                or ":" in value
+                or ".." in parts
+                or any(part == "" for part in parts[:-1])
+                or "[" in value
+                or any("**" in part and part != "**" for part in parts)
+            ):
+                raise ValueError(f"unsupported or unsafe glob: {value!r}")
+        return values
+
+
 class HarnessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -26,6 +57,7 @@ class HarnessConfig(BaseModel):
     description: Annotated[str, Field(max_length=4000)] = ""
     adapter: Literal["claude-code"] = "claude-code"
     technologies: list[str] = Field(default_factory=list)
+    roles: dict[RoleName, RoleConfig] = Field(default_factory=dict)
 
     @field_validator("project_name")
     @classmethod

@@ -107,6 +107,32 @@ Komut çalıştırmaz: kanıtların tutarlılığını denetler, doğruluğunu k
 Reviewer adı (`review.by`) beyandır; kimlik doğrulaması yapılmaz.
 CI'da çalıştırılması önerilir. Plan: [docs/plans/team-system.md](docs/plans/team-system.md).
 
+## Roller ve yazma kapsamı
+
+`.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.
+`init` lead, developer ve reviewer için başlangıç değerleri yazar; projeye göre
+düzenleyin. Roller teknolojiye göre değil yetkiye göredir.
+
+```yaml
+roles:
+  developer:
+    write: ["**"]
+    deny: [".harness/config.yaml", ".claude/**", ".github/**"]
+  reviewer:
+    write: [".harness/tasks/**"]
+```
+
+Glob: `*` tek segment, `?` tek karakter, `**` sıfır veya daha fazla segment, sonda `/`
+dizinin tamamı. `deny` önce uygulanır; hiçbirine uymayan yol reddedilir. Proje dışı,
+`..` ile kaçan ve symlink içeren yollar her zaman reddedilir.
+
+```bash
+harness scope developer src/app.py .claude/agents/lead.md --json
+```
+
+Roller tanımlıysa `check`, görev sahibinin (`owner`) tanımlı bir rol olmasını ister.
+`roles` olmayan eski config'ler geçerlidir; bu durumda sahip denetlenmez.
+
 ## Geliştirme döngüsü
 
 Hedef ve kabul kriterleri → plan → kod → bağımsız inceleme → gerçek testler →

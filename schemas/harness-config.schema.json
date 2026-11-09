@@ -1,4 +1,40 @@
 {
+  "$defs": {
+    "RoleConfig": {
+      "additionalProperties": false,
+      "description": "Write scope for one role. Globs are project-relative; deny wins over write.",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Description",
+          "type": "string"
+        },
+        "write": {
+          "items": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Write",
+          "type": "array"
+        },
+        "deny": {
+          "items": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Deny",
+          "type": "array"
+        }
+      },
+      "title": "RoleConfig",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "schema_version": {
@@ -38,6 +74,15 @@
       },
       "title": "Technologies",
       "type": "array"
+    },
+    "roles": {
+      "patternProperties": {
+        "^[a-z][a-z0-9-]{0,39}$": {
+          "$ref": "#/$defs/RoleConfig"
+        }
+      },
+      "title": "Roles",
+      "type": "object"
     }
   },
   "required": [

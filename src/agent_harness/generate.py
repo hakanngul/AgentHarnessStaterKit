@@ -10,7 +10,7 @@ from jinja2 import Environment, StrictUndefined
 
 from agent_harness.analyze import analyze
 from agent_harness.filesystem import HarnessError, managed_path, project_root
-from agent_harness.models import HarnessConfig, Manifest
+from agent_harness.models import HarnessConfig, Manifest, RoleConfig
 
 TEMPLATES = {
     "AGENTS.md": "agents.md.j2",
@@ -31,6 +31,22 @@ TEMPLATES = {
 CONFIG_PATH = ".harness/config.yaml"
 MANIFEST_PATH = ".harness/manifest.json"
 EXPECTED_FILES = frozenset([CONFIG_PATH, *TEMPLATES])
+# Starting point only; projects edit these. Paths are project-relative globs.
+DEFAULT_ROLES = {
+    "lead": RoleConfig(
+        description="Plans tasks and records decisions; does not edit source.",
+        write=[".harness/tasks/**", ".harness/decisions/**", ".harness/state/**", "docs/**"],
+    ),
+    "developer": RoleConfig(
+        description="Implements tasks inside the project.",
+        write=["**"],
+        deny=[".harness/config.yaml", ".harness/manifest.json", ".claude/**", ".github/**"],
+    ),
+    "reviewer": RoleConfig(
+        description="Records review results; does not edit source.",
+        write=[".harness/tasks/**", ".harness/state/**"],
+    ),
+}
 
 
 def sha256(content: bytes) -> str:
@@ -66,6 +82,7 @@ def initialize(
         project_name=name if name is not None else root.name,
         description=description,
         technologies=technologies,
+        roles=DEFAULT_ROLES,
     )
     outputs = render(config)
     # Complete preflight before creating any directories or files.

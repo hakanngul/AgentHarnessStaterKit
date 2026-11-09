@@ -5,3 +5,27 @@ description: Projeye ajan rolleri, skills ve kalıcı görev hafızası kuran Py
 adapter: claude-code
 technologies:
 - Python
+roles:
+  lead:
+    description: Plans tasks and records decisions; does not edit source.
+    write:
+    - .harness/tasks/**
+    - .harness/decisions/**
+    - .harness/state/**
+    - docs/**
+    deny: []
+  developer:
+    description: Implements tasks inside the project.
+    write:
+    - '**'
+    deny:
+    - .harness/config.yaml
+    - .harness/manifest.json
+    - .claude/**
+    - .github/**
+  reviewer:
+    description: Records review results; does not edit source.
+    write:
+    - .harness/tasks/**
+    - .harness/state/**
+    deny: []
