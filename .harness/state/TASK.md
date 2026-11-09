@@ -1,27 +1,23 @@
 # Current task
 
-Status: implementation and local verification complete
+Status: Faz 1 implemented; see `.harness/tasks/T-1.yaml` for structured status.
 
 ## Goal and scope
 
-Implement the first Agent Harness Starter Kit Python CLI from the user's supplied
-conversation, populate the previously empty repository, and prepare GitHub delivery.
+Faz 1 of docs/plans/team-system.md: structured task, evidence and decision ledger
+plus `harness check`. Out of scope: roles/hooks (Faz 2), stack packs (Faz 3),
+upgrade (Faz 4), version bump.
 
 ## Acceptance criteria
 
-- [x] init, analyze, validate, doctor are real installed CLI commands.
-- [x] Packaged Claude roles, skill, rules and persistent task memory are generated.
-- [x] Existing files and local customizations are preserved; unsafe paths rejected.
-- [x] Config/manifest contracts, frozen dependencies, tests and documentation exist.
-- [x] Build a wheel and exercise its installed commands outside the source checkout.
+AC1–AC7 in docs/plans/team-system.md, mirrored in `.harness/tasks/T-1.yaml`.
 
 ## Required checks
 
-From repository root: uv sync --frozen --group dev; uv run --frozen pytest;
-uv run --frozen ruff check .; uv run --frozen ruff format --check .;
-uv run --frozen python -m build --no-isolation. See EVIDENCE.md for actual outcomes.
+From repository root: uv run --frozen pytest; uv run --frozen ruff check .;
+uv run --frozen ruff format --check .; uv run --frozen python -m build --no-isolation;
+uv run --frozen harness check .; installed wheel smoke outside the checkout.
 
 ## Product decisions and blockers
 
-Scope is 0.1.0's four commands. Upgrade/sync and intelligent role generation are
-future work. User requested repository delivery; no deployment or model runtime requested.
+Version stays 0.1.0 until upgrade exists (config pins harness_version). No blockers.

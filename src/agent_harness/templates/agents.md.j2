@@ -8,12 +8,14 @@ Resume from `PROGRESS.md` and `HANDOFF.md`; read detailed documents only as need
 Each cloud task is already isolated. Use this checkout; create a Git worktree only
 when the user explicitly requests one.
 
-1. Record the goal, scope, acceptance criteria, and required checks in TASK.md.
+1. Record the goal, scope, acceptance criteria, and required checks in a task file
+   under `.harness/tasks/`; keep TASK.md as a short summary of the current focus.
 2. Implement a small, reviewable change. Preserve unrelated user work.
-3. Run relevant real checks; record commands, outcomes, and limitations in EVIDENCE.md.
+3. Run relevant real checks; record them as task evidence (EVIDENCE.md for notes).
 4. Request independent review when supported and authorized. Record its outcome,
    or explicitly record that independent review was unavailable.
-5. Update PROGRESS.md and HANDOFF.md before ending a long task or changing sessions.
+5. Run `harness check` before marking work DONE. Update PROGRESS.md and HANDOFF.md
+   before ending a long task or changing sessions.
 
 Never claim skipped or unrun checks passed. Never store credentials in memory files.
 Ask for missing product decisions that block work; continue independent work.
