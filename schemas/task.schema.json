@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "AcceptanceCriterion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^AC[1-9][0-9]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        },
+        "verified_by": {
+          "items": {
+            "pattern": "^E[1-9][0-9]*$",
+            "type": "string"
+          },
+          "title": "Verified By",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "AcceptanceCriterion",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "A recorded check. The ledger stores claims; `check` validates their consistency.",
+      "properties": {
+        "id": {
+          "pattern": "^E[1-9][0-9]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "default": "command",
+          "enum": [
+            "command",
+            "manual"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "cwd": {
+          "default": ".",
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Cwd",
+          "type": "string"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit Code"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "enum": [
+                "pass",
+                "fail"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{7,40}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output"
+        },
+        "recorded_at": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recorded At"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Review": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "approved",
+            "changes_requested",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "by": {
+          "default": "",
+          "maxLength": 120,
+          "title": "By",
+          "type": "string"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Notes",
+          "type": "string"
+        }
+      },
+      "title": "Review",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": 1,
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "id": {
+      "maxLength": 40,
+      "pattern": "^[A-Z][A-Z0-9]*-[1-9][0-9]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Title",
+      "type": "string"
+    },
+    "owner": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Owner",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "BACKLOG",
+        "READY",
+        "IN_PROGRESS",
+        "BLOCKED",
+        "IN_REVIEW",
+        "DONE",
+        "CANCELLED"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "goal": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Goal",
+      "type": "string"
+    },
+    "scope": {
+      "items": {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Scope",
+      "type": "array"
+    },
+    "depends_on": {
+      "items": {
+        "maxLength": 40,
+        "pattern": "^[A-Z][A-Z0-9]*-[1-9][0-9]*$",
+        "type": "string"
+      },
+      "title": "Depends On",
+      "type": "array"
+    },
+    "reason": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Reason",
+      "type": "string"
+    },
+    "acceptance": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceCriterion"
+      },
+      "title": "Acceptance",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "review": {
+      "$ref": "#/$defs/Review"
+    },
+    "log": {
+      "items": {
+        "maxLength": 2000,
+        "type": "string"
+      },
+      "title": "Log",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "owner",
+    "status"
+  ],
+  "title": "Task",
+  "type": "object"
+}

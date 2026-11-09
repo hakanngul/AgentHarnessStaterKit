@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "DecisionOption": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Z]$",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "DecisionOption",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A product decision that only the user may make.",
+  "properties": {
+    "schema_version": {
+      "default": 1,
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "id": {
+      "maxLength": 40,
+      "pattern": "^DEC-[1-9][0-9]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "question": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Question",
+      "type": "string"
+    },
+    "options": {
+      "items": {
+        "$ref": "#/$defs/DecisionOption"
+      },
+      "maxItems": 10,
+      "minItems": 2,
+      "title": "Options",
+      "type": "array"
+    },
+    "recommendation": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Recommendation",
+      "type": "string"
+    },
+    "status": {
+      "default": "PENDING",
+      "enum": [
+        "PENDING",
+        "DECIDED",
+        "WITHDRAWN"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "answer": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Answer",
+      "type": "string"
+    },
+    "decided_by": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Decided By",
+      "type": "string"
+    },
+    "decided_at": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decided At"
+    }
+  },
+  "required": [
+    "id",
+    "question",
+    "options"
+  ],
+  "title": "Decision",
+  "type": "object"
+}

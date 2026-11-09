@@ -10,6 +10,7 @@ flowchart TD
   Generate --> Roles[Claude rolleri, skill ve kurallar]
   Generate --> Memory[TASK, PROGRESS, EVIDENCE, HANDOFF]
   CLI --> Validate[validate.py: şema, dosyalar, değişiklikler]
+  CLI --> Check[check.py: görev ve karar defteri]
   CLI --> Doctor[doctor.py: yerel gereksinimler]
   Doctor --> Validate
   Roles --> Runtime[Claude Code: geliştirme ve inceleme]
@@ -28,6 +29,11 @@ kötü niyetle değiştiren süreçlere karşı tam transactional filesystem gar
 `validate` manifestin sadece desteklenen dosyaları içermesine izin verir. Dosya
 hash'leri değişiklik tespiti içindir; imza veya güvenlik onayı değildir. Kullanıcı
 özelleştirmeleri hata değil uyarıdır; eksik dosya/geçersiz config hata üretir.
+
+`check` `.harness/tasks/` ve `.harness/decisions/` altındaki YAML dosyalarını katı
+şemayla okur, görevler arası bağımlılık ve DONE koşullarını denetler. Bu dizinler
+`init` tarafından üretilmez ve manifestte yer almaz; böylece mevcut kurulumların
+`validate` sonucu değişmez. `check` komut çalıştırmaz; kanıt kayıtları beyandır.
 
 Şu an sürüm 0.1.0 ve config şeması 1 desteklenir. Tanınmayan sürüm kabul edilmez;
 sürüm yükseltme migration'ları ayrı bir geliştirmedir. Metadata veri olarak tutulur;

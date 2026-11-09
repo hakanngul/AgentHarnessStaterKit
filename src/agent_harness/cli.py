@@ -10,6 +10,7 @@ from rich.console import Console
 
 from agent_harness import __version__
 from agent_harness.analyze import analyze as inspect_project
+from agent_harness.check import check as check_ledger
 from agent_harness.doctor import doctor as diagnose
 from agent_harness.filesystem import HarnessError
 from agent_harness.generate import initialize
@@ -92,6 +93,12 @@ def analyze(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> Non
 def validate(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> None:
     """Check configuration, manifest, required files and local customizations."""
     report_result(check_project(path), output_json)
+
+
+@app.command()
+def check(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> None:
+    """Check the task and decision ledger for completeness; commands are not rerun."""
+    report_result(check_ledger(path), output_json)
 
 
 @app.command()

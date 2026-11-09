@@ -1,25 +1,43 @@
 # Evidence
 
-Validated on 2026-10-25 in the managed cloud environment, Python 3.12.14.
-Working directory unless stated otherwise: /workspace/AgentHarnessStaterKit.
+Structured evidence for Faz 1 lives in `.harness/tasks/T-1.yaml`; raw outputs are
+in `.harness/evidence/T-1/`. Environment: managed cloud container, Python 3.12,
+repository root as working directory, 2026-11-09.
 
 | Check | Result |
 | --- | --- |
-| uv sync --frozen --group dev | exit 0; pinned project environment installed |
-| .venv/bin/pytest -q | exit 0; 86 passed, no skipped/xfail tests |
-| .venv/bin/ruff check . | exit 0 |
-| .venv/bin/ruff format --check . | exit 0 |
-| .venv/bin/python -m build --no-isolation | exit 0; sdist and wheel built |
-| Isolated wheel install, temporary cwd outside checkout | version/analyze/dry-run/init/validate/doctor passed; repeated init rejected with exit 1; packaged role/skill files present |
-| harness doctor on this repository | schema/files/Python/Git pass; Claude CLI absent, reported as optional warning |
+| uv run --frozen ruff check . | exit 0 |
+| uv run --frozen ruff format --check . | exit 0 |
+| uv run --frozen pytest -q | exit 0; 187 passed, none skipped |
+| uv run --frozen python -m build --no-isolation | exit 0; sdist and wheel |
+| uv run --frozen harness validate . --json | exit 0; edited generated files are warnings |
+| uv run --frozen harness check . --json | exit 0; 1 task checked |
+| Wheel in fresh venv outside checkout | init/validate/check 0; bad ledger made check exit 1 |
 
-The 86 tests cover CLI workflows, every generated-file collision and missing file,
-user-file preservation, invalid YAML/schema versions, manifest layout/hashes,
-symlink/path traversal rejection, partial-write rollback, unexecuted manifest commands,
-root-only technology detection, UTF-8 metadata, and local customization detection.
+Mutation check: four rules deliberately broken (review status, dependency state,
+failing evidence, cycle reporting); tests caught all four. Regression tests for the
+review findings fail on the code before each fix (11 on a3ce0a9, 2 on f477ce6,
+11 on c5a45a0, 5 on 31cbb17)
+and pass after the fixes.
 
-Self-review caught overly permissive numeric Literal validation (true/1.0 accepted
-as schema version 1) and newline-normalized hashes. Both were corrected and regression
-tested. No independent reviewer agent ran in this session; that review remains unrun.
-Claude Code sessions/model behavior/authentication were not tested. Python 3.11/3.13
-are configured in CI but were not locally executed. Remote CI status is not implied.
+## Independent review
+
+A read-only reviewer agent (no command execution) reported 1 high, 4 medium and
+4 low findings: missing self-ledger and evidence (H1); uncaught OSError for long
+paths and unlistable directories, RecursionError for deep YAML and long dependency
+chains (M1–M4); case-sensitive self-approval, template example contradicting its
+own rule, numeric dates accepted, duplicate dependencies (L1–L4). All were fixed
+with tests. Re-review found one more crash (invalid YAML date, oversized integer);
+fixed with tests. Sourcery's PR review then found 6 more real issues (blank names,
+evidence cwd, duplicate YAML keys, NUL paths, entry and byte caps); fixed with tests,
+and one regression it caused (YAML merge keys) was caught and fixed. Final verdict
+on 3c92c6f: APPROVED, no blocking items. The reviewer read code
+only and did not rerun the checks above.
+
+## Not tested
+
+Python 3.11 and 3.13 run only in CI. Real Claude Code sessions are not tested.
+`check` does not verify that commits exist or that recorded commands really ran.
+Reviewer identity in `review.by` is self-declared text.
+
+Earlier 0.1.0 evidence (2026-10-25, 86 tests) is in Git history.

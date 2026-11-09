@@ -20,4 +20,5 @@ jobs:
       - run: uv run --frozen ruff check .
       - run: uv run --frozen ruff format --check .
       - run: uv run --frozen pytest
+      - run: uv run --frozen harness check .
       - run: uv run --frozen python -m build --no-isolation

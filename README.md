@@ -1,7 +1,7 @@
 # Agent Harness Starter Kit
 
 Bir projeye Claude Code ajan rolleri, skills, kurallar ve kalıcı görev hafızası kuran
-Python CLI. İlk sürüm: `init`, `analyze`, `validate`, `doctor`.
+Python CLI. Komutlar: `init`, `analyze`, `validate`, `check`, `doctor`.
 
 Python kurulum ve denetim motorudur. Ajanları çalıştıran sistem Claude Code'dur;
 bu CLI model çağırmaz, API anahtarı istemez ve kendi agent runtime'ını içermez.
@@ -73,6 +73,26 @@ kendi kimlik doğrulaması gerekir; CLI bunların çalıştığını iddia etmez
 
 Başarılı denetim çıkış kodu 0, yapılandırma/kurulum hatası 1, CLI kullanım hatası 2.
 Tüm komutlar `--json` destekler; `harness --version` sürümü gösterir.
+
+## Görev ve karar defteri
+
+Her görev `.harness/tasks/<ID>.yaml` (ör. `T-1`), kullanıcının vermesi gereken her
+ürün kararı `.harness/decisions/DEC-<n>.yaml` dosyasıdır. Şemalar:
+`schemas/task.schema.json`, `schemas/decision.schema.json`. Şemalar alan yapısını
+tanımlar; alanlar arası kurallar (kanıt türüne göre zorunlu alanlar, `DEC-` önekinin
+görevlerde yasak olması, karar durumu) yalnız `harness check` ile denetlenir.
+
+```bash
+harness check /path/to/project --json
+```
+
+`check` hata varsa 1 ile çıkar. Denetledikleri: şema ve dosya adı = id; DONE görevde
+her kabul kriterinin başarılı kanıta bağlı olması; review'un sahibinden farklı biri
+tarafından onaylanması ya da gerekçeli `unavailable`; bilinmeyen/döngüsel
+bağımlılıklar; PENDING karara bağlı ilerleyen iş; proje dışı veya symlink yollar.
+Komut çalıştırmaz: kanıtların tutarlılığını denetler, doğruluğunu kanıtlamaz.
+Reviewer adı (`review.by`) beyandır; kimlik doğrulaması yapılmaz.
+CI'da çalıştırılması önerilir. Plan: [docs/plans/team-system.md](docs/plans/team-system.md).
 
 ## Geliştirme döngüsü
 
