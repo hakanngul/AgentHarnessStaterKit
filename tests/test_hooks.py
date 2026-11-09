@@ -362,3 +362,13 @@ def test_new_settings_file_uses_umask_mode(tmp_path):
     umask = os.umask(0)
     os.umask(umask)
     assert mode == 0o666 & ~umask
+
+
+def test_existing_settings_mode_is_preserved(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    target = tmp_path / ".claude/settings.json"
+    target.write_text("{}")
+    target.chmod(0o640)
+    install(tmp_path)
+    assert target.stat().st_mode & 0o777 == 0o640
+    assert not list((tmp_path / ".claude").glob("*.tmp"))

@@ -2,7 +2,8 @@
 
 import hashlib
 import os
-import tempfile
+import secrets
+import shutil
 from pathlib import Path, PurePosixPath
 
 import yaml
@@ -91,18 +92,26 @@ def load_yaml(text: str):
 
 
 def atomic_write(path: Path, text: str) -> None:
-    """Replace path with text via a unique temporary file, keeping the file mode."""
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    """Replace path with text via a unique temporary file.
+
+    The temporary file is created with `open(..., "x")`, so the OS applies the umask
+    exactly as for any new file; an existing file's mode is copied over.
+    """
+    for _ in range(100):
+        temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+        try:
+            stream = temporary.open("x", encoding="utf-8", newline="\n")
+            break
+        except FileExistsError:
+            continue
+    else:
+        raise HarnessError(f"Could not create a temporary file next to {path}")
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+        with stream:
             stream.write(text)
         if path.exists():
-            os.chmod(temporary, path.stat().st_mode & 0o7777)
-        else:  # mkstemp creates 0600; use the usual umask-based mode instead
-            umask = os.umask(0)
-            os.umask(umask)
-            os.chmod(temporary, 0o666 & ~umask)
+            shutil.copymode(path, temporary)
         os.replace(temporary, path)
     except BaseException:
-        Path(temporary).unlink(missing_ok=True)
+        temporary.unlink(missing_ok=True)
         raise
