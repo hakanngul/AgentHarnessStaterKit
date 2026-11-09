@@ -53,8 +53,8 @@ evidence:
     command: uv run --frozen pytest -q
     exit_code: 0
     summary: >-
-      167 passed (86 existing + 81 ledger tests). The 11 regression tests for review
-      findings failed against commit a3ce0a9 and pass now.
+      169 passed (86 existing + 83 ledger tests). Regression tests for review findings
+      fail on the code before each fix (11 on a3ce0a9, 2 on f477ce6) and pass now.
     output: .harness/evidence/T-1/pytest.txt
     recorded_at: 2026-11-09
   - id: E4
@@ -70,9 +70,10 @@ evidence:
     output: .harness/evidence/T-1/validate.txt
     recorded_at: 2026-11-09
   - id: E6
-    command: installed wheel in a fresh venv outside the checkout; init, validate, check
-    exit_code: 0
+    kind: manual
+    result: pass
     summary: >-
+      Installed the built wheel with uv into a fresh venv outside the checkout.
       init/validate/empty check exit 0; a DONE task with failing evidence and
       case-variant self-approval made check exit 1 with both errors
     output: .harness/evidence/T-1/wheel-smoke.txt
@@ -87,4 +88,5 @@ review:
   status: pending
 log:
   - "2026-11-09 reviewer agent: 1 high, 4 medium, 4 low findings; all fixed with tests"
-  - "2026-11-09 re-review of fixes requested"
+  - "2026-11-09 re-review: all findings resolved; blocking: invalid YAML date crashed check"
+  - "2026-11-09 fixed by catching ValueError per file; 2 regression tests added"

@@ -56,7 +56,9 @@ def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -
         except RecursionError:
             report.errors.append(f"{relative}: YAML nesting is too deep")
             continue
-        except (HarnessError, OSError, UnicodeError, yaml.YAMLError) as exc:
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            # ValueError covers HarnessError, UnicodeError and values the YAML loader
+            # cannot build, such as 2026-02-30 or integers beyond the digit limit.
             report.errors.append(f"{relative}: {exc}")
             continue
         if entry.stem != item.id:

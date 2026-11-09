@@ -450,3 +450,16 @@ def test_numeric_dates_are_rejected(tmp_path, value):
     evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "recorded_at": value}]
     errors = errors_for(tmp_path, done_task(evidence=evidence))
     assert any("not a number" in error for error in errors), errors
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["title: 2026-02-30", "title: x\nlog: [" + "1" * 5000 + "]"],
+)
+def test_values_yaml_cannot_build_are_reported(tmp_path, line):
+    target = tmp_path / TASKS_DIR / "T-1.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text(f"id: T-1\nowner: d\nstatus: BACKLOG\n{line}\n")
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert report["errors"][0].startswith(f"{TASKS_DIR}/T-1.yaml: ")
