@@ -5,7 +5,7 @@ rerun commands, so it cannot prove that recorded evidence is truthful.
 """
 
 from itertools import islice
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TypeVar
 
 import yaml
@@ -28,6 +28,8 @@ class _UniqueKeyLoader(yaml.SafeLoader):
     def construct_mapping(self, node, deep=False):
         seen = set()
         for key_node, _ in node.value:
+            if key_node.tag == "tag:yaml.org,2002:merge":
+                continue  # `<<` merge keys are flattened by the base constructor
             key = self.construct_object(key_node, deep=deep)
             try:
                 duplicate = key in seen
@@ -135,7 +137,8 @@ def _check_task(
 
     for item in task.evidence:
         try:
-            if item.cwd != "." and not managed_path(root, item.cwd).is_dir():
+            cwd = PurePosixPath(item.cwd).as_posix()  # accept "./src", "src/" and "./"
+            if cwd != "." and not managed_path(root, cwd).is_dir():
                 errors.append(f"{where}: evidence {item.id} cwd not found: {item.cwd}")
             if item.output is not None and not managed_path(root, item.output).is_file():
                 errors.append(f"{where}: evidence {item.id} output not found: {item.output}")

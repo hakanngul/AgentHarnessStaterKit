@@ -554,3 +554,24 @@ def test_entry_cap_stops_enumeration_early(tmp_path, monkeypatch):
     code, report = run_check(tmp_path)
     assert code == 1
     assert len(calls) == 3
+
+
+def test_yaml_merge_keys_still_work(tmp_path):
+    text = (
+        "id: T-1\ntitle: x\nowner: d\nstatus: BACKLOG\n"
+        "review: &r {status: pending}\n"
+        "log: [a]\n"
+        "acceptance:\n  - <<: {id: AC1, text: base}\n    text: overridden\n"
+    )
+    target = tmp_path / TASKS_DIR / "T-1.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text(text)
+    code, report = run_check(tmp_path)
+    assert code == 0, report
+
+
+@pytest.mark.parametrize("cwd", ["./app", "app/", "./", "./app/"])
+def test_evidence_cwd_spellings_are_normalized(tmp_path, cwd):
+    (tmp_path / "app").mkdir()
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "cwd": cwd}]
+    assert errors_for(tmp_path, done_task(evidence=evidence)) == []
