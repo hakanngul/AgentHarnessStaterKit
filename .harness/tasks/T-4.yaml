@@ -2,7 +2,7 @@ schema_version: 1
 id: T-4
 title: 'Faz 2c: PreToolUse hook and hooks install'
 owner: developer
-status: IN_REVIEW
+status: BLOCKED
 depends_on:
 - T-3
 acceptance:
@@ -81,3 +81,7 @@ evidence:
     allowed src/app.py, evidence run recorded, check and validate exit 0.'
   output: .harness/evidence/T-4/wheel-smoke.txt
   recorded_at: '2026-11-09'
+reason: Implementation and evidence complete; waits for T-3 to be DONE (same review round).
+log:
+- 2026-11-09 set IN_REVIEW while T-3 was not DONE; harness check rejected it; corrected to
+  BLOCKED
