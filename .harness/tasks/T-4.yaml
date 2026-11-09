@@ -1,6 +1,6 @@
 schema_version: 1
 id: T-4
-title: 'Faz 2c: PreToolUse hook and hooks install'
+title: 'Faz 2c: PreToolUse hook and hook install'
 owner: developer
 status: BLOCKED
 depends_on:
@@ -13,7 +13,7 @@ acceptance:
   - E3
   - E6
 - id: AC5
-  text: hooks install preserves settings.json, is idempotent, writes nothing on invalid JSON.
+  text: hook install preserves settings.json, is idempotent, writes nothing on invalid JSON.
   verified_by:
   - E3
   - E6

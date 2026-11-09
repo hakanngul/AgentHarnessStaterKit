@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from agent_harness.filesystem import (
     HarnessError,
+    load_yaml,
     managed_path,
     project_root,
     read_text,
@@ -27,27 +28,6 @@ MAX_LEDGER_FILES = 5000
 MAX_LEDGER_BYTES = 32 * 1_048_576  # aggregate cap per ledger directory
 ACTIVE = {"READY", "IN_PROGRESS", "IN_REVIEW", "DONE"}
 M = TypeVar("M", Task, Decision)
-
-
-class _UniqueKeyLoader(yaml.SafeLoader):
-    """SafeLoader that rejects repeated mapping keys instead of keeping the last one."""
-
-    def construct_mapping(self, node, deep=False):
-        seen = set()
-        for key_node, _ in node.value:
-            if key_node.tag == "tag:yaml.org,2002:merge":
-                continue  # `<<` merge keys are flattened by the base constructor
-            key = self.construct_object(key_node, deep=deep)
-            try:
-                duplicate = key in seen
-            except TypeError:
-                continue  # unhashable keys are rejected later by the base constructor
-            if duplicate:
-                raise yaml.constructor.ConstructorError(
-                    None, None, f"duplicate key {key!r}", key_node.start_mark
-                )
-            seen.add(key)
-        return super().construct_mapping(node, deep=deep)
 
 
 def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -> dict[str, M]:
@@ -82,7 +62,7 @@ def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -
             if total_bytes > MAX_LEDGER_BYTES:
                 report.errors.append(f"{relative_dir} exceeds {MAX_LEDGER_BYTES} bytes in total")
                 return items
-            item = model.model_validate(yaml.load(read_text(entry), Loader=_UniqueKeyLoader))
+            item = model.model_validate(load_yaml(read_text(entry)))
         except ValidationError as exc:
             for error in exc.errors(include_input=False):
                 location = ".".join(str(part) for part in error["loc"]) or "<root>"

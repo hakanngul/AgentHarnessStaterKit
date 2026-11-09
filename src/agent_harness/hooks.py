@@ -3,9 +3,10 @@
 The hook is a guardrail, not a sandbox: it only sees file-editing tools, so writes
 through Bash are not covered. CI (`harness check`) remains the real gate.
 
-Role: the HARNESS_ROLE environment variable, otherwise the hook input's `agent_type`
-when that name is a configured role. With no role, no configured roles or unreadable
-input, the hook does not block and says why on stderr.
+Role: the hook input's `agent_type` when that name is a configured role, otherwise the
+HARNESS_ROLE environment variable. With no role, no configured roles or unreadable
+input the hook does not block and says why on stderr; input too large to inspect is
+denied when roles are configured.
 """
 
 import json
@@ -13,10 +14,16 @@ import os
 from pathlib import Path
 from typing import Any, TextIO
 
-from agent_harness.filesystem import HarnessError, managed_path, project_root, read_text
+from agent_harness.filesystem import (
+    HarnessError,
+    atomic_write,
+    managed_path,
+    project_root,
+    read_text,
+)
 from agent_harness.roles import CONFIG_PATH, decide, load_config
 
-MAX_INPUT_BYTES = 1_048_576
+MAX_INPUT_CHARS = 64 * 1_048_576
 SETTINGS_PATH = ".claude/settings.json"
 MATCHER = "Write|Edit|MultiEdit|NotebookEdit"
 HOOK_SUFFIX = "hook pre-tool-use"
@@ -32,6 +39,16 @@ def _deny(reason: str) -> dict[str, Any]:
     }
 
 
+def _project(directory: str) -> tuple[Path, tuple[Path, ...], Any]:
+    """Real project root, its other spelling (if symlinked) and the config, or raise."""
+    raw = Path(os.path.abspath(os.path.expanduser(directory)))
+    root = project_root(Path(os.path.realpath(raw)))
+    aliases = (raw,) if raw != root else ()
+    if not managed_path(root, CONFIG_PATH).exists():
+        return root, aliases, None
+    return root, aliases, load_config(root)
+
+
 def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | None, str]:
     """Return (stdout JSON or None to allow, stderr note)."""
     tool_input = payload.get("tool_input")
@@ -44,19 +61,17 @@ def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | N
     if not isinstance(project, str) or not project:
         return None, "harness hook: no project directory; not enforcing"
     try:
-        root = project_root(Path(project))
-        if not managed_path(root, CONFIG_PATH).exists():
-            return None, ""
-        config = load_config(root)
+        root, aliases, config = _project(project)
     except (HarnessError, OSError) as exc:
         return None, f"harness hook: {exc}; not enforcing"
-    if not config.roles:
+    if config is None or not config.roles:
         return None, ""
 
-    role = environ.get("HARNESS_ROLE", "").strip()
-    if not role:
-        agent = payload.get("agent_type")
-        role = agent if isinstance(agent, str) and agent in config.roles else ""
+    # The runtime's agent name is more specific than a session-wide HARNESS_ROLE,
+    # so a configured agent_type (a subagent or `claude --agent`) wins.
+    agent = payload.get("agent_type")
+    role = agent if isinstance(agent, str) and agent in config.roles else ""
+    role = role or environ.get("HARNESS_ROLE", "").strip()
     if not role:
         return None, "harness hook: role unknown (set HARNESS_ROLE); not enforcing"
     if role not in config.roles:
@@ -65,7 +80,7 @@ def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | N
 
     cwd = payload.get("cwd")
     base = Path(cwd) if isinstance(cwd, str) and cwd else root
-    decision = decide(config, role, root, target, base)
+    decision = decide(config, role, root, target, base, aliases)
     if decision.allowed:
         return None, ""
     return _deny(
@@ -74,26 +89,40 @@ def evaluate(payload: dict[str, Any], environ: dict[str, str]) -> tuple[dict | N
     ), ""
 
 
-def run_pre_tool_use(stdin: TextIO, stdout: TextIO, stderr: TextIO, environ=None) -> int:
-    environ = dict(os.environ if environ is None else environ)
-    raw = stdin.read(MAX_INPUT_BYTES + 1)
-    if len(raw) > MAX_INPUT_BYTES:
-        print("harness hook: input too large; not enforcing", file=stderr)
-        return 0
+def _oversized(environ: dict[str, str]) -> tuple[dict | None, str]:
+    """Input too large to inspect: fail closed when the project defines roles."""
+    project = environ.get("CLAUDE_PROJECT_DIR")
     try:
-        payload = json.loads(raw)
-    except ValueError:
-        print("harness hook: input is not JSON; not enforcing", file=stderr)
-        return 0
-    if not isinstance(payload, dict):
-        print("harness hook: input is not a JSON object; not enforcing", file=stderr)
-        return 0
-    output, note = evaluate(payload, environ)
+        config = _project(project)[2] if project else None
+    except (HarnessError, OSError):
+        config = None
+    if config is not None and config.roles:
+        return _deny(
+            f"[harness] Tool input exceeds {MAX_INPUT_CHARS} characters and cannot be "
+            "checked against write scopes; split the change into smaller edits."
+        ), ""
+    return None, "harness hook: input too large; not enforcing"
+
+
+def run_pre_tool_use(stdin: TextIO, stdout: TextIO, stderr: TextIO, environ=None) -> None:
+    """Hook entry point. Always exits 0: Claude Code reads a denial from stdout JSON."""
+    environ = dict(os.environ if environ is None else environ)
+    try:
+        raw = stdin.read(MAX_INPUT_CHARS + 1)
+        if len(raw) > MAX_INPUT_CHARS:
+            output, note = _oversized(environ)
+        else:
+            payload = json.loads(raw)
+            if isinstance(payload, dict):
+                output, note = evaluate(payload, environ)
+            else:
+                output, note = None, "harness hook: input is not a JSON object; not enforcing"
+    except (ValueError, RecursionError) as exc:  # bad UTF-8, invalid or too deep JSON
+        output, note = None, f"harness hook: unreadable input ({type(exc).__name__}); not enforcing"
     if note:
         print(note, file=stderr)
     if output is not None:
         stdout.write(json.dumps(output, ensure_ascii=False) + "\n")
-    return 0
 
 
 def _is_ours(hook: Any) -> bool:
@@ -138,11 +167,5 @@ def install(path: Path, *, command: str = "harness", dry_run: bool = False) -> d
     if not dry_run:
         if not target.parent.exists():
             target.parent.mkdir()
-        temporary = target.with_name(f".{target.name}.tmp")
-        try:
-            with temporary.open("x", encoding="utf-8", newline="\n") as stream:
-                stream.write(json.dumps(settings, indent=2, ensure_ascii=False) + "\n")
-            os.replace(temporary, target)
-        finally:
-            temporary.unlink(missing_ok=True)
+        atomic_write(target, json.dumps(settings, indent=2, ensure_ascii=False) + "\n")
     return {"changed": True, "dry_run": dry_run, "path": SETTINGS_PATH, "settings": settings}

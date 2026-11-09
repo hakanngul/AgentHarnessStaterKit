@@ -40,6 +40,7 @@ class RoleConfig(BaseModel):
                 or "\\" in value
                 or ":" in value
                 or ".." in parts
+                or "." in parts
                 or any(part == "" for part in parts[:-1])
                 or "[" in value
                 or any("**" in part and part != "**" for part in parts)

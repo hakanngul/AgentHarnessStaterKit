@@ -67,7 +67,7 @@ denetler; doğruluğunu kanıtlamaz.
   config'ler geçerli kalır). `harness scope ROL YOL...` izin kararı verir. `check`,
   roller tanımlıysa görev sahibinin tanımlı bir rol olmasını ister.
 - T-4 `harness hook pre-tool-use`: Claude Code PreToolUse girdisini okur, rolün yazma
-  kapsamı dışını reddeder. `harness hooks install` hook'u `.claude/settings.json`'a
+  kapsamı dışını reddeder. `harness hook install` hook'u `.claude/settings.json`'a
   mevcut ayarları koruyarak ekler (opsiyonel, dry-run destekli).
 
 ## Faz 2 kabul kriterleri
@@ -79,7 +79,7 @@ denetler; doğruluğunu kanıtlamaz.
   proje dışı ve `..` yolları reddeder.
 - AC4: Hook kapsam dışı yazmayı Claude Code'un belgelenmiş biçimiyle reddeder; rol
   bilinmiyorsa ya da config'te rol yoksa engellemez ve bunu belirtir.
-- AC5: `hooks install` mevcut settings.json içeriğini korur, tekrar çalıştırınca
+- AC5: `hook install` mevcut settings.json içeriğini korur, tekrar çalıştırınca
   çoğaltmaz, geçersiz JSON'da hiçbir şey yazmaz.
 - AC6: Mevcut 0.1.0 kurulumları `validate` ve `check`'ten geçmeye devam eder.
 

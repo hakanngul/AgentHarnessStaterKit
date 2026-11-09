@@ -123,8 +123,11 @@ roles:
 ```
 
 Glob: `*` tek segment, `?` tek karakter, `**` sıfır veya daha fazla segment, sonda `/`
-dizinin tamamı. `deny` önce uygulanır; hiçbirine uymayan yol reddedilir. Proje dışı,
-`..` ile kaçan ve symlink içeren yollar her zaman reddedilir.
+dizinin tamamı. `deny` önce uygulanır; hiçbirine uymayan yol reddedilir. Eşleştirme
+büyük/küçük harf ve Unicode normalleştirme farkını yok sayar (macOS ve Windows dosya
+sistemleri de öyle yapar). Proje dışı yollar, `..` içeren hedefler ve proje içinde
+symlink'ten geçen yollar reddedilir; proje kökünün kendisi symlink altındaysa gerçek
+yolu kullanılır.
 
 ```bash
 harness scope developer src/app.py .claude/agents/lead.md --json
@@ -143,10 +146,11 @@ harness hook install . --command "uv run harness"    # .claude/settings.json'a e
 `install`, mevcut `.claude/settings.json` içeriğini korur, ikinci kez çalıştırınca
 çoğaltmaz, geçersiz JSON'da hiçbir şey yazmaz (JSON biçimlendirmesi yeniden yazılır).
 Hook, Write/Edit/MultiEdit/NotebookEdit çağrılarında rolün kapsamı dışındaki yazmayı
-Claude Code'a `permissionDecision: deny` ile bildirir. Rol `HARNESS_ROLE` ortam
-değişkeninden, yoksa hook girdisindeki `agent_type` tanımlı bir rolse ondan alınır.
-Rol bilinmiyorsa, config'te rol yoksa ya da girdi okunamıyorsa engellemez ve
-nedenini stderr'e yazar.
+Claude Code'a `permissionDecision: deny` ile bildirir. Rol, hook girdisindeki
+`agent_type` tanımlı bir rolse ondan (subagent veya `claude --agent`), yoksa
+`HARNESS_ROLE` ortam değişkeninden alınır. Rol bilinmiyorsa, config'te rol yoksa ya
+da girdi okunamıyorsa engellemez ve nedenini stderr'e yazar. Denetlenemeyecek kadar
+büyük girdi (64 MiB üstü) roller tanımlıysa reddedilir.
 
 Bu bir guardrail'dir, sandbox değil: Bash ile yazma görülmez; asıl kapı CI'daki
 `harness check`'tir. Hook zaman aşımında Claude Code varsayılan olarak çağrıyı

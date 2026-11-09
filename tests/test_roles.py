@@ -60,7 +60,8 @@ def test_glob_match(pattern, path, expected):
 
 
 @pytest.mark.parametrize(
-    "glob", ["/etc/**", "../x", "a/../b", "a\\b", "C:/x", "a//b", "a[bc]", "src/**x", ""]
+    "glob",
+    ["/etc/**", "../x", "a/../b", "a\\b", "C:/x", "a//b", "a[bc]", "src/**x", "", "./.harness/**"],
 )
 def test_unsafe_or_unsupported_globs_are_rejected(glob):
     with pytest.raises(ValueError):
@@ -97,9 +98,9 @@ def test_scope_allow_deny_and_default(tmp_path):
 @pytest.mark.parametrize(
     ("target", "reason"),
     [
-        ("../outside.py", "outside the project"),
+        ("../outside.py", "'..' segments"),
         ("/etc/passwd", "outside the project"),
-        ("src/../../x", "outside the project"),
+        ("src/../../x", "'..' segments"),
         (".", "project root"),
     ],
 )
@@ -110,11 +111,12 @@ def test_scope_rejects_escapes(tmp_path, target, reason):
     assert reason in out["decisions"][0]["reason"]
 
 
-def test_scope_normalizes_dot_segments_inside_project(tmp_path):
+def test_scope_rejects_dotdot_even_inside_project(tmp_path):
     write_config(tmp_path, ROLES)
     code, out = scope(tmp_path, "developer", "./src/../src/app.py")
-    assert code == 0
-    assert out["decisions"][0]["path"] == "src/app.py"
+    assert code == 1 and "'..' segments" in out["decisions"][0]["reason"]
+    code, out = scope(tmp_path, "developer", "./src/./app.py")
+    assert code == 0 and out["decisions"][0]["path"] == "src/app.py"
 
 
 def test_scope_rejects_symlinked_directories(tmp_path):

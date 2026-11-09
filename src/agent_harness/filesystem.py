@@ -2,7 +2,10 @@
 
 import hashlib
 import os
+import tempfile
 from pathlib import Path, PurePosixPath
+
+import yaml
 
 MAX_FILE_BYTES = 1_048_576
 
@@ -59,3 +62,43 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(65536), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+class UniqueKeyLoader(yaml.SafeLoader):
+    """SafeLoader that rejects repeated mapping keys instead of keeping the last one."""
+
+    def construct_mapping(self, node, deep=False):
+        seen = set()
+        for key_node, _ in node.value:
+            if key_node.tag == "tag:yaml.org,2002:merge":
+                continue  # `<<` merge keys are flattened by the base constructor
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in seen
+            except TypeError:
+                continue  # unhashable keys are rejected later by the base constructor
+            if duplicate:
+                raise yaml.constructor.ConstructorError(
+                    None, None, f"duplicate key {key!r}", key_node.start_mark
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
+def load_yaml(text: str):
+    """Safe YAML load that rejects duplicate mapping keys."""
+    return yaml.load(text, Loader=UniqueKeyLoader)
+
+
+def atomic_write(path: Path, text: str) -> None:
+    """Replace path with text via a unique temporary file, keeping the file mode."""
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(text)
+        if path.exists():
+            os.chmod(temporary, path.stat().st_mode & 0o7777)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise

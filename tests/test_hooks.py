@@ -41,9 +41,9 @@ def event(root: Path, file_path: str, tool: str = "Write", **extra) -> dict:
 def hook(payload, env: dict | None = None):
     stdout, stderr = io.StringIO(), io.StringIO()
     raw = payload if isinstance(payload, str) else json.dumps(payload)
-    code = run_pre_tool_use(io.StringIO(raw), stdout, stderr, env or {})
+    assert run_pre_tool_use(io.StringIO(raw), stdout, stderr, env or {}) is None
     out = stdout.getvalue()
-    return code, (json.loads(out) if out else None), stderr.getvalue()
+    return 0, (json.loads(out) if out else None), stderr.getvalue()
 
 
 def denied(result) -> str:
@@ -98,9 +98,11 @@ def test_agent_type_is_used_only_when_it_is_a_role(tmp_path):
     assert "role unknown" in note
 
 
-def test_env_role_takes_precedence_over_agent_type(tmp_path):
+def test_configured_agent_type_takes_precedence_over_env_role(tmp_path):
     root = project(tmp_path)
     payload = event(root, str(root / "src/a.py"), agent_type="reviewer")
+    denied(hook(payload, {"HARNESS_ROLE": "developer"}))
+    payload = event(root, str(root / "src/a.py"), agent_type="Explore")
     assert allowed(hook(payload, {"HARNESS_ROLE": "developer"})) == ""
 
 
@@ -121,13 +123,14 @@ def test_claude_project_dir_wins_over_cwd(tmp_path):
 @pytest.mark.parametrize(
     ("setup", "payload", "note"),
     [
-        ("no-roles", None, ""),
-        ("no-config", None, ""),
+        ("no-roles", None, None),
+        ("no-config", None, None),
         ("bad-config", None, "Invalid configuration"),
-        ("ok", "not json", "not JSON"),
+        ("ok", "not json", "unreadable input (JSONDecodeError)"),
+        ("ok", '{"a":' * 100_000, "unreadable input (RecursionError)"),
         ("ok", "[1, 2]", "not a JSON object"),
-        ("ok", {"tool_name": "Write"}, ""),
-        ("ok", {"tool_input": {"content": "x"}}, ""),
+        ("ok", {"tool_name": "Write"}, None),
+        ("ok", {"tool_input": {"content": "x"}}, None),
     ],
 )
 def test_non_enforcing_cases_do_not_block(tmp_path, setup, payload, note):
@@ -140,12 +143,81 @@ def test_non_enforcing_cases_do_not_block(tmp_path, setup, payload, note):
     if payload is None:
         payload = event(tmp_path, str(tmp_path / "docs/x.md"))
     result = hook(payload, {"HARNESS_ROLE": "developer"})
-    assert note in allowed(result)
+    stderr = allowed(result)
+    assert stderr == "" if note is None else note in stderr
 
 
-def test_oversized_input_does_not_block(tmp_path):
+def test_oversized_write_is_denied_when_roles_exist(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_harness.hooks.MAX_INPUT_CHARS", 1000)
+    root = project(tmp_path)
+    payload = event(root, str(root / ".claude/settings.json"))
+    payload["tool_input"]["content"] = "x" * 2000
+    env = {"HARNESS_ROLE": "developer", "CLAUDE_PROJECT_DIR": str(root)}
+    assert "cannot be checked" in denied(hook(payload, env))
+
+
+def test_oversized_input_without_roles_is_not_blocked(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_harness.hooks.MAX_INPUT_CHARS", 1000)
+    root = project(tmp_path, roles=None)
+    env = {"CLAUDE_PROJECT_DIR": str(root)}
+    assert "too large" in allowed(hook("x" * 2000, env))
+
+
+@pytest.mark.parametrize(
+    "target", [".CLAUDE/settings.json", ".Claude/agents/x.md", "SRC/SECRETS/key"]
+)
+def test_case_variants_cannot_bypass_deny(tmp_path, target):
+    root = project(tmp_path)
+    roles = {"developer": {"write": ["**"], "deny": [".claude/**", "src/secrets/**"]}}
+    project(tmp_path, roles=roles)
+    reason = denied(hook(event(root, str(root / target)), {"HARNESS_ROLE": "developer"}))
+    assert "denied by" in reason
+
+
+def test_unicode_normalization_cannot_bypass_deny(tmp_path):
+    root = project(tmp_path, roles={"developer": {"write": ["**"], "deny": ["caf\u00e9/**"]}})
+    decomposed = str(root / "cafe\u0301" / "x.txt")
+    assert "denied by" in denied(hook(event(root, decomposed), {"HARNESS_ROLE": "developer"}))
+
+
+def test_symlink_plus_dotdot_is_denied(tmp_path):
+    root = project(tmp_path, roles={"lead": {"write": ["docs/**"]}})
+    (root / "docs").mkdir()
+    (root / ".claude/agents").mkdir(parents=True)
+    (root / "docs/link").symlink_to("../.claude/agents")
+    target = f"{root}/docs/link/../settings.json"
+    assert "'..' segments" in denied(hook(event(root, target), {"HARNESS_ROLE": "lead"}))
+
+
+def test_symlinked_project_directory_still_enforces(tmp_path):
+    real = tmp_path / "real"
+    real.mkdir()
+    project(real)
+    alias = tmp_path / "alias"
+    alias.symlink_to(real)
+    payload = event(alias, str(alias / "docs/x.md"))
+    env = {"HARNESS_ROLE": "developer", "CLAUDE_PROJECT_DIR": str(alias)}
+    assert "may not write docs/x.md" in denied(hook(payload, env))
+    payload = event(alias, str(alias / "src/a.py"))
+    assert allowed(hook(payload, env)) == ""
+
+
+def test_invalid_utf8_input_is_reported(tmp_path):
     project(tmp_path)
-    assert "too large" in allowed(hook("x" * 1_048_577, {"HARNESS_ROLE": "developer"}))
+    stdin = io.TextIOWrapper(io.BytesIO(b'{"cwd": "\xff"}'), encoding="utf-8")
+    stdout, stderr = io.StringIO(), io.StringIO()
+    run_pre_tool_use(stdin, stdout, stderr, {"HARNESS_ROLE": "developer"})
+    assert stdout.getvalue() == ""
+    assert "UnicodeDecodeError" in stderr.getvalue()
+
+
+def test_duplicate_role_keys_in_config_are_reported(tmp_path):
+    root = project(tmp_path)
+    (root / ".harness/config.yaml").write_text(
+        "project_name: x\nroles:\n  developer: {write: ['**']}\n  developer: {write: []}\n"
+    )
+    note = allowed(hook(event(root, str(root / "a")), {"HARNESS_ROLE": "developer"}))
+    assert "duplicate key 'developer'" in note
 
 
 def test_cli_hook_as_subprocess(tmp_path):

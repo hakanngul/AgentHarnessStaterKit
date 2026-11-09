@@ -156,9 +156,70 @@ def test_existing_output_file_is_not_overwritten(tmp_path):
     target = tmp_path / ".harness/evidence/T-1/E1.txt"
     target.parent.mkdir(parents=True)
     target.write_text("user file\n")
-    code, out = run(tmp_path, "T-1", "--", PY, "-c", "pass")
+    code, out = run(tmp_path, "T-1", "--id", "E1", "--", PY, "-c", "pass")
     assert code == 1 and "Refusing to overwrite" in out["errors"][0]
     assert target.read_text() == "user file\n"
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", "pass")
+    assert code == 0 and out["evidence"]["id"] == "E2"
+    assert target.read_text() == "user file\n"
+
+
+def test_task_edits_during_the_run_are_kept(tmp_path):
+    task = make_task(tmp_path)
+    script = (
+        f"import pathlib; p = pathlib.Path({str(task)!r});"
+        "p.write_text(p.read_text().replace('IN_PROGRESS', 'IN_REVIEW'))"
+    )
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", script)
+    assert code == 0, out
+    data = yaml.safe_load(task.read_text())
+    assert data["status"] == "IN_REVIEW"
+    assert data["evidence"][0]["id"] == "E1"
+
+
+def test_conflicting_id_does_not_delete_the_other_runs_output(tmp_path):
+    task = make_task(tmp_path)
+    other = tmp_path / ".harness/evidence/T-1/E1.txt"
+    script = (
+        f"import pathlib, yaml; t = pathlib.Path({str(task)!r});"
+        "d = yaml.safe_load(t.read_text());"
+        "d['evidence'] = [{'id': 'E1', 'command': 'x', 'exit_code': 0}];"
+        "t.write_text(yaml.safe_dump(d))"
+    )
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", script)
+    assert code == 1 and "gained evidence E1 while running" in out["errors"][0]
+    assert not other.exists()  # this run's own reserved file is removed
+    assert yaml.safe_load(task.read_text())["evidence"] == [
+        {"id": "E1", "command": "x", "exit_code": 0}
+    ]
+
+
+def test_lock_held_by_another_writer(tmp_path, monkeypatch):
+    task = make_task(tmp_path)
+    monkeypatch.setattr("agent_harness.evidence.LOCK_WAIT_SECONDS", 0.2)
+    lock = task.with_name(".T-1.yaml.lock")
+    lock.write_text("")
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", "pass")
+    assert code == 1 and "held by another writer" in out["errors"][0]
+    assert lock.exists()
+    assert not (tmp_path / ".harness/evidence/T-1").exists()
+    assert "evidence" not in yaml.safe_load(task.read_text())
+
+
+def test_json_output_summary_uses_last_meaningful_line(tmp_path):
+    make_task(tmp_path)
+    script = "import json; print(json.dumps({'ok': True}, indent=2))"
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", script)
+    assert out["evidence"]["summary"] == '"ok": true'
+
+
+def test_stale_temp_file_is_not_deleted(tmp_path):
+    task = make_task(tmp_path)
+    stale = task.with_name(".T-1.yaml.tmp")
+    stale.write_text("someone else's temp\n")
+    code, out = run(tmp_path, "T-1", "--", PY, "-c", "pass")
+    assert code == 0
+    assert stale.read_text() == "someone else's temp\n"
 
 
 def test_failed_task_write_removes_output(tmp_path, monkeypatch):

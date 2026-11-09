@@ -186,7 +186,7 @@ def hook_pre_tool_use() -> None:
     """Read a Claude Code PreToolUse event on stdin; deny writes outside the role scope."""
     import sys
 
-    raise typer.Exit(run_pre_tool_use(sys.stdin, sys.stdout, sys.stderr))
+    run_pre_tool_use(sys.stdin, sys.stdout, sys.stderr)
 
 
 @hook_app.command("install")
