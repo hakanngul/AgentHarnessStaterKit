@@ -1,0 +1,8 @@
+cwd=<scratch>/smoke (outside checkout)
+0.1.0
+init exit=0
+validate exit=0
+check-empty exit=0
+.harness/tasks/T-1.yaml: DONE but AC1 relies on failing evidence E1
+.harness/tasks/T-1.yaml: owner cannot approve their own task
+check-bad exit=1

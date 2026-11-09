@@ -3,7 +3,14 @@
 import datetime as dt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from agent_harness import __version__
 
@@ -44,7 +51,16 @@ DecisionId = Annotated[str, Field(pattern=r"^DEC-[1-9][0-9]*$", max_length=40)]
 Reference = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9]*-[1-9][0-9]*$", max_length=40)]
 CriterionId = Annotated[str, Field(pattern=r"^AC[1-9][0-9]*$")]
 EvidenceId = Annotated[str, Field(pattern=r"^E[1-9][0-9]*$")]
-LooseDate = Annotated[dt.date, Field(strict=False)]
+
+
+def _no_numeric_date(value: object) -> object:
+    # Lax date parsing would turn 0 into 1970-01-01; require a real date or ISO string.
+    if isinstance(value, int | float):
+        raise ValueError("date must be YYYY-MM-DD, not a number")
+    return value
+
+
+LooseDate = Annotated[dt.date, Field(strict=False), BeforeValidator(_no_numeric_date)]
 
 
 def _nonblank(value: str | None) -> bool:

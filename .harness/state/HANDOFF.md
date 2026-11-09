@@ -2,27 +2,27 @@
 
 ## Context
 
-First implementation of Agent Harness Starter Kit 0.1.0. Four CLI commands work:
-init, analyze, validate, doctor. Read README.md and docs/ARCHITECTURE.md.
+Agent Harness Starter Kit: Python CLI that installs a Claude Code development
+harness. Goal (docs/plans/team-system.md): a stack-independent AI development team
+where mistakes cannot be hidden. Faz 1 added the task/decision ledger and
+`harness check`. Read README.md, docs/ARCHITECTURE.md, the plan, then T-1.yaml.
 
 ## Decisions
 
-- Python >=3.11; Typer/Rich/Pydantic/Jinja2/PyYAML; pytest; hatchling packaging.
-- Python is the setup engine; Claude Code is an optional separately installed runtime.
-- Refuse file collisions; warn on edits; no destructive force/upgrade or shell execution.
-- Keep agent entry points small; task/progress/evidence/handoff are persistent memory.
-- Markdown guides behavior; it does not provide sandboxing or enforced completion.
+- Ledger lives in `.harness/tasks/` and `.harness/decisions/`; not created by init
+  and not in the manifest, so existing 0.1.0 installs keep validating.
+- Version stays 0.1.0: config pins harness_version; bump together with upgrade (Faz 4).
+- `check` never runs commands; evidence is a claim checked for consistency only.
+- Roles will be defined by authority and write scope, not by technology; stack
+  specifics come from data-only stack packs (Faz 3).
 
 ## Remaining work
 
-See docs/ROADMAP.md: safe upgrade/sync, structured task evidence contracts, dynamic
-role selection and additional adapters. Claude CLI/authentication and independent
-review were not tested. Do not claim optional roadmap features already exist.
+Finish T-1 review (PR #1). Then Faz 2–5 per the plan. Do not claim hooks, stack
+packs, upgrade or evidence recording exist.
 
 ## Resume
 
-Use this checkout; no worktree unless explicitly requested. Set
-UV_CACHE_DIR=/workspace/.cache/uv; run uv sync --frozen --group dev. Read AGENTS.md,
-TASK.md, PROGRESS.md, EVIDENCE.md. Start a new task with its own acceptance criteria.
-Expected modifications to these state files are reported as warnings by validate;
-do not overwrite them or refresh their original hashes just to suppress warnings.
+Use this checkout; no worktree unless asked. `uv sync --frozen --group dev`, then
+`uv run --frozen pytest` and `uv run --frozen harness check .`. Expected edits to
+generated files show as `validate` warnings; do not refresh hashes to hide them.

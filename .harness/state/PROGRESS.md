@@ -2,18 +2,16 @@
 
 ## Completed
 
-- Implemented Python package, CLI, strict config/manifest models and safe generation.
-- Packaged Claude Code templates and generated this repository's own harness files.
-- Added Turkish usage, architecture, contribution and roadmap documentation.
-- Added frozen uv lock, JSON schemas and GitHub Actions Python checks.
-- Passed 86 behavior tests, lint/format, sdist/wheel build and installed wheel smoke.
+- 0.1.0: CLI init/analyze/validate/doctor, templates, manifest, 86 tests.
+- Faz 1 (unreleased): task/decision ledger models, JSON schemas, `harness check`,
+  templates and docs, CI step, this repository's own ledger (T-1). 167 tests.
 
 ## Current work
 
-Final delivery of the initial implementation. No application feature remains in
-scope after successful checks; Git publication outcome is reported in the chat.
+T-1 in review: independent review findings fixed; re-review of the fixes pending.
+PR: hakanngul/AgentHarnessStaterKit#1.
 
 ## Next step
 
-Choose the next roadmap task. Do not describe upgrade, sync, dynamic specialist
-selection, runtime authentication, or completion enforcement as implemented.
+Faz 2 (docs/plans/team-system.md): role and write-scope config, tested hooks, and a
+command that records evidence by running a check, so evidence stops being self-reported.

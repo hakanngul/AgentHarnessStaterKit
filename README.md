@@ -89,6 +89,7 @@ her kabul kriterinin başarılı kanıta bağlı olması; review'un sahibinden f
 tarafından onaylanması ya da gerekçeli `unavailable`; bilinmeyen/döngüsel
 bağımlılıklar; PENDING karara bağlı ilerleyen iş; proje dışı veya symlink yollar.
 Komut çalıştırmaz: kanıtların tutarlılığını denetler, doğruluğunu kanıtlamaz.
+Reviewer adı (`review.by`) beyandır; kimlik doğrulaması yapılmaz.
 CI'da çalıştırılması önerilir. Plan: [docs/plans/team-system.md](docs/plans/team-system.md).
 
 ## Geliştirme döngüsü

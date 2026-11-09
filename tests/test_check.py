@@ -322,12 +322,131 @@ def test_published_json_schemas_match_models(model, name):
     assert published == model.model_json_schema()
 
 
-def test_generated_skill_example_matches_task_schema(tmp_path):
+def test_generated_skill_example_passes_check_with_pending_decision(tmp_path):
     result = runner.invoke(app, ["init", str(tmp_path), "--json"])
     assert result.exit_code == 0, result.output
     skill = (tmp_path / ".claude/skills/development/SKILL.md").read_text()
-    example = skill.split("```yaml\n", 1)[1].split("```", 1)[0]
-    task = Task.model_validate(yaml.safe_load(example))
-    assert task.depends_on == ["DEC-1"]
+    example = yaml.safe_load(skill.split("```yaml\n", 1)[1].split("```", 1)[0])
+    write(tmp_path, TASKS_DIR, example)
+    write(tmp_path, DECISIONS_DIR, decision())
     code, report = run_check(tmp_path)
-    assert code == 0 and report["summary"]["tasks"] == 0
+    assert code == 0, report
+    assert report["summary"]["tasks_blocked"] == 1
+
+
+def test_in_review_requires_acceptance_and_evidence(tmp_path):
+    errors = errors_for(tmp_path, done_task(status="IN_REVIEW", acceptance=[], evidence=[]))
+    assert any("IN_REVIEW requires acceptance" in error for error in errors)
+    assert any("IN_REVIEW requires recorded evidence" in error for error in errors)
+
+
+def test_in_review_does_not_require_review_yet(tmp_path):
+    assert errors_for(tmp_path, done_task(status="IN_REVIEW", review={})) == []
+
+
+def test_two_node_cycle(tmp_path):
+    write(tmp_path, TASKS_DIR, done_task(status="BACKLOG", depends_on=["T-2"]))
+    write(tmp_path, TASKS_DIR, done_task(id="T-2", status="BACKLOG", depends_on=["T-1"]))
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert any("T-1 -> T-2 -> T-1" in error for error in report["errors"])
+
+
+def test_long_dependency_chain_does_not_crash(tmp_path):
+    count = 1500
+    for number in range(1, count + 1):
+        depends = [f"T-{number + 1}"] if number < count else ["T-1"]
+        write(
+            tmp_path, TASKS_DIR, done_task(id=f"T-{number}", status="BACKLOG", depends_on=depends)
+        )
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert report["summary"]["tasks"] == count
+    assert sum("dependency cycle" in error for error in report["errors"]) == 1
+
+
+def test_duplicate_dependencies_are_reported(tmp_path):
+    write(tmp_path, DECISIONS_DIR, decision())
+    task = done_task(status="BLOCKED", reason="x", depends_on=["DEC-1", "DEC-1"])
+    assert any("duplicate depends_on" in error for error in errors_for(tmp_path, task))
+
+
+def test_active_task_on_withdrawn_decision(tmp_path):
+    write(tmp_path, DECISIONS_DIR, decision(status="WITHDRAWN"))
+    errors = errors_for(tmp_path, done_task(depends_on=["DEC-1"]))
+    assert any("dependency DEC-1 is WITHDRAWN" in error for error in errors)
+
+
+@pytest.mark.parametrize("reviewer", ["Developer", " DEVELOPER ", "developer"])
+def test_self_approval_ignores_case_and_spacing(tmp_path, reviewer):
+    task = done_task(review={"status": "approved", "by": reviewer})
+    assert any("cannot approve their own" in e for e in errors_for(tmp_path, task))
+
+
+def test_ledger_path_that_is_a_file(tmp_path):
+    (tmp_path / ".harness").mkdir()
+    (tmp_path / TASKS_DIR).write_text("not a directory\n")
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert "is not a directory" in report["errors"][0]
+
+
+def test_ledger_entry_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_harness.check.MAX_LEDGER_FILES", 2)
+    for number in range(1, 4):
+        write(tmp_path, TASKS_DIR, done_task(id=f"T-{number}"))
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert "more than 2 entries" in report["errors"][0]
+
+
+@pytest.mark.parametrize("output", ["/etc/passwd", "a" * 300, "logs/" + "b" * 300 + "/x.txt"])
+def test_hostile_evidence_output_paths_are_reported(tmp_path, output):
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "output": output}]
+    errors = errors_for(tmp_path, done_task(evidence=evidence))
+    assert any("evidence E1" in error for error in errors), errors
+
+
+def test_symlinked_evidence_output_is_rejected(tmp_path):
+    (tmp_path / "real.txt").write_text("ok\n")
+    (tmp_path / "link.txt").symlink_to(tmp_path / "real.txt")
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "output": "link.txt"}]
+    errors = errors_for(tmp_path, done_task(evidence=evidence))
+    assert any("Symlinked managed path" in error for error in errors)
+
+
+def test_deeply_nested_yaml_is_reported_not_raised(tmp_path):
+    target = tmp_path / TASKS_DIR / "T-1.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text("[" * 20000)
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert report["errors"] and report["errors"][0].startswith(f"{TASKS_DIR}/T-1.yaml")
+
+
+def test_unreadable_ledger_directory_is_reported(tmp_path, monkeypatch):
+    write(tmp_path, TASKS_DIR, done_task())
+
+    def deny(self):
+        raise PermissionError(13, "Permission denied", str(self))
+
+    monkeypatch.setattr(Path, "iterdir", deny)
+    code, report = run_check(tmp_path)
+    assert code == 1
+    assert "cannot be listed" in report["errors"][0]
+
+
+def test_unquoted_yaml_date_is_accepted(tmp_path):
+    text = yaml.safe_dump(done_task()).replace("'2026-11-09'", "2026-11-09")
+    assert "recorded_at: 2026-11-09" in text
+    target = tmp_path / TASKS_DIR / "T-1.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text(text)
+    assert run_check(tmp_path)[0] == 0
+
+
+@pytest.mark.parametrize("value", [0, 1731110400, 1.5, True])
+def test_numeric_dates_are_rejected(tmp_path, value):
+    evidence = [{"id": "E1", "command": "pytest", "exit_code": 0, "recorded_at": value}]
+    errors = errors_for(tmp_path, done_task(evidence=evidence))
+    assert any("not a number" in error for error in errors), errors

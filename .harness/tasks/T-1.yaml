@@ -1,0 +1,90 @@
+schema_version: 1
+id: T-1
+title: "Faz 1: structured task/decision ledger and harness check"
+owner: developer
+status: IN_REVIEW
+goal: >-
+  Stack-independent ledger for tasks, evidence and user decisions, validated by
+  `harness check` without executing commands. Plan: docs/plans/team-system.md.
+scope:
+  - src/agent_harness/models.py
+  - src/agent_harness/check.py
+  - src/agent_harness/cli.py
+  - src/agent_harness/templates/
+  - schemas/
+  - tests/test_check.py
+  - docs/
+acceptance:
+  - id: AC1
+    text: Strict, versioned task/decision models; published JSON schemas match the models.
+    verified_by: [E3]
+  - id: AC2
+    text: "`harness check` exits 1 on errors, 0 otherwise; runs no commands and says so."
+    verified_by: [E3, E6]
+  - id: AC3
+    text: DONE needs passing evidence per criterion and an independent or explained review.
+    verified_by: [E3, E6]
+  - id: AC4
+    text: Unknown, self, duplicate and cyclic dependencies and work on pending decisions fail.
+    verified_by: [E3]
+  - id: AC5
+    text: Symlinks, out-of-project paths and hostile YAML are reported, never crash the command.
+    verified_by: [E3]
+  - id: AC6
+    text: Templates document the ledger; the example passes check; 0.1.0 installs still validate.
+    verified_by: [E3, E5, E6]
+  - id: AC7
+    text: This repository uses its own ledger and CI runs `harness check .`.
+    verified_by: [E7]
+evidence:
+  - id: E1
+    command: uv run --frozen ruff check .
+    exit_code: 0
+    summary: All checks passed
+    output: .harness/evidence/T-1/ruff-check.txt
+    recorded_at: 2026-11-09
+  - id: E2
+    command: uv run --frozen ruff format --check .
+    exit_code: 0
+    summary: 32 files already formatted
+    output: .harness/evidence/T-1/ruff-format.txt
+    recorded_at: 2026-11-09
+  - id: E3
+    command: uv run --frozen pytest -q
+    exit_code: 0
+    summary: >-
+      167 passed (86 existing + 81 ledger tests). The 11 regression tests for review
+      findings failed against commit a3ce0a9 and pass now.
+    output: .harness/evidence/T-1/pytest.txt
+    recorded_at: 2026-11-09
+  - id: E4
+    command: uv run --frozen python -m build --no-isolation
+    exit_code: 0
+    summary: sdist and wheel built
+    output: .harness/evidence/T-1/build.txt
+    recorded_at: 2026-11-09
+  - id: E5
+    command: uv run --frozen harness validate . --json
+    exit_code: 0
+    summary: Config and manifest valid; edited generated files reported as customizations
+    output: .harness/evidence/T-1/validate.txt
+    recorded_at: 2026-11-09
+  - id: E6
+    command: installed wheel in a fresh venv outside the checkout; init, validate, check
+    exit_code: 0
+    summary: >-
+      init/validate/empty check exit 0; a DONE task with failing evidence and
+      case-variant self-approval made check exit 1 with both errors
+    output: .harness/evidence/T-1/wheel-smoke.txt
+    recorded_at: 2026-11-09
+  - id: E7
+    command: uv run --frozen harness check . --json
+    exit_code: 0
+    summary: This ledger validated; CI step added in .github/workflows/ci.yml
+    output: .harness/evidence/T-1/harness-check.txt
+    recorded_at: 2026-11-09
+review:
+  status: pending
+log:
+  - "2026-11-09 reviewer agent: 1 high, 4 medium, 4 low findings; all fixed with tests"
+  - "2026-11-09 re-review of fixes requested"
