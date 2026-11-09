@@ -2,7 +2,7 @@ schema_version: 1
 id: T-1
 title: "Faz 1: structured task/decision ledger and harness check"
 owner: developer
-status: IN_REVIEW
+status: DONE
 goal: >-
   Stack-independent ledger for tasks, evidence and user decisions, validated by
   `harness check` without executing commands. Plan: docs/plans/team-system.md.
@@ -87,7 +87,12 @@ evidence:
     output: .harness/evidence/T-1/harness-check.txt
     recorded_at: 2026-11-09
 review:
-  status: pending
+  status: approved
+  by: reviewer
+  notes: >-
+    Read-only reviewer subagent in the same session; read code only, ran no commands.
+    Four rounds plus Sourcery's PR review: all findings fixed with regression tests.
+    Final verdict on 3c92c6f: APPROVED, no blocking items.
 log:
   - "2026-11-09 reviewer agent: 1 high, 4 medium, 4 low findings; all fixed with tests"
   - "2026-11-09 re-review: all findings resolved; blocking: invalid YAML date crashed check"
@@ -95,3 +100,4 @@ log:
   - "2026-11-09 final re-review: APPROVED; status DONE"
   - "2026-11-09 Sourcery PR review on a3ce0a9: 6 new real findings fixed after approval; back to IN_REVIEW"
   - "2026-11-09 re-review: merge keys (<<) wrongly rejected; fixed; cwd spellings normalized"
+  - "2026-11-09 final re-review on 3c92c6f: APPROVED; status DONE"
