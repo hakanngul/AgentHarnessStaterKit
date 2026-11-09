@@ -8,7 +8,7 @@
     "Evidence is checked for consistency only; commands were not rerun"
   ],
   "summary": {
-    "tasks_in_review": 1,
+    "tasks_done": 1,
     "tasks": 1,
     "decisions": 0,
     "decisions_pending": 0

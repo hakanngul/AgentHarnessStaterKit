@@ -18,8 +18,8 @@ where mistakes cannot be hidden. Faz 1 added the task/decision ledger and
 
 ## Remaining work
 
-Finish T-1 review (PR #1). Then Faz 2–5 per the plan. Do not claim hooks, stack
-packs, upgrade or evidence recording exist.
+T-1 is DONE; PR #1 awaits CI and the user's merge decision. Then Faz 2–5 per
+the plan. Do not claim hooks, stack packs, upgrade or evidence recording exist.
 
 ## Resume
 
