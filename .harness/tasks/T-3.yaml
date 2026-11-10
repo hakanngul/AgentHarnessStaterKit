@@ -1,0 +1,88 @@
+schema_version: 1
+id: T-3
+title: 'Faz 2b: roles and write scopes in config; harness scope'
+owner: developer
+status: DONE
+acceptance:
+- id: AC3
+  text: Strict role/glob config; scope applies deny before allow; rejects outside and .. paths.
+  verified_by:
+  - E6
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 67d1662e7c4815b75b6aa860628245b79e22c1f0
+  output: .harness/evidence/T-3/E1.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 36 files already formatted
+  commit: 67d1662e7c4815b75b6aa860628245b79e22c1f0
+  output: .harness/evidence/T-3/E2.txt
+  output_sha256: 1f65f71255a0421f69bd105212d663fff7e01288f5e4cd5ab477196e2a95180c
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 255 passed in 4.96s
+  commit: 67d1662e7c4815b75b6aa860628245b79e22c1f0
+  output: .harness/evidence/T-3/E3.txt
+  output_sha256: 2b8ba1dc6e9f3546199c5c6e889a354df96d73387b94f5c035501a20d6ba351e
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: 67d1662e7c4815b75b6aa860628245b79e22c1f0
+  output: .harness/evidence/T-3/E4.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: validate ok; config changed (roles added) reported as customization
+  commit: 67d1662e7c4815b75b6aa860628245b79e22c1f0
+  output: .harness/evidence/T-3/E5.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 322 passed in 12.84s
+  commit: dd1bf1c498e4588e74175e7be4cf04c8c5b2bfaf
+  output: .harness/evidence/T-3/E6.txt
+  output_sha256: c58e4e52e344adbf40db02ec6fb0613c7ef8053a9808617fc4c2368446673c08
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+log:
+- 2026-11-09 this repository now defines roles; check validates task owners against them
+- 2026-11-10 final-tree evidence E6 at dd1bf1c; review approved; DONE
+review:
+  status: approved
+  by: reviewer
+  notes: 'Independent read-only reviewer subagent in this session; read code only, ran no
+    commands. Rounds: 3 medium + 9 low findings, then 1 blocking (leftover processes writing
+    into evidence), plus Sourcery''s PR review (11 new real findings) and SonarCloud S2612/S3516;
+    all fixed with regression tests that fail on the previous code. Final verdict on dd1bf1c:
+    APPROVED.'

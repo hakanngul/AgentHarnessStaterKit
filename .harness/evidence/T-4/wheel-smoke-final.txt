@@ -1,0 +1,11 @@
+cwd outside checkout; version 0.1.0
+init exit=0
+hook install exit=0
+idempotent=1
+dev->.claude: "permissionDecision": "deny"
+dev->.CLAUDE (case): "permissionDecision": "deny"
+dev->src output='' (empty = allow)
+evidence exit=0
+redacted lines=1
+check exit=0
+validate exit=0

@@ -11,36 +11,23 @@ from typing import TypeVar
 import yaml
 from pydantic import ValidationError
 
-from agent_harness.filesystem import HarnessError, managed_path, project_root, read_text
+from agent_harness.filesystem import (
+    HarnessError,
+    load_yaml,
+    managed_path,
+    project_root,
+    read_text,
+    sha256_file,
+)
 from agent_harness.models import Decision, LedgerReport, Task
 
 TASKS_DIR = ".harness/tasks"
 DECISIONS_DIR = ".harness/decisions"
+CONFIG_PATH = ".harness/config.yaml"
 MAX_LEDGER_FILES = 5000
 MAX_LEDGER_BYTES = 32 * 1_048_576  # aggregate cap per ledger directory
 ACTIVE = {"READY", "IN_PROGRESS", "IN_REVIEW", "DONE"}
 M = TypeVar("M", Task, Decision)
-
-
-class _UniqueKeyLoader(yaml.SafeLoader):
-    """SafeLoader that rejects repeated mapping keys instead of keeping the last one."""
-
-    def construct_mapping(self, node, deep=False):
-        seen = set()
-        for key_node, _ in node.value:
-            if key_node.tag == "tag:yaml.org,2002:merge":
-                continue  # `<<` merge keys are flattened by the base constructor
-            key = self.construct_object(key_node, deep=deep)
-            try:
-                duplicate = key in seen
-            except TypeError:
-                continue  # unhashable keys are rejected later by the base constructor
-            if duplicate:
-                raise yaml.constructor.ConstructorError(
-                    None, None, f"duplicate key {key!r}", key_node.start_mark
-                )
-            seen.add(key)
-        return super().construct_mapping(node, deep=deep)
 
 
 def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -> dict[str, M]:
@@ -75,7 +62,7 @@ def _load(root: Path, relative_dir: str, model: type[M], report: LedgerReport) -
             if total_bytes > MAX_LEDGER_BYTES:
                 report.errors.append(f"{relative_dir} exceeds {MAX_LEDGER_BYTES} bytes in total")
                 return items
-            item = model.model_validate(yaml.load(read_text(entry), Loader=_UniqueKeyLoader))
+            item = model.model_validate(load_yaml(read_text(entry)))
         except ValidationError as exc:
             for error in exc.errors(include_input=False):
                 location = ".".join(str(part) for part in error["loc"]) or "<root>"
@@ -140,8 +127,15 @@ def _check_task(
             cwd = PurePosixPath(item.cwd).as_posix()  # accept "./src", "src/" and "./"
             if cwd != "." and not managed_path(root, cwd).is_dir():
                 errors.append(f"{where}: evidence {item.id} cwd not found: {item.cwd}")
-            if item.output is not None and not managed_path(root, item.output).is_file():
-                errors.append(f"{where}: evidence {item.id} output not found: {item.output}")
+            if item.output is not None:
+                output = managed_path(root, item.output)
+                if not output.is_file():
+                    errors.append(f"{where}: evidence {item.id} output not found: {item.output}")
+                elif item.output_sha256 and sha256_file(output) != item.output_sha256:
+                    errors.append(
+                        f"{where}: evidence {item.id} output changed after it was recorded "
+                        f"(sha256 mismatch): {item.output}"
+                    )
         except (OSError, ValueError) as exc:  # ValueError includes HarnessError and NUL bytes
             errors.append(f"{where}: evidence {item.id}: {exc}")
 
@@ -206,6 +200,19 @@ def _cycles(tasks: dict[str, Task]) -> list[str]:
     return found
 
 
+def _configured_roles(root: Path, report: LedgerReport) -> set[str]:
+    """Role names from the config; empty when the project defines none."""
+    from agent_harness.roles import load_config
+
+    try:
+        if not managed_path(root, CONFIG_PATH).exists():
+            return set()
+        return set(load_config(root).roles)
+    except (HarnessError, OSError) as exc:
+        report.errors.append(f"{CONFIG_PATH}: {exc}")
+        return set()
+
+
 def check(path: Path) -> LedgerReport:
     report = LedgerReport()
     try:
@@ -216,8 +223,15 @@ def check(path: Path) -> LedgerReport:
         report.errors.append(str(exc))
         return report
 
+    roles = _configured_roles(root, report)
     for task_id in sorted(tasks):
         _check_task(tasks[task_id], tasks, decisions, root, report.errors)
+        owner = tasks[task_id].owner.strip()
+        if roles and owner not in roles:
+            report.errors.append(
+                f"{TASKS_DIR}/{task_id}.yaml: owner {owner!r} is not a role in "
+                f"{CONFIG_PATH} ({', '.join(sorted(roles))})"
+            )
     for cycle in _cycles(tasks):
         report.errors.append(f"dependency cycle: {cycle}")
 

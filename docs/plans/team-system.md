@@ -20,7 +20,7 @@ olarak taşınır.
 | Faz | İçerik | Durum |
 | --- | --- | --- |
 | 1 | Görev/kanıt/karar şemaları + `harness check` | uygulandı, review onaylı (T-1) |
-| 2 | config'te rol + yazma kapsamı; testli hook'lar | planlandı |
+| 2 | Kanıt kaydeden komut, config'te rol + yazma kapsamı, testli hook | uygulandı, review onaylı (T-2..T-4) |
 | 3 | Stack pack mekanizması: generic + 2 pack | planlandı |
 | 4 | `upgrade` / `sync`, kullanıcı değişikliklerini koruyarak | planlandı |
 | 5 | Opsiyonel roller, sürüm sabitli dış skill'ler | ihtiyaca göre |
@@ -54,3 +54,41 @@ denetler; doğruluğunu kanıtlamaz.
   kaydeden bir komut (`harness evidence run`) ve CI'da gerçek test koşusu.
 - Sürüm 0.1.0'da kaldı: config `harness_version` sabit değer olduğu için yükseltme
   mevcut kurulumları bozardı. Sürüm yükseltme Faz 4 (`upgrade`) ile birlikte yapılır.
+
+## Faz 2 kapsamı
+
+Üç görev, tek PR, ayrı commit'ler:
+
+- T-2 `harness evidence run TASK [--id E<n>] [--cwd DIR] -- KOMUT...`: komutu shell
+  olmadan çalıştırır, çıktıyı `.harness/evidence/<TASK>/<E>.txt`'ye yazar, çıkış kodu,
+  komut, dizin, tarih, commit ve çıktı hash'iyle görev dosyasına `recorded_by: harness`
+  kanıtı ekler. `check` hash'i doğrular; sonradan değiştirilmiş çıktıyı yakalar.
+- T-3 `config.yaml` içinde `roles: {ad: {write: [glob], deny: [glob]}}` (opsiyonel; eski
+  config'ler geçerli kalır). `harness scope ROL YOL...` izin kararı verir. `check`,
+  roller tanımlıysa görev sahibinin tanımlı bir rol olmasını ister.
+- T-4 `harness hook pre-tool-use`: Claude Code PreToolUse girdisini okur, rolün yazma
+  kapsamı dışını reddeder. `harness hook install` hook'u `.claude/settings.json`'a
+  mevcut ayarları koruyarak ekler (opsiyonel, dry-run destekli).
+
+## Faz 2 kabul kriterleri
+
+- AC1: `evidence run` komutu argv olarak çalıştırır (shell yok), çıktıyı ve kaydı yazar,
+  komut başarısızsa da kaydeder ve 1 ile çıkar; görev dosyası geçersiz kalacaksa yazmaz.
+- AC2: `check`, harness kayıtlı kanıtın çıktı dosyası hash'ini doğrular.
+- AC3: Rol/glob config'i katı şemayla doğrulanır; `scope` deny'ı allow'dan önce uygular,
+  proje dışı ve `..` yolları reddeder.
+- AC4: Hook kapsam dışı yazmayı Claude Code'un belgelenmiş biçimiyle reddeder; rol
+  belirlenemiyorsa ya da config'te rol yoksa engellemez ve bunu belirtir; config'te
+  olmayan bir `HARNESS_ROLE` reddedilir.
+- AC5: `hook install` mevcut settings.json içeriğini korur, tekrar çalıştırınca
+  çoğaltmaz, geçersiz JSON'da hiçbir şey yazmaz.
+- AC6: Mevcut 0.1.0 kurulumları `validate` ve `check`'ten geçmeye devam eder.
+
+## Faz 2 sınırları
+
+- Hook yalnız Write/Edit/MultiEdit/NotebookEdit'i görür; Bash ile yazma engellenmez.
+  Asıl güvence CI'dır.
+- `evidence run` ile kaydedilen kanıt da yerel makinede üretilir; hash, çıktının
+  sonradan değiştirilmesini yakalar, uydurulmasını değil. Güvenilir kanıt CI koşusudur.
+- Bu fazda CLI ilk kez komut çalıştırır; yalnız kullanıcının/ajanın açıkça verdiği
+  argv'yi, proje metadata'sından gelen komutları değil.

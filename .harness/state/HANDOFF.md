@@ -12,14 +12,17 @@ where mistakes cannot be hidden. Faz 1 added the task/decision ledger and
 - Ledger lives in `.harness/tasks/` and `.harness/decisions/`; not created by init
   and not in the manifest, so existing 0.1.0 installs keep validating.
 - Version stays 0.1.0: config pins harness_version; bump together with upgrade (Faz 4).
-- `check` never runs commands; evidence is a claim checked for consistency only.
+- `check` never runs commands. `evidence run` runs only explicit argv, no shell;
+  its hash detects later edits, not fabrication. CI is the trusted run.
+- Hook role comes from HARNESS_ROLE, else agent_type if configured; unknown role is
+  not blocked. Do not install the hook into this repository's own settings.
 - Roles will be defined by authority and write scope, not by technology; stack
   specifics come from data-only stack packs (Faz 3).
 
 ## Remaining work
 
-T-1 is DONE; PR #1 awaits CI and the user's merge decision. Then Faz 2–5 per
-the plan. Do not claim hooks, stack packs, upgrade or evidence recording exist.
+Faz 2 is DONE in PR #2 (awaiting merge). Then Faz 3 (stack packs) and Faz 4 (upgrade) per the
+plan. Do not claim stack packs, upgrade or a sandbox exist. The hook does not see Bash.
 
 ## Resume
 

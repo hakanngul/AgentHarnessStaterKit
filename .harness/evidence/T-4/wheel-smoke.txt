@@ -1,0 +1,16 @@
+cwd outside checkout; version 0.1.0
+init exit=0
+hook install exit=0
+idempotent=1
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "[harness] Role 'developer' may not write .claude/agents/lead.md: denied by '.claude/**'. Write scopes are in .harness/config.yaml; ask the lead or the user if this is needed."}}
+hook(dev->.claude) exit=0
+hook(dev->src, no output=allow) exit=0
+ok: true
+evidence: {"id": "E1", "kind": "command", "command": "python3 -c 'print('\"'\"'1
+passed'\"'\"')'", "cwd": ".", "exit_code": 0, "summary": "1 passed", "output": 
+".harness/evidence/T-1/E1.txt", "output_sha256": 
+"a92b7fdcb45e1d22fc2af4c80adc6e7fc1389ff8a694010cf5e6ff0b5ffbf1f6", 
+"recorded_at": "2026-11-09", "recorded_by": "harness"}
+evidence exit=0
+check exit=0
+validate exit=0

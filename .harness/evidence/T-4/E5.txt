@@ -1,0 +1,21 @@
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+{
+  "ok": true,
+  "errors": [],
+  "warnings": [
+    "Local customizations detected; files were preserved"
+  ],
+  "modified_files": [
+    ".claude/skills/development/SKILL.md",
+    ".harness/config.yaml",
+    ".harness/state/EVIDENCE.md",
+    ".harness/state/HANDOFF.md",
+    ".harness/state/PROGRESS.md",
+    ".harness/state/TASK.md",
+    "AGENTS.md"
+  ],
+  "checks": [
+    "Configuration schema is valid",
+    "Manifest schema and file list are valid"
+  ]
+}

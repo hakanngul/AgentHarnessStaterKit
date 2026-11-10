@@ -1,0 +1,159 @@
+schema_version: 1
+id: T-4
+title: 'Faz 2c: PreToolUse hook and hook install'
+owner: developer
+status: DONE
+depends_on:
+- T-3
+acceptance:
+- id: AC4
+  text: Hook denies out-of-scope writes in Claude Code's documented format; no detectable
+    role is not blocked, an unconfigured HARNESS_ROLE is denied.
+  verified_by:
+  - E7
+  - E12
+- id: AC5
+  text: hook install preserves settings.json, is idempotent, writes nothing on invalid JSON.
+  verified_by:
+  - E7
+  - E12
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 409e0536bd425ef9b2a2cf96695fdf429a19623e
+  output: .harness/evidence/T-4/E1.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 38 files already formatted
+  commit: 409e0536bd425ef9b2a2cf96695fdf429a19623e
+  output: .harness/evidence/T-4/E2.txt
+  output_sha256: d74b90a378dd77c04698fb828f1ccd0ff0f8ade34ad2987cfc2d7776ea35e29e
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 283 passed in 5.96s
+  commit: 409e0536bd425ef9b2a2cf96695fdf429a19623e
+  output: .harness/evidence/T-4/E3.txt
+  output_sha256: 887d2959a09a0674d77f21b137f3c615ae1fe35c61551e6454126ce96213922b
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: 409e0536bd425ef9b2a2cf96695fdf429a19623e
+  output: .harness/evidence/T-4/E4.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: validate ok; edited generated files reported as customizations
+  commit: 409e0536bd425ef9b2a2cf96695fdf429a19623e
+  output: .harness/evidence/T-4/E5.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E6
+  kind: manual
+  result: pass
+  summary: 'Built wheel installed with uv into a fresh venv outside the checkout: init, hook
+    install (idempotent), real hook process denied developer -> .claude/agents/lead.md and
+    allowed src/app.py, evidence run recorded, check and validate exit 0.'
+  output: .harness/evidence/T-4/wheel-smoke.txt
+  recorded_at: '2026-11-09'
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 322 passed in 13.03s
+  commit: dd1bf1c498e4588e74175e7be4cf04c8c5b2bfaf
+  output: .harness/evidence/T-4/E7.txt
+  output_sha256: 7dabc8dfbd0e51af5656a79fd81a76b8bd4ba260cc0834c40f9dcbd8c4a0bdc2
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: dd1bf1c498e4588e74175e7be4cf04c8c5b2bfaf
+  output: .harness/evidence/T-4/E8.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 38 files already formatted
+  commit: dd1bf1c498e4588e74175e7be4cf04c8c5b2bfaf
+  output: .harness/evidence/T-4/E9.txt
+  output_sha256: d74b90a378dd77c04698fb828f1ccd0ff0f8ade34ad2987cfc2d7776ea35e29e
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: dd1bf1c498e4588e74175e7be4cf04c8c5b2bfaf
+  output: .harness/evidence/T-4/E10.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: validate ok on final tree; edited generated files reported as customizations
+  commit: dd1bf1c498e4588e74175e7be4cf04c8c5b2bfaf
+  output: .harness/evidence/T-4/E11.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-09'
+  recorded_by: harness
+- id: E12
+  kind: manual
+  result: pass
+  summary: 'Built wheel from dd1bf1c installed with uv into a fresh venv outside the checkout:
+    init; hook install (idempotent); real hook process denied developer -> .claude/agents/lead.md
+    and -> .CLAUDE/settings.json, allowed src/app.py; evidence run redacted API_TOKEN; check
+    and validate exit 0.'
+  output: .harness/evidence/T-4/wheel-smoke-final.txt
+  recorded_at: '2026-11-10'
+log:
+- 2026-11-09 set IN_REVIEW while T-3 was not DONE; harness check rejected it; corrected to
+  BLOCKED
+- 2026-11-10 final-tree evidence E7-E12 at dd1bf1c; review approved; DONE
+review:
+  status: approved
+  by: reviewer
+  notes: 'Independent read-only reviewer subagent in this session; read code only, ran no
+    commands. Rounds: 3 medium + 9 low findings, then 1 blocking (leftover processes writing
+    into evidence), plus Sourcery''s PR review (11 new real findings) and SonarCloud S2612/S3516;
+    all fixed with regression tests that fail on the previous code. Final verdict on dd1bf1c:
+    APPROVED.'

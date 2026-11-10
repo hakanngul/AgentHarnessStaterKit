@@ -12,9 +12,13 @@ from agent_harness import __version__
 from agent_harness.analyze import analyze as inspect_project
 from agent_harness.check import check as check_ledger
 from agent_harness.doctor import doctor as diagnose
-from agent_harness.filesystem import HarnessError
+from agent_harness.evidence import run_evidence
+from agent_harness.filesystem import HarnessError, project_root
 from agent_harness.generate import initialize
+from agent_harness.hooks import install as install_hook
+from agent_harness.hooks import run_pre_tool_use
 from agent_harness.models import Report
+from agent_harness.roles import decide, load_config
 from agent_harness.validate import validate as check_project
 
 app = typer.Typer(
@@ -99,6 +103,115 @@ def validate(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> No
 def check(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> None:
     """Check the task and decision ledger for completeness; commands are not rerun."""
     report_result(check_ledger(path), output_json)
+
+
+evidence_app = typer.Typer(no_args_is_help=True, help="Record task evidence.")
+app.add_typer(evidence_app, name="evidence")
+
+
+@evidence_app.command("run")
+def evidence_run(
+    task: Annotated[str, typer.Argument(help="Task id, e.g. T-1.")],
+    command: Annotated[list[str], typer.Argument(help="Command to run, after `--`.")],
+    path: Annotated[Path, typer.Option("--path", help="Project directory.")] = Path("."),
+    evidence_id: Annotated[
+        str | None, typer.Option("--id", help="Evidence id; default next E<n>.")
+    ] = None,
+    cwd: Annotated[str, typer.Option(help="Working directory inside the project.")] = ".",
+    timeout: Annotated[
+        float, typer.Option(help="Timeout in seconds; the run is recorded as exit 124.")
+    ] = 3600.0,
+    summary: Annotated[str | None, typer.Option(help="Summary; default last output line.")] = None,
+    output_json: JsonFlag = False,
+) -> None:
+    """Run a command without a shell and record its result as task evidence.
+
+    Exits 1 when the command fails; the failure is still recorded.
+    """
+    try:
+        item = run_evidence(
+            path,
+            task,
+            command,
+            evidence_id=evidence_id,
+            cwd=cwd,
+            timeout=timeout,
+            summary=summary,
+        )
+    except (HarnessError, OSError, UnicodeError, ValidationError) as exc:
+        fail(exc, output_json)
+    warnings = [] if item.commit else ["No git commit recorded (not a Git checkout?)"]
+    emit(
+        {
+            "ok": item.passed,
+            "evidence": item.model_dump(mode="json", exclude_none=True),
+            "warnings": warnings,
+        },
+        output_json,
+    )
+    if not item.passed:
+        raise typer.Exit(1)
+
+
+@app.command()
+def scope(
+    role: Annotated[str, typer.Argument(help="Role name from .harness/config.yaml.")],
+    targets: Annotated[list[str], typer.Argument(help="Paths to check.")],
+    path: Annotated[Path, typer.Option("--path", help="Project directory.")] = Path("."),
+    output_json: JsonFlag = False,
+) -> None:
+    """Report whether a role may write each path; exits 1 if any is denied."""
+    try:
+        root = project_root(path)
+        config = load_config(root)
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    if not config.roles:
+        fail(HarnessError("No roles are defined in .harness/config.yaml"), output_json)
+    decisions = [decide(config, role, root, target) for target in targets]
+    allowed = all(item.allowed for item in decisions)
+    emit(
+        {
+            "ok": allowed,
+            "role": role,
+            "decisions": [
+                {"path": d.path, "allowed": d.allowed, "reason": d.reason} for d in decisions
+            ],
+        },
+        output_json,
+    )
+    if not allowed:
+        raise typer.Exit(1)
+
+
+hook_app = typer.Typer(no_args_is_help=True, help="Claude Code hook integration.")
+app.add_typer(hook_app, name="hook")
+
+
+@hook_app.command("pre-tool-use")
+def hook_pre_tool_use() -> None:
+    """Read a Claude Code PreToolUse event on stdin; deny writes outside the role scope."""
+    import sys
+
+    run_pre_tool_use(sys.stdin, sys.stdout, sys.stderr)
+
+
+@hook_app.command("install")
+def hook_install(
+    path: ProjectPath = Path("."),
+    command: Annotated[
+        str, typer.Option(help="How Claude Code should invoke harness, e.g. 'uv run harness'.")
+    ] = "harness",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the result without writing.")
+    ] = False,
+    output_json: JsonFlag = False,
+) -> None:
+    """Register the PreToolUse hook in .claude/settings.json, keeping existing settings."""
+    try:
+        emit({"ok": True, **install_hook(path, command=command, dry_run=dry_run)}, output_json)
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
 
 
 @app.command()
