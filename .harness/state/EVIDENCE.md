@@ -29,6 +29,9 @@ could write into recorded evidence after hashing; fixed by streaming into a priv
 unlinked temp file and killing the process group on timeout. Final verdict on dd1bf1c:
 APPROVED. PR bots: Sourcery (24 findings on an older commit; real ones fixed, 4 threads
 left for the maintainer), SonarCloud (S3516, S2612; fixed, gate green).
+Maintainer decisions (2026-11-10): the subprocess audit finding is by design and is
+suppressed inline with its justification; redaction stays heuristic; settings.json
+concurrency is not addressed.
 
 ## Not tested / limits
 

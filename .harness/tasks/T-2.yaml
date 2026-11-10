@@ -86,9 +86,17 @@ evidence:
   output_sha256: 22a52f47928c0b0ae3382f78af94ead1140ed1ea006b10158d3b0f40eec49dbe
   recorded_at: '2026-11-09'
   recorded_by: harness
-log:
-- 2026-11-09 evidence for T-2 recorded with harness evidence run itself (E1-E5)
-- 2026-11-10 final-tree evidence E6 at dd1bf1c; review approved; DONE
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 322 passed in 14.89s
+  commit: a2d9380ab61028bad4f9fc813686c1ab207923ed
+  output: .harness/evidence/T-2/E7.txt
+  output_sha256: b63d884c9045fd9d858842d0a2024c94480e0b709591776cd06bb5cb9654694f
+  recorded_at: '2026-11-10'
+  recorded_by: harness
 review:
   status: approved
   by: reviewer
@@ -97,3 +105,9 @@ review:
     into evidence), plus Sourcery''s PR review (11 new real findings) and SonarCloud S2612/S3516;
     all fixed with regression tests that fail on the previous code. Final verdict on dd1bf1c:
     APPROVED.'
+log:
+- 2026-11-09 evidence for T-2 recorded with harness evidence run itself (E1-E5)
+- 2026-11-10 final-tree evidence E6 at dd1bf1c; review approved; DONE
+- '2026-11-10 maintainer decisions on PR #2: subprocess audit finding accepted as by-design
+  with an inline nosemgrep and justification; heuristic redaction kept as is; settings.json
+  concurrency not fixed. E7 recorded after the comment-only change.'

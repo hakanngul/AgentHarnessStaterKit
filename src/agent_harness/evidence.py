@@ -103,7 +103,11 @@ def _run(argv: list[str], workdir: Path, sink, timeout: float | None) -> tuple[i
     """Run argv with output to sink; on timeout kill its whole process group (POSIX)."""
     posix = os.name == "posix"
     try:
-        process = subprocess.Popen(
+        # Reviewed (PR #2): argv comes only from the arguments the caller passes after
+        # `--`; nothing is read from task files or project metadata, and no shell is used.
+        # Running that command is the purpose of `harness evidence run`. Suppressed rule:
+        # python.lang.security.audit.dangerous-subprocess-use-audit
+        process = subprocess.Popen(  # nosemgrep
             argv,
             cwd=workdir,
             stdin=subprocess.DEVNULL,
