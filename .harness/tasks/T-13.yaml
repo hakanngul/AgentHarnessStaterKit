@@ -44,7 +44,40 @@ acceptance:
   text: Git alt süreçleri zaman aşımına uğrarsa HarnessError verir ve komutu söyler. Testler
     unit testtir (gerçek dosyalar ve gerçek flock; çapraz süreç testi bir alt süreç açar);
     pytest, ruff check ve ruff format --check geçer.
-evidence: []
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 947 passed in 32.53s
+  commit: 06c362a8b7e4bb002d3b8de9bd9262bf226cab0c
+  output: .harness/evidence/T-13/E1.txt
+  output_sha256: cc2ec56654f849130863f90cafbae842f9711e68db70ac26278c8034b0546929
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 06c362a8b7e4bb002d3b8de9bd9262bf226cab0c
+  output: .harness/evidence/T-13/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 06c362a8b7e4bb002d3b8de9bd9262bf226cab0c
+  output: .harness/evidence/T-13/E3.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 log:
 - '2026-11-16 developer: task opened; follows the T-12 review findings (wave claim race, shared
   git index, git without timeout); flock chosen over an O_EXCL file because a crash must not
