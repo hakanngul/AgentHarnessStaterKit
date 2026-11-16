@@ -73,3 +73,12 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
   latest run per command. Any change to the task during review blocks it.
 - Not done: scope check by code (reviewer cannot run git), commit per task, phase gate in
   the loop. Known: tampering detected not reverted; forged `recorded_by: harness` evidence.
+
+## Commit per task (T-10)
+
+- `harness commit`: one commit per DONE task on a group branch (layout A); scope checked by
+  code, any unowned change blocks all commits; most specific scope owns a file; CANCELLED
+  scopes own nothing but keep their ledger files. Nothing is pushed.
+- Known limits: rev-parse failure treated as unborn branch; `git switch -c` on an unborn
+  repo untested; wildcard scopes over-own; run the team on a clean working tree.
+- Next: FastAPI server, React UI, desktop shell; phase gate in the loop.

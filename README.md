@@ -314,7 +314,9 @@ reddedilir). Hiçbir şey push edilmez, merge sende.
   görevlerde bunun kimin olduğu bilinemeyeceği için grubun tamamı durur. Yalnız testlerin
   ürettiği `__pycache__`, `*.pyc` (izlenen olsalar bile) ve `.harness/tasks/` altındaki defter
   kilit dosyaları (`.T-n.yaml.lock`) sayılmaz; başka yerdeki `.x.lock` ve `uv.lock` sayılır;
-  iptal edilmiş görevin kapsamı hiçbir dosyayı sahiplenmez;
+  iptal edilmiş görevin kapsamı hiçbir dosyayı sahiplenmez (o kapsamdaki değişiklik stray sayılır ve
+  commit'leri durdurur); iptal edilmiş görevin kendi defter dosyaları ise sahipli kalır, commit'lenmez
+  ve engellemez;
   `uv.lock` gibi proje dosyaları sayılır.
 - Bir görevin commit'i başarısız olursa (örneğin pre-commit hook) stage edilenler geri alınır,
   o görev `blocked`, sonrakiler `skipped` raporlanır; önceki commit'ler raporda kalır.

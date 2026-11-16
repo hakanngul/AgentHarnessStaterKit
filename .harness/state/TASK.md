@@ -1,7 +1,6 @@
 # Current task
 
-Status: Adım 1-4 DONE (motor T-7, dalga T-8, reviewer T-9), review approved. Sıradaki:
-kapsamı kodla denetleyen görev başına commit (layout A), sonra FastAPI.
+Status: T-7..T-10 DONE (motor, dalga, reviewer, görev başına commit), review approved. Sıradaki: FastAPI sunucusu.
 
 ## Goal and scope
 

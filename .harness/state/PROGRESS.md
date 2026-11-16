@@ -39,3 +39,8 @@ real Claude session. Next: real-session trial (needs permission), then FastAPI s
 DONE. 734 unit tests, ruff clean, two review rounds (last APPROVED). Real session trial:
 wave then review took two tasks to DONE (before the read-only fix). Next: scope check and
 commit per task, then FastAPI.
+
+## 2026-11-16 T-10 commit per task
+
+DONE. 795 unit tests, ruff clean, four review rounds (last APPROVED, low findings accepted).
+Real trial: four tasks committed one per task on a group branch. Next: FastAPI server.
