@@ -33,11 +33,88 @@ acceptance:
     `start` yerine `held` listesine, kesiştiği görevlerle birlikte girer; kapsamı boş görev
     yalnız tek başına başlatılır.
 - id: AC5
-  text: Sıralama görev numarasına göredir (T-2, T-10'dan önce) ve çıktı aynı defter için
-    hep aynıdır.
+  text: Sıralama görev numarasına göredir (T-2, T-10'dan önce) ve çıktı aynı defter için hep
+    aynıdır.
 - id: AC6
   text: Kurulu wheel ile temiz bir projede `harness next` uçtan uca çalışır; mevcut komutların
     davranışı değişmez.
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 422 passed in 17.35s
+  commit: dcaafa117c251c2cc4bb72be3fdfc1a94ba373fe
+  output: .harness/evidence/T-6/E1.txt
+  output_sha256: ced11cb2230e027e50029d79ce2355a1fa75ad388b4309f5b8292eaed607150b
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: dcaafa117c251c2cc4bb72be3fdfc1a94ba373fe
+  output: .harness/evidence/T-6/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 42 files already formatted
+  commit: dcaafa117c251c2cc4bb72be3fdfc1a94ba373fe
+  output: .harness/evidence/T-6/E3.txt
+  output_sha256: 505dc7c2a10562495c9430689d1fe5e6753b5f766a90efacc3676a7a42eea6e1
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: dcaafa117c251c2cc4bb72be3fdfc1a94ba373fe
+  output: .harness/evidence/T-6/E4.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: '"Manifest schema and file list are valid"'
+  commit: dcaafa117c251c2cc4bb72be3fdfc1a94ba373fe
+  output: .harness/evidence/T-6/E5.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen harness check . --json
+  cwd: .
+  exit_code: 0
+  summary: '"decisions_pending": 0'
+  commit: dcaafa117c251c2cc4bb72be3fdfc1a94ba373fe
+  output: .harness/evidence/T-6/E6.txt
+  output_sha256: c434490bd5b25897df5d4c331d900e634456713c8e828e1030828bfe47b1a895
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E7
+  kind: manual
+  result: pass
+  summary: 'Wheel built from dcaafa1 installed with uv into a fresh venv outside the checkout:
+    empty ledger gives an empty plan (exit 0); with spec DONE, T-2 (src/api/) and T-3 (src/web/)
+    start, T-4 (src/api/auth.py) is held, T-5 waits for DEC-1 and DEC-1 lists it; once T-2
+    is IN_PROGRESS it moves to running and T-4 stays held; a READY implement task without
+    a spec makes next report the check error and exit 1, as check does.'
+  output: .harness/evidence/T-6/wheel-smoke.txt
+  recorded_at: '2026-11-17'
 log:
 - 2026-11-17 görev açıldı; plan docs/plans/lifecycle.md (L3)
 review:
