@@ -8,11 +8,11 @@
 - Faz 2 (unreleased, done): `harness evidence run`, roles + `harness scope`,
   PreToolUse hook + `harness hook install`.
 - Yaşam döngüsü L1 (unreleased, PR #3): `workflow` phases in the config, `phase` on
-  tasks, phase gate in `harness check` (T-5). 379 tests.
+  tasks, phase gate in `harness check` (T-5, DONE, review approved). 380 tests.
 
 ## Current work
 
-T-5 in PR #3. Three open threads from PR #2 remain for the maintainer (subprocess audit
+T-5 is DONE in PR #3, awaiting merge. Three open threads from PR #2 remain for the maintainer (subprocess audit
 finding, credential redaction scope, settings.json concurrency).
 
 ## Next step

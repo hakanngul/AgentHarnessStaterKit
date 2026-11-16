@@ -1,6 +1,6 @@
 # Current task
 
-Status: Yaşam döngüsü L1 (T-5) in PR #3; see `.harness/tasks/T-5.yaml` for status.
+Status: Yaşam döngüsü L1 (T-5) DONE, review approved; PR #3 awaits merge.
 Faz 2 (T-2..T-4) is merged.
 
 ## Goal and scope
