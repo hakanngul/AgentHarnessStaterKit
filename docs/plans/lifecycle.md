@@ -40,8 +40,10 @@ Bu plan [team-system.md](team-system.md) planını değiştirmez; onun süreç �
 - Açık: dal düzeni. "Görev başına branch" ile "worktree'siz paralel" birlikte olamaz;
   bir checkout'ta aynı anda tek branch açıktır. Seçenekler: paralel grup için tek dal
   (görev başına commit, grup başına PR) ya da görev başına worktree.
-- Ortak dosyalar: paralel görevler `.harness/state/` ve lock dosyalarına yazmaz; bunları
-  orchestrator, başka iş çalışmıyorken günceller.
+
+Öneri (kullanıcı kararı değil): paralel görevler `.harness/state/` ve lock dosyalarına
+yazmasın; bunları orchestrator, başka iş çalışmıyorken güncellesin. Bugün AGENTS.md her
+göreve bu belgeleri güncellemesini söyler ve bu kuralı uygulayan kod yoktur.
 
 Bilinen riskler: üyelikle otomasyon dokümanlarda açıkça izinli değil (kişisel kullanım
 gri alan); paralel ajanlar limiti hızlı doldurur; pywebview paketlemesi denenmedi;

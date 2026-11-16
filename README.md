@@ -165,16 +165,19 @@ READY görevler), `unblocked` (bağımlılıkları tamam, READY yapılabilecek B
 proje köküne göre yol ya da glob'dur (`*`, `?`, `**`; köşeli parantez ve süslü parantez
 desteklenmez). Kesişim yol öneklerine bakar ve temkinlidir: `src/api/*.py` ile
 `src/api/v1/` kesişir sayılır. Büyük/küçük harf ve Unicode normalleştirme farkı yok
-sayılır; mutlak yollar, `~` ve `..` her şeyle kesişir. `scope` yazılmamış görev her şeye
+sayılır; mutlak yollar, `~`, sürücü harfi, `$VAR`, URL ve `..` her şeyle kesişir. `scope` yazılmamış görev her şeye
 dokunuyor kabul edilir ve yalnız tek başına başlar; başka işler sürdükçe bekleyebilir.
 Sıra önce önek, sonra numaradır (`API-3`, `T-1`, `T-2`, `T-10`); kesişmede önce gelen
 başlar.
 
 Sınırlar: `scope` beyandır; görevin gerçekten yalnız o yollara yazdığını rolün yazma
-kapsamı ve review denetler. Serbest metin (`API katmanı`) yol sayılır ve hiçbir yolla
-kesişmez; yol yazın. Paralel görevlerin herkesin yazdığı dosyalara (`.harness/state/`,
-lock dosyaları) dokunmaması gerekir: ortak durum belgelerini orchestrator, başka iş
-çalışmıyorken günceller. `next` öncelik, tahmin ya da rol kapasitesi bilmez.
+kapsamı ve review denetler. Serbest metin (`API katmanı`) yol gibi okunur ve gerçek
+yollarla kesişmez; yol yazın. Herkesin yazdığı dosyalar (`.harness/state/`, lock
+dosyaları) hiçbir görevin kapsamında değildir ve `next` bunları korumaz. AGENTS.md her
+göreve durum belgelerini güncellemesini söylediği için, paralel çalıştırırken bu
+belgeleri yalnız başka iş çalışmıyorken güncellemek kullanıcının uyması gereken bir
+kuraldır; bunu yapan bir orchestrator henüz yok. `next` öncelik, tahmin ya da rol
+kapasitesi bilmez.
 
 ## Roller ve yazma kapsamı
 

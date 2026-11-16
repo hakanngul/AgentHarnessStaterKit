@@ -92,6 +92,16 @@ def ids(entries: list[dict]) -> list[str]:
         (["src/api/ "], ["src/api/login.py"], True),
         ([" src / api "], ["src/api/login.py"], True),
         (["src/web/"], ["/"], True),
+        (["$HOME/proj/src/api"], ["docs/"], True),
+        (["%USERPROFILE%\\proj"], ["docs/"], True),
+        (["file:///home/u/proj/src"], ["docs/"], True),
+        (["\\\\server\\share"], ["docs/"], True),
+        (["\ufeffsrc/api"], ["src/api/login.py"], True),
+        (["\u200b/home/u/proj"], ["docs/"], True),
+        (["src/ /api"], ["src/api/login.py"], True),
+        (["   "], ["docs/"], True),
+        (["docs/o\u0308*"], ["docs/\u00f6zet.md"], True),
+        (["src/[ab]pi/"], ["src/api/"], False),
     ],
 )
 def test_scopes_overlap(first, second, expected):
@@ -377,9 +387,20 @@ def test_next_is_repeatable_and_writes_nothing(tmp_path):
 
 
 def test_running_task_without_scope_holds_every_ready_task(tmp_path):
-    report = plan(tmp_path, task("T-1", "IN_PROGRESS"), task("T-2", scope=["docs/"]))
+    report = plan(
+        tmp_path,
+        task("T-1", "IN_PROGRESS"),
+        task("T-2", scope=["docs/"]),
+        task("T-3", scope=["src/"]),
+    )
     assert report["start"] == []
-    assert report["held"][0]["conflicts_with"] == ["T-1"]
+    assert [(entry["id"], entry["conflicts_with"]) for entry in report["held"]] == [
+        ("T-2", ["T-1"]),
+        ("T-3", ["T-1"]),
+    ]
+    assert {entry["reason"] for entry in report["held"]} == {
+        "a task without a declared scope is running or starting"
+    }
 
 
 def test_blocked_task_also_lists_a_missing_phase(tmp_path):

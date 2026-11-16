@@ -4,11 +4,10 @@
 their declared scopes do not overlap; a task without a scope is assumed to touch
 anything. Scope overlap is judged on path prefixes and errs on the side of holding a
 task back: `src/api/*.py` and `src/api/v1/` are treated as overlapping. Entries are compared the
-way `roles.py` compares paths (Unicode NFC, case folded); absolute paths, `~` and `..`
-overlap everything.
+way `roles.py` compares paths (Unicode NFC, case folded); absolute, home, drive, URL and
+variable forms and `..` overlap everything.
 """
 
-import re
 from pathlib import Path
 
 from agent_harness.check import inspect_ledger, reachable_phases
@@ -25,7 +24,8 @@ from agent_harness.models import (
 from agent_harness.roles import _fold
 
 RUNNING = ("IN_PROGRESS", "IN_REVIEW")
-DRIVE = re.compile(r"^[a-z]:")
+# Whitespace plus the zero-width characters that copy and paste tends to leave behind.
+BLANK = " \t\r\n\f\v\u00a0\ufeff\u200b\u200c\u200d\u2060"
 FINAL = ("DONE", "CANCELLED")
 
 
@@ -36,12 +36,14 @@ def _order(item_id: str) -> tuple[str, int]:
 
 def _prefix(entry: str) -> tuple[str, ...]:
     """Literal leading path segments of a scope entry; empty means the whole project."""
-    text = _fold(entry.strip()).replace("\\", "/")
-    if text.startswith(("/", "~")) or DRIVE.match(text):
-        return ()  # outside the project-relative form: assume it may touch anything
+    text = _fold(entry.strip(BLANK)).replace("\\", "/")
+    head = text.split("/", 1)[0]
+    if text.startswith(("/", "~")) or any(mark in head for mark in ":$%"):
+        # Absolute, home, drive, URL or variable form: assume it may touch anything.
+        return ()
     parts: list[str] = []
     for raw in text.split("/"):
-        segment = raw.strip()
+        segment = raw.strip(BLANK)
         if segment in ("", "."):
             continue
         if segment == ".." or "*" in segment or "?" in segment:
@@ -118,11 +120,12 @@ def plan(path: Path) -> PlanReport:
         else:  # READY: `check` already guarantees its dependencies and phase gate
             conflicts = [other.id for other in occupied if scopes_overlap(task.scope, other.scope)]
             if conflicts:
-                reason = (
-                    "scope overlaps a task that is running or starting"
-                    if task.scope
-                    else "no scope declared, so it cannot run beside another task"
-                )
+                if not task.scope:
+                    reason = "no scope declared, so it cannot run beside another task"
+                elif all(not tasks[other].scope for other in conflicts):
+                    reason = "a task without a declared scope is running or starting"
+                else:
+                    reason = "scope overlaps a task that is running or starting"
                 report.held.append(HeldTask(**_view(task), conflicts_with=conflicts, reason=reason))
             else:
                 report.start.append(PlanTask(**_view(task)))
