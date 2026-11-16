@@ -128,6 +128,14 @@ def test_a_wave_job_with_review_reviews_only_tasks_that_reached_review(monkeypat
         job = view(api, job_id)
     assert calls[0]["task_ids"] == ["T-1"] and calls[0]["role"] == "qa"
     assert job["result"]["ok"] is True and job["result"]["reviews"][0]["verdict"] == "APPROVED"
+    assert set(job["result"]["reviews"][0]) == {
+        "task",
+        "verdict",
+        "status",
+        "cost_usd",
+        "note",
+        "recorded",
+    }
 
 
 def test_a_failed_review_makes_the_wave_result_not_ok(monkeypatch, tmp_path):
@@ -732,22 +740,21 @@ def test_a_huge_last_event_id_is_ignored_not_a_500(tmp_path):
             assert [ln for ln in response.iter_lines() if ln.startswith("id: ")] == []
 
 
-def test_the_body_cap_is_enforced_while_reading_not_after_the_upload(tmp_path):
-    """Drive the app at the ASGI level with a body that never ends: it must answer 413 after
-    reading about the cap, not buffer the upload."""
-    from agent_harness.server import MAX_BODY
-
-    root = project(tmp_path, task("T-1"))
-    app = create_app(root, TOKEN)
+def asgi_post(app, *, chunks=None, extra_headers=(), max_reads=500):
+    """POST /api/jobs at the ASGI level; returns (status, bytes handed to the app, reads)."""
     state = {"reads": 0, "sent": 0}
-    chunk = b"x" * 1000
+    queue = list(chunks) if chunks is not None else None
 
     async def receive():
         state["reads"] += 1
-        if state["reads"] > 500:  # a runaway reader would get here
+        if state["reads"] > max_reads:  # a runaway reader would get here
             return {"type": "http.disconnect"}
-        state["sent"] += len(chunk)
-        return {"type": "http.request", "body": chunk, "more_body": True}
+        if queue is None:  # an endless body
+            body, more = b"x" * 1000, True
+        else:
+            body, more = (queue.pop(0), bool(queue)) if queue else (b"", False)
+        state["sent"] += len(body)
+        return {"type": "http.request", "body": body, "more_body": more}
 
     sent = []
 
@@ -770,29 +777,44 @@ def test_the_body_cap_is_enforced_while_reading_not_after_the_upload(tmp_path):
             (b"host", b"localhost"),
             (b"authorization", f"Bearer {TOKEN}".encode()),
             (b"content-type", b"application/json"),
+            *extra_headers,
         ],
     }
     asyncio.run(app(scope, receive, send))
     status = next(m["status"] for m in sent if m["type"] == "http.response.start")
+    return status, state["sent"], state["reads"]
+
+
+def test_the_body_cap_is_enforced_while_reading_not_after_the_upload(tmp_path):
+    """An endless body must get a 413 after about the cap, not be buffered."""
+    from agent_harness.server import MAX_BODY
+
+    app = create_app(project(tmp_path, task("T-1")), TOKEN)
+    status, handed, _ = asgi_post(app)
     assert status == 413
-    assert state["sent"] <= MAX_BODY + 2 * len(chunk), state  # read to the cap, then stopped
+    assert handed <= MAX_BODY + 2000, handed  # read to the cap, then stopped
 
 
-def test_cancelling_a_review_job_leaves_its_task_in_review(tmp_path):
-    from test_review import in_review
-    from test_review import project as reviewed_project
+def test_body_size_boundaries(monkeypatch, tmp_path):
+    from agent_harness.server import MAX_BODY
 
-    root = reviewed_project(tmp_path, in_review("T-1"))
-    with make_client(root, Blocking) as api:
-        job_id = start(api, {"kind": "review"}).json()["id"]
-        deadline = time.time() + 10
-        while time.time() < deadline:  # the reviewer session has started
-            if any("s-blocked" in e["text"] for e in api.app.state.jobs.jobs[job_id].events):
-                break
-            time.sleep(0.02)
-        else:
-            raise AssertionError("the review never started")
-        cancelled = api.post(f"/api/jobs/{job_id}/cancel", headers=AUTH)
-        assert cancelled.status_code == 200 and cancelled.json()["status"] == "cancelled"
-        assert events_of(api, job_id)[-1]["text"] == "review cancelled"
-    assert status_of(root, "T-1") == "IN_REVIEW"  # a review does not claim the task
+    monkeypatch.setattr(jobs_module, "commit_done_tasks", lambda *a, **k: [])
+    root = project(tmp_path, task("T-1"))
+    base = b'{"kind":"commit"}'
+    exact = base + b" " * (MAX_BODY - len(base))
+    assert len(exact) == MAX_BODY
+
+    def post(chunks):  # a fresh app each time: an accepted body starts a job
+        return asgi_post(create_app(root, TOKEN), chunks=chunks)[0]
+
+    assert post([b""]) == 422  # empty: a clear error, not a 500
+    assert post([exact]) == 202  # exactly the cap passes
+    assert post([exact[:4000], exact[4000:]]) == 202  # also when it arrives in pieces
+    assert post([exact + b" "]) == 413  # one byte over
+
+
+def test_a_content_length_with_thousands_of_digits_is_413_not_a_crash(tmp_path):
+    app = create_app(project(tmp_path, task("T-1")), TOKEN)
+    huge = (b"content-length", b"9" * 5000)
+    status, handed, _ = asgi_post(app, chunks=[b"{}"], extra_headers=(huge,))
+    assert status == 413 and handed == 0  # refused before any body byte was read

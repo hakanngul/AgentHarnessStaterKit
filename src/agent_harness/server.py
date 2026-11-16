@@ -172,8 +172,10 @@ def create_app(
         if media_type != "application/json":
             raise HTTPException(415, "send application/json")
         declared = request.headers.get("content-length", "")
-        if declared.isascii() and declared.isdigit() and int(declared) > MAX_BODY:
-            raise HTTPException(413, "the request body is too large")
+        if declared.isascii() and declared.isdigit():
+            # a number with more digits than any real size is too large (and int() would balk)
+            if len(declared) > MAX_ID_DIGITS or int(declared) > MAX_BODY:
+                raise HTTPException(413, "the request body is too large")
         chunks, total = [], 0
         async for chunk in request.stream():  # stop reading at the cap, not after the upload
             total += len(chunk)
