@@ -399,3 +399,35 @@ def test_hook_is_registered_next_to_the_callback(tmp_path):
     options = hook_for(tmp_path)["options"]
     assert list(options.hooks) == ["PreToolUse"] and options.can_use_tool is not None
     assert options.permission_mode == "default"
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {},
+        {"tool_name": "Bash"},
+        {"tool_input": {"command": "ls"}},
+        {"tool_name": None, "tool_input": {}},
+        {"tool_name": "Bash", "tool_input": "ls"},
+        {"tool_name": "Bash", "tool_input": None},
+    ],
+)
+def test_hook_denies_malformed_input_instead_of_failing_open(tmp_path, data):
+    output = asyncio.run(hook_for(tmp_path)["hook"](data, "t1", None))
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "policy error" in output["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_hook_denies_when_the_policy_itself_raises(tmp_path, monkeypatch):
+    captured = hook_for(tmp_path)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("policy crashed")
+
+    monkeypatch.setattr(claude_engine, "check_tool", boom)
+    data = {"tool_name": "Write", "tool_input": {"file_path": "src/a.py"}}
+    output = asyncio.run(captured["hook"](data, "t1", None))
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert (
+        "RuntimeError: policy crashed" in output["hookSpecificOutput"]["permissionDecisionReason"]
+    )

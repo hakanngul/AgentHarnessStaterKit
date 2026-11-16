@@ -209,17 +209,23 @@ verilenler şunlardır.
 - Dosya yazan araçlar (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) rolün yazma
   kapsamı içinde; `harness scope` ile aynı kural.
 - Bilinen okuma araçları (`Read`, `Glob`, `Grep`, `LS`, `TodoWrite`, `Task`, `Skill`...),
-  yalnız proje klasörünün içindeki yollar için.
+  yalnız proje klasörünün içindeki yollar ve desenler için (`/`, `~` ya da `..` ile başlayan
+  `Glob` deseni reddedilir).
 - `Bash` yalnız `bash` listesindeki önekle başlayan tek komut. `;`, `&`, `|`, `<`, `>`,
   `` ` ``, `$(` ve satır sonu içeren komutlar reddedilir. `harness evidence run T-1 -- KOMUT`
-  yalnız `--` sonrasındaki KOMUT da listedeyse geçer; yoksa kanıt komutu her şeyi çalıştırma
-  yolu olurdu.
+  yalnız şu biçimde ve KOMUT listedeyse geçer: görev kimliği, bilinen seçenekler (`--cwd`,
+  `--id`, `--timeout`, `--summary`, `--json`; `--cwd` proje içinde), sonra hemen `--`. Komut
+  satırı ayrıştırıcısı `--` öncesindeki sözcükleri de komuta kattığı için (`T-1 rm build --
+  uv run pytest` gerçekte `rm build uv run pytest` çalıştırır), başka hiçbir sözcüğe ve
+  `--path` seçeneğine izin verilmez.
 - Reddedilenler: MCP araçları (proje ayarları dosya yazan sunucu ekleyebilir), ağ araçları
   (`WebFetch`, `WebSearch`) ve politikanın tanımadığı her araç.
 
 Politika iki yerden bağlanır: `PreToolUse` hook'u ve izin geri çağrımı. Hook, projenin kendi
 `.claude/settings.json` dosyasındaki bir izin kuralının (ör. `Bash(*)`) geri çağrımı
-atlamasını engeller. Rol politikasının yaptığı reddi proje ayarları geri alamaz.
+atlamasını engeller. Hook hata verirse ya da girdisi bozuksa çağrı reddedilir (açık
+bırakılmaz). Hook'un reddini proje ayarlarının geri aldığı SDK dokümanında yazan davranışa
+dayanır; gerçek CLI ile denenmedi.
 
 Kullanım limiti dolunca koşu hatayla biter; çalıştırıcı "bekleniyor" olayını yazdırır,
 motorun bildirdiği sıfırlanma zamanına (yoksa 5 dakikaya) kadar bekler ve aynı oturumu
@@ -234,6 +240,11 @@ Sınırlar:
   zararsız komutlar yazın, bayraklı biçimleri de düşünün.
 - Okuma kuralı yalnız yola bakar; proje içindeki bir symlink dışarıyı gösterebilir.
 - Ajan proje ayarlarını (`.claude/settings.json`, CLAUDE.md, hook'lar, yetenekler) yükler.
+  `.mcp.json`'daki MCP sunucuları başlatılır (yalnız araçları reddedilir), projenin kendi
+  hook'ları ve `statusLine` komutları araç hattının dışında kabuk komutu çalıştırabilir.
+  Yalnız güvendiğiniz projelerde çalıştırın.
+- Kullanım limiti SDK'dan `ResultMessage` yerine istisna olarak gelirse beklenmez, koşu
+  `failed` olur.
 - Devam eden oturumda `cost_usd` ve `turns` toplamının tekrar saymayabileceği doğrulanmadı.
 - Bekleme sırasında Ctrl-C temiz bir `failed` sonucu vermez.
 - Gerçek Claude oturumu henüz denenmedi: motor yalnız sahte SDK ve sahte motorla birim

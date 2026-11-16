@@ -13,6 +13,7 @@ such as a test runner can still write files, and reads follow symlinks inside th
 """
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,10 +37,15 @@ READ_TOOLS = {
     "Agent": (),
     "Skill": (),
 }
+# Fields holding a glob that must not point outside the project.
+READ_PATTERNS = {"Glob": ("pattern",), "Grep": ("glob",)}
 DENIED_KINDS = (
     ("mcp__", "MCP tools are not allowed for unattended runs"),
     ("Web", "network tools are not allowed for unattended runs"),
 )
+EVIDENCE_OPTIONS = {"--cwd", "--id", "--timeout", "--summary"}  # each takes one value
+EVIDENCE_FLAGS = {"--json"}
+TASK_ID = re.compile(r"^[A-Z][A-Z0-9]*-[1-9][0-9]*$")
 EVIDENCE_COMMANDS = (("harness", "evidence", "run"), ("uv", "run", "harness", "evidence", "run"))
 # Characters that would let one command line run, feed or redirect another command.
 SHELL_META = (";", "&", "|", "<", ">", "`", "$(", "\n", "\r")
@@ -60,18 +66,39 @@ def _not_listed(prefixes: list[str]) -> Verdict:
     return Verdict(False, f"command is not in this role's bash list (allowed: {allowed})")
 
 
-def _evidence(words: list[str], prefixes: list[str]) -> Verdict:
-    if "--" not in words:
+def _evidence(words: list[str], prefixes: list[str], root: Path) -> Verdict:
+    """`harness evidence run TASK [options] -- COMMAND`, nothing else.
+
+    The command line parser also collects words before `--` into the command, so the
+    only safe shape is the task id, known options with one value each, then `--`.
+    """
+    rest = words[
+        next(len(head) for head in EVIDENCE_COMMANDS if tuple(words[: len(head)]) == head) :
+    ]
+    if not rest or not TASK_ID.match(rest[0]):
+        return Verdict(False, "harness evidence run needs a task id such as T-1")
+    index = 1
+    while index < len(rest) and rest[index] != "--":
+        option = rest[index]
+        if option in EVIDENCE_FLAGS:
+            index += 1
+            continue
+        if option not in EVIDENCE_OPTIONS:
+            return Verdict(False, f"harness evidence run: {option!r} is not allowed here")
+        if index + 1 >= len(rest) or rest[index + 1] == "--" or rest[index + 1].startswith("-"):
+            return Verdict(False, f"harness evidence run: {option} needs a value")
+        if option == "--cwd" and not _inside(root, rest[index + 1]):
+            return Verdict(False, "harness evidence run: --cwd must stay inside the project")
+        index += 2
+    inner = rest[index + 1 :]
+    if index >= len(rest) or not inner:
         return Verdict(False, "harness evidence run needs `-- <command>`")
-    inner = words[words.index("--") + 1 :]
-    if not inner:
-        return Verdict(False, "harness evidence run needs a command after `--`")
     if not _matches(inner, prefixes):
         return Verdict(False, "the command after `--` is not in this role's bash list")
     return Verdict(True)
 
 
-def _shell(command: str, prefixes: list[str]) -> Verdict:
+def _shell(command: str, prefixes: list[str], root: Path) -> Verdict:
     command = command.strip()
     if not command:
         return Verdict(False, "empty command")
@@ -83,13 +110,17 @@ def _shell(command: str, prefixes: list[str]) -> Verdict:
         )
     words = command.split()
     if any(tuple(words[: len(head)]) == head for head in EVIDENCE_COMMANDS):
-        return _evidence(words, prefixes)
+        return _evidence(words, prefixes, root)
     return Verdict(True) if _matches(words, prefixes) else _not_listed(prefixes)
 
 
 def _inside(root: Path, target: str) -> bool:
     candidate = Path(os.path.abspath(root / os.path.expanduser(target)))
     return candidate == root or root in candidate.parents
+
+
+def _escapes(pattern: str) -> bool:
+    return pattern.startswith(("/", "~")) or ".." in pattern.replace("\\", "/").split("/")
 
 
 def check_tool(
@@ -106,12 +137,16 @@ def check_tool(
         command = tool_input.get("command")
         if not isinstance(command, str):
             return Verdict(False, "Bash call without a command")
-        return _shell(command, role_config.bash)
+        return _shell(command, role_config.bash, root)
     if tool in READ_TOOLS:
         for key in READ_TOOLS[tool]:
             target = tool_input.get(key)
             if isinstance(target, str) and target and not _inside(root, target):
                 return Verdict(False, f"{tool} may only read inside the project")
+        for key in READ_PATTERNS.get(tool, ()):
+            pattern = tool_input.get(key)
+            if isinstance(pattern, str) and _escapes(pattern):
+                return Verdict(False, f"{tool} pattern may only match inside the project")
         return Verdict(True)
     key = WRITE_TOOLS.get(tool) or ("notebook_path" if tool == NOTEBOOK_TOOL else None)
     if key is None:

@@ -261,3 +261,95 @@ def test_evidence_run_cannot_smuggle_an_unlisted_command(command):
 def test_evidence_run_needs_a_bash_list():
     command = "harness evidence run T-1 -- uv run pytest"
     assert not verdict("Bash", {"command": command}, role="reviewer").allowed
+
+
+# --- evidence run: the command parser also collects words before `--` -------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "harness evidence run T-1 rm build -- uv run pytest",
+        "harness evidence run T-1 echo hi -- uv run pytest",
+        "harness evidence run T-1 uv run pytest -- uv run pytest",
+        "harness evidence run -- uv run pytest",
+        "harness evidence run notatask -- uv run pytest",
+        "harness evidence run T-1 --path /elsewhere -- uv run pytest",
+        "harness evidence run T-1 --evil x -- uv run pytest",
+        "harness evidence run T-1 --cwd /etc -- uv run pytest",
+        "harness evidence run T-1 --cwd .. -- uv run pytest",
+        "harness evidence run T-1 --cwd -- uv run pytest",
+        "harness evidence run T-1 --cwd --id -- uv run pytest",
+        "harness evidence run T-1 --id",
+        "uv run harness evidence run T-1 rm x -- ruff check .",
+    ],
+)
+def test_evidence_run_accepts_only_the_strict_shape(command):
+    assert not verdict("Bash", {"command": command}).allowed
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "harness evidence run T-1 -- uv run pytest",
+        "harness evidence run T-12 --cwd app -- uv run pytest",
+        "harness evidence run T-1 --cwd . --id E9 --timeout 600 -- uv run pytest -q",
+        "harness evidence run T-1 --json -- ruff check .",
+        "harness evidence run API-3 --summary done -- git status",
+        "harness evidence run T-1 -- uv run pytest -- -k login",
+    ],
+)
+def test_evidence_run_with_known_options_is_allowed(command):
+    assert verdict("Bash", {"command": command}).allowed
+
+
+def test_the_command_parser_really_merges_words_before_the_separator(monkeypatch):
+    """Pins why the strict shape is needed: `rm build` ends up inside the command."""
+    from typer.testing import CliRunner
+
+    import agent_harness.cli as cli
+
+    seen = {}
+
+    def fake(path, task, command, **kwargs):
+        seen["command"] = list(command)
+        raise cli.HarnessError("stop")
+
+    monkeypatch.setattr(cli, "run_evidence", fake)
+    CliRunner().invoke(
+        cli.app, ["evidence", "run", "T-1", "rm", "build", "--", "uv", "run", "pytest"]
+    )
+    assert seen["command"] == ["rm", "build", "uv", "run", "pytest"]
+
+
+# --- glob patterns ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input"),
+    [
+        ("Glob", {"pattern": "/etc/*"}),
+        ("Glob", {"pattern": "~/.ssh/*"}),
+        ("Glob", {"pattern": "../../**"}),
+        ("Glob", {"pattern": "src/../../x", "path": "/proj"}),
+        ("Glob", {"pattern": "..\\..\\x"}),
+        ("Grep", {"pattern": "x", "glob": "/etc/*"}),
+        ("Grep", {"pattern": "x", "glob": "../*"}),
+    ],
+)
+def test_glob_patterns_that_leave_the_project_are_denied(tool, tool_input):
+    result = verdict(tool, tool_input)
+    assert not result.allowed and "inside the project" in result.reason
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input"),
+    [
+        ("Glob", {"pattern": "**/*.py"}),
+        ("Glob", {"pattern": "src/*.py", "path": "/proj"}),
+        ("Grep", {"pattern": "..", "glob": "*.py"}),
+        ("Grep", {"pattern": "x", "glob": "src/**"}),
+    ],
+)
+def test_glob_patterns_inside_the_project_are_allowed(tool, tool_input):
+    assert verdict(tool, tool_input).allowed

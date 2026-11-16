@@ -100,20 +100,28 @@ async def run_task(
         outcome.sessions += 1
         limit: RateLimit | None = None
         finished: Finished | None = None
-        try:
-            async for event in engine.run(request, root):
-                _record(outcome, event, on_event)
-                if isinstance(event, Started):
-                    outcome.session_id = event.session_id
-                elif isinstance(event, RateLimit):
-                    limit = event
-                elif isinstance(event, Finished):
-                    finished = event
-        except Exception as exc:  # engine and process errors are not HarnessError
-            outcome.error = f"{type(exc).__name__}: {exc}"
-            return outcome
+        crashed: Exception | None = None
+        stream = engine.run(request, root).__aiter__()
+        while True:
+            try:
+                event = await stream.__anext__()
+            except StopAsyncIteration:
+                break
+            except Exception as exc:  # engine and process errors are not HarnessError
+                crashed = exc
+                break
+            _record(outcome, event, on_event)  # a failing listener is not an engine error
+            if isinstance(event, Started):
+                outcome.session_id = event.session_id
+            elif isinstance(event, RateLimit):
+                limit = event
+            elif isinstance(event, Finished):
+                finished = event
         if finished is None:
-            outcome.error = "the engine stopped without a result"
+            if crashed is not None:
+                outcome.error = f"{type(crashed).__name__}: {crashed}"
+            else:
+                outcome.error = "the engine stopped without a result"
             return outcome
         outcome.session_id = finished.session_id or outcome.session_id
         outcome.turns += finished.turns

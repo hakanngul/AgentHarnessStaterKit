@@ -20,7 +20,7 @@ from agent_harness.engine.events import (
     ToolDenied,
     ToolUse,
 )
-from agent_harness.engine.policy import check_tool
+from agent_harness.engine.policy import Verdict, check_tool
 from agent_harness.filesystem import HarnessError
 from agent_harness.roles import load_config
 
@@ -99,7 +99,15 @@ class ClaudeEngine:
         async def pre_tool_use(input_data: dict, tool_use_id: Any, context: Any) -> dict:
             # Runs before permission rules, so allow rules in the project's own settings
             # cannot shadow the policy the way they can shadow `can_use_tool`.
-            verdict = verdict_for(input_data["tool_name"], input_data["tool_input"])
+            try:
+                tool, tool_input = input_data["tool_name"], input_data["tool_input"]
+                if not isinstance(tool, str) or not isinstance(tool_input, dict):
+                    raise TypeError("malformed PreToolUse input")
+                verdict = verdict_for(tool, tool_input)
+            except Exception as exc:  # a hook error would let the call through: deny instead
+                name = input_data.get("tool_name") if isinstance(input_data, dict) else None
+                verdict = Verdict(False, f"policy error, call denied: {type(exc).__name__}: {exc}")
+                denied.append(ToolDenied(str(name), verdict.reason))
             if verdict.allowed:
                 return {}
             return {

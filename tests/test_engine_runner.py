@@ -368,3 +368,31 @@ def test_waiting_is_announced_before_sleeping(tmp_path):
     outcome, _ = run(project(tmp_path, task()), engine, sleep=sleep, on_event=listener)
     assert order == ["waiting event", f"sleep {100 + LIMIT_MARGIN}"]
     assert Waiting(100 + LIMIT_MARGIN) in outcome.events and Waiting(100 + LIMIT_MARGIN) in seen
+
+
+def test_error_after_a_successful_result_does_not_turn_the_run_into_a_failure(tmp_path):
+    engine = RaisingEngine(
+        Started("s1"), ok("s1", result="all green", turns=4), error=OSError("teardown")
+    )
+    outcome, slept = run(project(tmp_path, task()), engine)
+    assert (outcome.status, outcome.result, outcome.turns, slept) == (
+        "completed",
+        "all green",
+        4,
+        [],
+    )
+
+
+def test_error_after_a_failed_result_keeps_the_agents_own_error(tmp_path):
+    engine = RaisingEngine(Finished(False, "s1", error="tool crashed"), error=OSError("teardown"))
+    outcome, _ = run(project(tmp_path, task()), engine)
+    assert (outcome.status, outcome.error) == ("failed", "tool crashed")
+
+
+def test_a_failing_event_listener_is_not_reported_as_an_engine_error(tmp_path):
+    def listener(event) -> None:
+        raise ValueError("printer broke")
+
+    engine = FakeEngine([Started("s1"), ok()])
+    with pytest.raises(ValueError, match="printer broke"):
+        run(project(tmp_path, task()), engine, on_event=listener)
