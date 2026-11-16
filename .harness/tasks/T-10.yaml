@@ -17,30 +17,30 @@ acceptance:
   text: Her DONE görev, commit'i yoksa, yalnız sahip olduğu dosyalarla (kapsamı ve kendi defter
     dosyaları) ayrı bir commit olur; açık yol verilerek stage edilir ve hiçbir şey push edilmez.
   verified_by:
-  - E4
+  - E7
 - id: AC2
   text: Bir dosya tek göreve gider, en spesifik kapsam kazanır, eşitlikte küçük görev numarası;
     geniş kapsam başka görevin adıyla andığı dosyayı yutmaz; çalışan görevin dosyası commit'lenmez.
   verified_by:
-  - E4
+  - E7
 - id: AC3
   text: Hiçbir görevin açıklamadığı değişiklik varsa hiçbir commit atılmaz ve dosya adları
     söylenir; üretilen dosyalar (pycache, pyc, lock) sayılmaz.
   verified_by:
-  - E4
+  - E7
 - id: AC4
   text: Aynı komutun ikinci çalıştırması commit atmaz; depo kökü değilse, index'te stage edilmiş
     değişiklik, bozuk defter ya da bilinmeyen görev varsa hata verir; --branch dalı oluşturur
     ya da kullanır.
   verified_by:
-  - E4
+  - E7
 - id: AC5
   text: '`harness commit [PATH] [--task] [--branch] [--json]` sonucu gösterir; engellenen
     görev yoksa 0, varsa 1 ile çıkar. Testler yalnız unit testtir, gerçek git deposunda çalışır.'
   verified_by:
-  - E4
-  - E5
-  - E6
+  - E7
+  - E8
+  - E9
 evidence:
 - id: E1
   kind: command
@@ -108,10 +108,53 @@ evidence:
   output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 5593e6017fc586cf4b0507db15292172f794a2f2
+  output: .harness/evidence/T-10/E7.txt
+  output_sha256: 40aa6d231bf72658f659682f0f980f8e9f90ab0f3b57731429fcb7d4ea98674f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 5593e6017fc586cf4b0507db15292172f794a2f2
+  output: .harness/evidence/T-10/E8.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 5593e6017fc586cf4b0507db15292172f794a2f2
+  output: .harness/evidence/T-10/E9.txt
+  output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 review:
   status: changes_requested
   by: reviewer
-  notes: 'Round 1 (read-only reviewer subagent, ran nothing): CHANGES REQUESTED. HIGH git add -- still expands pathspec globs so a file named src/*.py could stage a running task''s file; file paths went through the scope-entry parser so names like ~x, a:b or a*b became owned by everybody. MEDIUM a failed commit left files staged and lost earlier results; the .lock filter hid uv.lock; the already-committed check matched any body line and was not branch-aware; branch names were not validated; an unborn repository failed confusingly. LOW unmerged paths, nested repositories, trust boundary, identity fallback, weak tests. All fixed afterwards (literal pathspecs, literal path matching, index reset with partial results, narrow generated filter, subject-exact check on the target branch, branch name validation, unborn and detached HEAD handling) with 28 new tests; the fixes are not re-reviewed yet.'
+  notes: 'Round 1 (read-only reviewer subagent, ran nothing): CHANGES REQUESTED. HIGH git
+    add -- still expands pathspec globs so a file named src/*.py could stage a running task''s
+    file; file paths went through the scope-entry parser so names like ~x, a:b or a*b became
+    owned by everybody. MEDIUM a failed commit left files staged and lost earlier results;
+    the .lock filter hid uv.lock; the already-committed check matched any body line and was
+    not branch-aware; branch names were not validated; an unborn repository failed confusingly.
+    LOW unmerged paths, nested repositories, trust boundary, identity fallback, weak tests.
+    All fixed afterwards (literal pathspecs, literal path matching, index reset with partial
+    results, narrow generated filter, subject-exact check on the target branch, branch name
+    validation, unborn and detached HEAD handling) with 28 new tests; the fixes are not re-reviewed
+    yet.'
 log:
 - 2026-11-16 görev açıldı. Gerçek oturum denemesi (geçici proje) bir hata buldu - geniş kapsamlı
   T-1 diğer görevlerin dosyalarını yutuyordu; en spesifik sahip kuralı ile düzeltildi ve gerçek

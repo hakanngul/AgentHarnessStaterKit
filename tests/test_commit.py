@@ -485,21 +485,41 @@ def test_unmerged_paths_and_nested_repositories_are_refused(tmp_path):
         commit_done_tasks(root)
 
 
-def test_the_commit_identity_falls_back_per_missing_setting(tmp_path):
+def test_the_commit_identity_falls_back_per_missing_setting(tmp_path, monkeypatch):
     root = repo(tmp_path, done("T-1", ["src/a/"]))
     git(root, "config", "--unset", "user.name")
+    for name in (
+        "GIT_AUTHOR_NAME",
+        "GIT_COMMITTER_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_EMAIL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
     write(root, "src/a/one.py")
-    env_free = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
-    import os
-
-    old = {key: os.environ.get(key) for key in env_free}
-    os.environ.update(env_free)
-    try:
-        commit_done_tasks(root)
-    finally:
-        for key, value in old.items():
-            os.environ.pop(key) if value is None else os.environ.__setitem__(key, value)
+    commit_done_tasks(root)
     assert git(root, "log", "-1", "--format=%an <%ae>").strip() == "Agent Harness <t@example.com>"
+
+
+def test_the_commit_identity_falls_back_when_nothing_is_configured(tmp_path, monkeypatch):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    git(root, "config", "--unset", "user.name")
+    git(root, "config", "--unset", "user.email")
+    for name in (
+        "GIT_AUTHOR_NAME",
+        "GIT_COMMITTER_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_EMAIL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+    write(root, "src/a/one.py")
+    commit_done_tasks(root)
+    assert (
+        git(root, "log", "-1", "--format=%an <%ae>").strip() == "Agent Harness <harness@localhost>"
+    )
 
 
 def test_the_stray_check_applies_to_a_single_requested_task_too(tmp_path):
@@ -516,3 +536,56 @@ def test_quotes_newlines_and_unicode_in_file_names_survive_status_parsing(tmp_pa
     for name in names:
         write(root, name)
     assert sorted(changed_files(root)) == sorted(names)
+
+
+def test_a_dotted_lock_file_outside_the_ledger_is_a_real_change(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/"]))
+    write(root, "src/one.py")
+    write(root, "src/.deps.lock", "pinned")
+    (result,) = commit_done_tasks(root)
+    assert sorted(result.files) == ["src/.deps.lock", "src/one.py"]
+
+
+def test_a_cancelled_tasks_scope_owns_nothing_so_its_files_are_stray(tmp_path):
+    cancelled = task("T-3", status="CANCELLED", reason="dropped", scope=["src/a.py"])
+    root = repo(tmp_path, done("T-1", ["src/b/"]), cancelled)
+    write(root, "src/b/one.py")
+    write(root, "src/a.py")
+    (result,) = commit_done_tasks(root)
+    assert result.status == "blocked" and "src/a.py" in result.note
+    assert subjects(root) == ["baseline"]
+
+
+def test_a_cancelled_task_does_not_win_a_file_from_a_live_broader_scope(tmp_path):
+    cancelled = task("T-3", status="CANCELLED", reason="dropped", scope=["src/a.py"])
+    root = repo(tmp_path, done("T-1", ["src/"]), cancelled)
+    write(root, "src/a.py")
+    (result,) = commit_done_tasks(root)
+    assert result.status == "committed" and files_of(root, "T-1: ") == ["src/a.py"]
+
+
+def test_names_that_look_like_options_or_pathspec_magic_are_committed_literally(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/"]))
+    for name in ("src/-dash.txt", "src/:(top)magic.txt", "src/[a].txt"):
+        write(root, name)
+    (result,) = commit_done_tasks(root)
+    assert sorted(result.files) == ["src/-dash.txt", "src/:(top)magic.txt", "src/[a].txt"]
+    assert untracked(root) == []
+
+
+def test_a_name_in_other_letter_case_or_unicode_form_is_still_owned(tmp_path):
+    model = Task.model_validate(task("T-1", scope=["src/Café/"]))
+    assert owners("src/Cafe\u0301/x.py", {"T-1": model}) == ["T-1"]  # decomposed é
+    assert owners("SRC/CAFÉ/x.py", {"T-1": model}) == ["T-1"]
+
+
+def test_a_failed_commit_names_the_real_git_command(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    write(root, "src/a/one.py")
+    hooks = root / ".git/hooks"
+    hooks.mkdir(exist_ok=True)
+    (hooks / "pre-commit").write_text("#!/bin/sh\nexit 1\n")
+    (hooks / "pre-commit").chmod(0o755)
+    (result,) = commit_done_tasks(root)
+    assert result.status == "blocked" and "git commit failed" in result.note
+    assert git(root, "diff", "--cached", "--name-only").strip() == ""

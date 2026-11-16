@@ -312,7 +312,9 @@ reddedilir). Hiçbir şey push edilmez, merge sende.
 - **Kapsam denetimi kodla yapılır:** hiçbir görevin kapsamının ya da defter dosyalarının
   açıklamadığı bir değişiklik varsa hiçbir commit atılmaz ve dosya adları söylenir. Paralel
   görevlerde bunun kimin olduğu bilinemeyeceği için grubun tamamı durur. Yalnız testlerin
-  ürettiği `__pycache__`, `*.pyc` ve defter kilit dosyaları (`.T-n.yaml.lock`) sayılmaz;
+  ürettiği `__pycache__`, `*.pyc` (izlenen olsalar bile) ve `.harness/tasks/` altındaki defter
+  kilit dosyaları (`.T-n.yaml.lock`) sayılmaz; başka yerdeki `.x.lock` ve `uv.lock` sayılır;
+  iptal edilmiş görevin kapsamı hiçbir dosyayı sahiplenmez;
   `uv.lock` gibi proje dosyaları sayılır.
 - Bir görevin commit'i başarısız olursa (örneğin pre-commit hook) stage edilenler geri alınır,
   o görev `blocked`, sonrakiler `skipped` raporlanır; önceki commit'ler raporda kalır.
@@ -326,7 +328,7 @@ reddedilir). Hiçbir şey push edilmez, merge sende.
 
 Sınırlar:
 - Kapsam eşleşmesi önek temellidir; `src/*.py` gibi joker karakterli kapsam, joker öncesi
-  öneki sahiplenir (aşırı geniş). `.`, `**`, mutlak ya da `..` içeren bir kapsam tüm projeyi
+  öneki sahiplenir (aşırı geniş). `.`, `**`, `*.md` (ilk segmenti joker), mutlak ya da `..` içeren bir kapsam tüm projeyi
   sahiplenir; bu görev en düşük öncelikli sahiptir ama kapsam denetimini fiilen kapatır, böyle
   kapsamdan kaçının.
 - Commit'lemeden önce çalışma ağacında kendi değişikliğiniz varsa ve bir görevin kapsamına

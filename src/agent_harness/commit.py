@@ -45,7 +45,8 @@ def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
     except OSError as exc:
         raise HarnessError(f"git is not available: {exc}") from exc
     if check and done.returncode != 0:
-        raise HarnessError(f"git {args[0]} failed: {(done.stderr or done.stdout).strip()[:300]}")
+        name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
+        raise HarnessError(f"git {name} failed: {(done.stderr or done.stdout).strip()[:300]}")
     return done
 
 
@@ -65,7 +66,11 @@ def _identity(root: Path) -> list[str]:
 def _is_generated(path: str) -> bool:
     parts = PurePosixPath(path).parts
     name = parts[-1] if parts else ""
-    ledger_lock = name.startswith(".") and name.endswith(".lock")  # .T-1.yaml.lock
+    ledger_lock = (
+        PurePosixPath(path).parent.as_posix() == TASKS_DIR
+        and name.startswith(".")
+        and name.endswith(".lock")
+    )  # .harness/tasks/.T-1.yaml.lock
     return path.endswith(".pyc") or ledger_lock or any(part in GENERATED_DIRS for part in parts)
 
 
@@ -115,7 +120,9 @@ def _rank(path: str, task: Task) -> int:
 
 def owners(path: str, tasks: dict[str, Task]) -> list[str]:
     """Tasks whose scope or ledger files account for `path` (an empty scope owns nothing)."""
-    return [task.id for task in tasks.values() if _rank(path, task) >= 0]
+    return [
+        task.id for task in tasks.values() if task.status != "CANCELLED" and _rank(path, task) >= 0
+    ]
 
 
 def _number(task_id: str) -> int:
@@ -216,14 +223,15 @@ def commit_done_tasks(
         try:
             _git(root, "add", "--", *files)
             _run(root, *_identity(root), "commit", "-m", _message(task, files))
+            sha = _git(root, "rev-parse", "HEAD").strip()
         except HarnessError as exc:
-            _run(root, "reset", "-q", "--", *files, check=False)  # leave the index as it was
-            results.append(CommitResult(task.id, "blocked", f"commit failed: {exc}"))
+            reset = _run(root, "reset", "-q", "--", *files, check=False)  # restore the index
+            dirty = "" if reset.returncode == 0 else " (the index could not be restored)"
+            results.append(CommitResult(task.id, "blocked", f"commit failed: {exc}{dirty}"))
             results += [
                 CommitResult(rest.id, "skipped", "not attempted after an earlier failure")
                 for rest, _ in pending[position + 1 :]
             ]
             break
-        sha = _git(root, "rev-parse", "HEAD").strip()
         results.append(CommitResult(task.id, "committed", "", sha, files))
     return sorted(results, key=lambda result: _number(result.task_id))
