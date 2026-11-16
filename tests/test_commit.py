@@ -589,3 +589,79 @@ def test_a_failed_commit_names_the_real_git_command(tmp_path):
     (result,) = commit_done_tasks(root)
     assert result.status == "blocked" and "git commit failed" in result.note
     assert git(root, "diff", "--cached", "--name-only").strip() == ""
+
+
+def test_a_git_log_failure_is_an_error_not_an_unborn_branch(tmp_path, monkeypatch):
+    import agent_harness.commit as commit_module
+
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    write(root, "src/a/one.py")
+    real = commit_module._run
+
+    def broken_log(root_, *args, check=True):
+        if args[0] != "log":
+            return real(root_, *args, check=check)
+        failed = subprocess.CompletedProcess(args, 128, "", "fatal: bad object")
+        if check:  # what the real helper does for a failing command
+            raise HarnessError("git log failed: fatal: bad object")
+        return failed
+
+    monkeypatch.setattr(commit_module, "_run", broken_log)
+    with pytest.raises(HarnessError, match="git log failed"):
+        commit_done_tasks(root)
+    monkeypatch.undo()
+    assert subjects(root) == ["baseline"]  # nothing was committed twice or at all
+
+
+def test_a_cancelled_tasks_own_ledger_file_is_not_stray(tmp_path):
+    cancelled = task("T-3", status="CANCELLED", reason="dropped", scope=["src/c/"])
+    root = repo(tmp_path, done("T-1", ["src/a/"]), cancelled)
+    write(root, "src/a/one.py")
+    path = root / ".harness/tasks/T-3.yaml"
+    data = yaml.safe_load(path.read_text())
+    data["log"] = ["2026-11-16 cancelled later"]
+    path.write_text(yaml.safe_dump(data))
+    (result,) = commit_done_tasks(root)
+    assert result.status == "committed"
+    assert untracked(root) == ["M", ".harness/tasks/T-3.yaml"]
+
+
+def _no_identity(root: Path, monkeypatch, *, keep: str | None = None) -> None:
+    for key in ("user.name", "user.email"):
+        if key != keep:
+            git(root, "config", "--unset", key)
+    for name in (
+        "GIT_AUTHOR_NAME",
+        "GIT_COMMITTER_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_EMAIL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+
+
+def test_a_missing_email_alone_falls_back_but_keeps_the_configured_name(tmp_path, monkeypatch):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    _no_identity(root, monkeypatch, keep="user.name")
+    write(root, "src/a/one.py")
+    commit_done_tasks(root)
+    assert git(root, "log", "-1", "--format=%an <%ae>").strip() == "T <harness@localhost>"
+
+
+def test_a_failed_commit_still_names_git_commit_when_the_identity_options_are_added(
+    tmp_path, monkeypatch
+):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    _no_identity(root, monkeypatch)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.hooksPath")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(root / ".git/hooks"))
+    hook = root / ".git/hooks/pre-commit"
+    hook.parent.mkdir(exist_ok=True)
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    write(root, "src/a/one.py")
+    (result,) = commit_done_tasks(root)
+    assert result.status == "blocked" and "git commit failed" in result.note
+    assert "git -c failed" not in result.note

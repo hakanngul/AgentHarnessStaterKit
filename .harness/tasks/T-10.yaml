@@ -141,6 +141,39 @@ evidence:
   output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: e3d89690d42d23e2b8041bbde5960e653fddd655
+  output: .harness/evidence/T-10/E10.txt
+  output_sha256: 1c4b1e1526410568a6765f5d1326acc8c847d7c1dc9abc27151b1d49586e06b8
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: e3d89690d42d23e2b8041bbde5960e653fddd655
+  output: .harness/evidence/T-10/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: e3d89690d42d23e2b8041bbde5960e653fddd655
+  output: .harness/evidence/T-10/E12.txt
+  output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 review:
   status: changes_requested
   by: reviewer

@@ -115,14 +115,14 @@ def _rank(path: str, task: Task) -> int:
     """How specifically `task` claims `path`: its own ledger files, else the deepest scope."""
     if path == f"{TASKS_DIR}/{task.id}.yaml" or path.startswith(f"{EVIDENCE_DIR}/{task.id}/"):
         return LEDGER_RANK
+    if task.status == "CANCELLED":
+        return -1  # a cancelled task keeps its ledger files but claims no scope
     return max((_covers(path, entry) for entry in task.scope), default=-1)
 
 
 def owners(path: str, tasks: dict[str, Task]) -> list[str]:
     """Tasks whose scope or ledger files account for `path` (an empty scope owns nothing)."""
-    return [
-        task.id for task in tasks.values() if task.status != "CANCELLED" and _rank(path, task) >= 0
-    ]
+    return [task.id for task in tasks.values() if _rank(path, task) >= 0]
 
 
 def _number(task_id: str) -> int:
@@ -142,10 +142,10 @@ def owner_of(path: str, tasks: dict[str, Task]) -> str | None:
 
 def _committed(root: Path, task_id: str) -> bool:
     """True if a commit reachable from HEAD has a subject starting `T-n: `."""
-    done = _run(root, "log", "--format=%s", "--fixed-strings", f"--grep={task_id}: ", check=False)
-    if done.returncode != 0:  # an unborn branch has no history yet
-        return False
-    return any(line.startswith(f"{task_id}: ") for line in done.stdout.splitlines())
+    if _run(root, "rev-parse", "--verify", "-q", "HEAD", check=False).returncode != 0:
+        return False  # an unborn branch has no history yet
+    log = _git(root, "log", "--format=%s", "--fixed-strings", f"--grep={task_id}: ")
+    return any(line.startswith(f"{task_id}: ") for line in log.splitlines())
 
 
 def _message(task: Task, files: list[str]) -> str:
@@ -223,7 +223,6 @@ def commit_done_tasks(
         try:
             _git(root, "add", "--", *files)
             _run(root, *_identity(root), "commit", "-m", _message(task, files))
-            sha = _git(root, "rev-parse", "HEAD").strip()
         except HarnessError as exc:
             reset = _run(root, "reset", "-q", "--", *files, check=False)  # restore the index
             dirty = "" if reset.returncode == 0 else " (the index could not be restored)"
@@ -233,5 +232,6 @@ def commit_done_tasks(
                 for rest, _ in pending[position + 1 :]
             ]
             break
+        sha = _run(root, "rev-parse", "HEAD", check=False).stdout.strip() or None
         results.append(CommitResult(task.id, "committed", "", sha, files))
     return sorted(results, key=lambda result: _number(result.task_id))
