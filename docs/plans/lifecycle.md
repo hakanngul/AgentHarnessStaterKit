@@ -17,13 +17,13 @@ Bu plan [team-system.md](team-system.md) planını değiştirmez; onun süreç �
 | L3 | Sıradaki işi defterden hesaplayan komut (`harness next`) | T-6 |
 | L4 | Motor adapter'ı, arka plan ajanları, masaüstü uygulaması | planlandı |
 
-## Kullanıcı kararları (2026-11-17)
+## Kullanıcı kararları (2026-11-16)
 
 - Fazlar: discovery → spec → design → implement → qa → release; küçük işler için
   gereksinimsiz `fix` fazı.
 - Otonomi: kullanıcı onayı yalnız spec ve release bitince istenir; diğer fazlar
   otomatik ilerler.
-- Git: görev başına branch ve PR; commit'i orchestrator atar, merge'i kullanıcı yapar.
+- Git: commit'i orchestrator atar, merge'i kullanıcı yapar. Dal düzeni açık (aşağıda).
 - Ajanlar arka planda, ayrı oturumlar olarak çalışır; orchestrator model değil koddur.
   Kapsamı kesişmeyen görevler paralel başlatılır (worktree yok); kanıt sayılan test
   koşusu faz kapısında yapılır.
@@ -35,7 +35,13 @@ Bu plan [team-system.md](team-system.md) planını değiştirmez; onun süreç �
   yöntemi değiştirilebilir kalır; dağıtım için API key gerekir.
 - Uygulama: masaüstü; Python arka uç (FastAPI), React arayüz, pywebview penceresi.
   Rust ve Electron yok. İlk hedef işletim sistemi macOS (varsayım, teyit edilmedi).
-- Açık: ilk hedef stack (stack pack ve L2 buna bağlı).
+- Stack: karar gerektirmez. `analyze` stack'i tanır; test/lint/build komutları proje
+  açılırken bir kez sorulur ve config'e yazılır.
+- Açık: dal düzeni. "Görev başına branch" ile "worktree'siz paralel" birlikte olamaz;
+  bir checkout'ta aynı anda tek branch açıktır. Seçenekler: paralel grup için tek dal
+  (görev başına commit, grup başına PR) ya da görev başına worktree.
+- Ortak dosyalar: paralel görevler `.harness/state/` ve lock dosyalarına yazmaz; bunları
+  orchestrator, başka iş çalışmıyorken günceller.
 
 Bilinen riskler: üyelikle otomasyon dokümanlarda açıkça izinli değil (kişisel kullanım
 gri alan); paralel ajanlar limiti hızlı doldurur; pywebview paketlemesi denenmedi;

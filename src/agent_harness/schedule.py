@@ -3,9 +3,12 @@
 `start` holds READY tasks that may begin now. Two tasks may run together only when
 their declared scopes do not overlap; a task without a scope is assumed to touch
 anything. Scope overlap is judged on path prefixes and errs on the side of holding a
-task back: `src/api/*.py` and `src/api/v1/` are treated as overlapping.
+task back: `src/api/*.py` and `src/api/v1/` are treated as overlapping. Entries are compared the
+way `roles.py` compares paths (Unicode NFC, case folded); absolute paths, `~` and `..`
+overlap everything.
 """
 
+import re
 from pathlib import Path
 
 from agent_harness.check import inspect_ledger, reachable_phases
@@ -19,8 +22,10 @@ from agent_harness.models import (
     Task,
     WaitingTask,
 )
+from agent_harness.roles import _fold
 
 RUNNING = ("IN_PROGRESS", "IN_REVIEW")
+DRIVE = re.compile(r"^[a-z]:")
 FINAL = ("DONE", "CANCELLED")
 
 
@@ -31,8 +36,12 @@ def _order(item_id: str) -> tuple[str, int]:
 
 def _prefix(entry: str) -> tuple[str, ...]:
     """Literal leading path segments of a scope entry; empty means the whole project."""
+    text = _fold(entry.strip()).replace("\\", "/")
+    if text.startswith(("/", "~")) or DRIVE.match(text):
+        return ()  # outside the project-relative form: assume it may touch anything
     parts: list[str] = []
-    for segment in entry.replace("\\", "/").casefold().split("/"):
+    for raw in text.split("/"):
+        segment = raw.strip()
         if segment in ("", "."):
             continue
         if segment == ".." or "*" in segment or "?" in segment:

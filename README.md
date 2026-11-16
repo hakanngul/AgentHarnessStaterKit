@@ -161,13 +161,20 @@ READY görevler), `held` (kapsamı çalışan ya da aynı turda başlayan bir g�
 READY görevler), `unblocked` (bağımlılıkları tamam, READY yapılabilecek BACKLOG görevler),
 `waiting` (nedenleriyle bekleyenler), `decisions` (PENDING kararlar ve beklettikleri).
 
-İki görev ancak `scope` alanları kesişmiyorsa birlikte başlatılır. Kesişim yol
-öneklerine bakar ve temkinlidir: `src/api/*.py` ile `src/api/v1/` kesişir sayılır.
-`scope` yazılmamış görev her şeye dokunuyor kabul edilir ve yalnız tek başına başlar.
-Sıra görev numarasına göredir; kesişmede küçük numara önce başlar.
+İki görev ancak `scope` alanları kesişmiyorsa birlikte başlatılır. `scope` girdileri
+proje köküne göre yol ya da glob'dur (`*`, `?`, `**`; köşeli parantez ve süslü parantez
+desteklenmez). Kesişim yol öneklerine bakar ve temkinlidir: `src/api/*.py` ile
+`src/api/v1/` kesişir sayılır. Büyük/küçük harf ve Unicode normalleştirme farkı yok
+sayılır; mutlak yollar, `~` ve `..` her şeyle kesişir. `scope` yazılmamış görev her şeye
+dokunuyor kabul edilir ve yalnız tek başına başlar; başka işler sürdükçe bekleyebilir.
+Sıra önce önek, sonra numaradır (`API-3`, `T-1`, `T-2`, `T-10`); kesişmede önce gelen
+başlar.
 
 Sınırlar: `scope` beyandır; görevin gerçekten yalnız o yollara yazdığını rolün yazma
-kapsamı ve review denetler. `next` öncelik, tahmin ya da rol kapasitesi bilmez.
+kapsamı ve review denetler. Serbest metin (`API katmanı`) yol sayılır ve hiçbir yolla
+kesişmez; yol yazın. Paralel görevlerin herkesin yazdığı dosyalara (`.harness/state/`,
+lock dosyaları) dokunmaması gerekir: ortak durum belgelerini orchestrator, başka iş
+çalışmıyorken günceller. `next` öncelik, tahmin ya da rol kapasitesi bilmez.
 
 ## Roller ve yazma kapsamı
 

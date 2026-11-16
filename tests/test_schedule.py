@@ -85,6 +85,13 @@ def ids(entries: list[dict]) -> list[str]:
         (["../other"], ["docs/"], True),
         (["src/api/"], [], True),
         ([], [], True),
+        (["docs/\u00f6zet.md"], ["docs/o\u0308zet.md"], True),
+        (["/home/u/proj/src/api/"], ["src/web/"], True),
+        (["~/proj/src/api"], ["docs/"], True),
+        (["C:\\proj\\src\\api"], ["docs/"], True),
+        (["src/api/ "], ["src/api/login.py"], True),
+        ([" src / api "], ["src/api/login.py"], True),
+        (["src/web/"], ["/"], True),
     ],
 )
 def test_scopes_overlap(first, second, expected):
@@ -99,7 +106,8 @@ def test_invalid_ledger_yields_errors_and_no_plan(tmp_path):
     report = plan(tmp_path, task("T-1", scope=["src/"]), task("T-2", depends_on=["T-9"]))
     assert report["ok"] is False
     assert any("unknown T-9" in error for error in report["errors"])
-    assert report["start"] == [] and report["running"] == [] and report["waiting"] == []
+    for key in ("start", "running", "held", "unblocked", "waiting", "decisions"):
+        assert report[key] == [], key
     assert "No plan was computed: fix the ledger errors first" in report["warnings"]
 
 
@@ -366,3 +374,18 @@ def test_next_is_repeatable_and_writes_nothing(tmp_path):
     after = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
     assert first == second
     assert before == after
+
+
+def test_running_task_without_scope_holds_every_ready_task(tmp_path):
+    report = plan(tmp_path, task("T-1", "IN_PROGRESS"), task("T-2", scope=["docs/"]))
+    assert report["start"] == []
+    assert report["held"][0]["conflicts_with"] == ["T-1"]
+
+
+def test_blocked_task_also_lists_a_missing_phase(tmp_path):
+    write_config(tmp_path, workflow={"phases": PHASES})
+    report = plan(tmp_path, task("T-1", "BLOCKED", phase="implement"))
+    assert report["waiting"][0]["reasons"] == [
+        "BLOCKED: Waiting for the designer",
+        "no 'spec' task is reachable through depends_on",
+    ]

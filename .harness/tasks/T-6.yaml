@@ -114,8 +114,8 @@ evidence:
     is IN_PROGRESS it moves to running and T-4 stays held; a READY implement task without
     a spec makes next report the check error and exit 1, as check does.'
   output: .harness/evidence/T-6/wheel-smoke.txt
-  recorded_at: '2026-11-17'
+  recorded_at: '2026-11-16'
 log:
-- 2026-11-17 görev açıldı; plan docs/plans/lifecycle.md (L3)
+- 2026-11-16 görev açıldı; plan docs/plans/lifecycle.md (L3)
 review:
   status: pending
