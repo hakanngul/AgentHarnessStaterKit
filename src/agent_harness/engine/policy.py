@@ -150,9 +150,18 @@ def _escapes(pattern: str) -> bool:
 
 
 def check_tool(
-    config: HarnessConfig, role: str, root: Path, tool: str, tool_input: dict
+    config: HarnessConfig,
+    role: str,
+    root: Path,
+    tool: str,
+    tool_input: dict,
+    *,
+    read_only: bool = False,
 ) -> Verdict:
-    """Allow or deny one tool call made by an agent acting as `role`."""
+    """Allow or deny one tool call made by an agent acting as `role`.
+
+    A read-only run (a review) refuses every file write whatever the role's write scope says.
+    """
     role_config = config.roles.get(role)
     if role_config is None:
         return Verdict(False, f"role {role!r} is not defined in .harness/config.yaml")
@@ -177,6 +186,8 @@ def check_tool(
     key = WRITE_TOOLS.get(tool) or ("notebook_path" if tool == NOTEBOOK_TOOL else None)
     if key is None:
         return Verdict(False, f"tool {tool!r} is not on the unattended allow list")
+    if read_only:
+        return Verdict(False, "this run is read-only; it may not write files")
     target = tool_input.get(key)
     if not isinstance(target, str) or not target:
         return Verdict(False, f"{tool} call without a {key}")

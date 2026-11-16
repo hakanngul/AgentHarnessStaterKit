@@ -91,7 +91,9 @@ class ClaudeEngine:
         denied: list[Event] = []
 
         def verdict_for(tool: str, tool_input: dict) -> Any:
-            verdict = check_tool(config, request.role, root, tool, tool_input)
+            verdict = check_tool(
+                config, request.role, root, tool, tool_input, read_only=request.read_only
+            )
             if not verdict.allowed:
                 denied.append(ToolDenied(tool, verdict.reason))
             return verdict

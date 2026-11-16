@@ -49,6 +49,7 @@ def prepare(
     *,
     runnable: tuple[str, ...] = RUNNABLE,
     prompt_for: Callable[[Task, str], str] = task_prompt,
+    read_only: bool = False,
 ) -> tuple[Path, RunRequest]:
     """Validate that a task may run and build its first request; raise HarnessError if not."""
     root = project_root(path)
@@ -70,6 +71,7 @@ def prepare(
         prompt=prompt_for(task, role),
         model=role_config.model,
         effort=role_config.effort,
+        read_only=read_only,
     )
     return root, request
 
@@ -98,13 +100,16 @@ async def run_task(
     role: str | None = None,
     runnable: tuple[str, ...] = RUNNABLE,
     prompt_for: Callable[[Task, str], str] = task_prompt,
+    read_only: bool = False,
     max_resumes: int = 3,
     max_wait: float = 6 * 3600,
     on_event: Callable[[Event], None] | None = None,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     clock: Callable[[], float] = time.time,
 ) -> RunOutcome:
-    root, request = prepare(path, task_id, role, runnable=runnable, prompt_for=prompt_for)
+    root, request = prepare(
+        path, task_id, role, runnable=runnable, prompt_for=prompt_for, read_only=read_only
+    )
     outcome = RunOutcome(status="failed", task_id=task_id, role=request.role)
     while True:
         outcome.sessions += 1

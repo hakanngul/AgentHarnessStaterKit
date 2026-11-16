@@ -267,21 +267,33 @@ sonucunu deftere yazar. Durumu yalnız bu komut değiştirir; ajanlar değiştir
 - Çıkış kodu 0: hepsi IN_REVIEW'a ulaştı ve defter yazıldı.
 
 `harness review [PATH] [--task T-n] [--role reviewer]` (ya da `wave --review`): IN_REVIEW
-görevleri reviewer rolüyle inceletir. Reviewer yalnız okur; kararını kendi yazmaz. Cevabını
-`VERDICT: APPROVED|CHANGES_REQUESTED` satırıyla ve her kabul kriteri için kanıt satırıyla
-(`AC1: E1`) bitirir. Karar kodla işlenir:
+görevleri reviewer rolüyle inceletir. Review koşusu **salt okunurdur**: politika, rolün yazma
+kapsamı ne olursa olsun her dosya yazımını reddeder (hook düzeyinde). Reviewer kararını
+kendi yazmaz; cevabını `VERDICT: APPROVED|CHANGES_REQUESTED` satırıyla ve her kabul kriteri
+için kanıt satırıyla (`AC1: E1`) bitirir. Karar kodla işlenir:
 
-- Onay yalnız her kriter kaydedilmiş, geçen bir kanıta bağlanırsa kabul edilir. Görev DONE
-  olur ve `verified_by` doldurulur. Eksik onay "değişiklik istendi" sayılır.
+- Onay yalnız şunlar sağlanırsa kabul edilir: her kriter, `harness evidence run` ile kaydedilmiş
+  ve geçen bir kanıta bağlanmış; bir komutun en son koşusu başarısız değil. Görev DONE olur,
+  `verified_by` doldurulur (geliştiricinin bağladıkları korunur). Aksi hâlde onay "değişiklik
+  istendi" sayılır ve nedeni nota yazılır.
+- Belirsizlik reddedilir: iki farklı `VERDICT` satırı karar sayılmaz, bir kritere iki farklı
+  kanıt kimliği yazılırsa o kriter bağlanmamış sayılır.
 - Değişiklik istenirse görev READY'ye döner, reviewer'ın notları bir sonraki geliştirici
-  istemine veri olarak eklenir.
-- Görev sahibi kendi görevini inceleyemez. Reviewer kanıtı ya da kriterleri değiştirirse
-  görev BLOCKED olur. Karar satırı yoksa ya da koşu başarısızsa görev IN_REVIEW'da kalır.
+  istemine veri olarak eklenir. Geliştirici metni istemde tek satıra indirilir ve alıntılanır,
+  böylece sahte `VERDICT` satırı üretemez.
+- Görev sahibi kendi görevini inceleyemez. İnceleme sırasında görevde herhangi bir değişiklik
+  olursa (salt okunur zorlama bir ikinci savunmadır) görev BLOCKED olur. Karar satırı yoksa ya
+  da koşu başarısızsa görev IN_REVIEW'da kalır ve log'a yazılır.
+- `--task` ile istenen görev IN_REVIEW değilse komut hata verir (sessiz başarı yok).
+- Çıkış kodu 0: incelenen her görev DONE oldu. `wave --review` yalnız o dalgada IN_REVIEW'a
+  ulaşan görevleri inceletir; çıkış kodu 0 için hem dalga hem review başarılı olmalıdır.
+  JSON'da son durum `reviews` listesindedir.
 
-Sınırlar: reviewer `bash` kullanamaz, bu yüzden "kapsam dışı dosya değişti mi" sorusunu
-`git` ile doğrulayamaz; onay bu noktada modelin okumasına dayanır. Kodla kapsam denetimi
-görev başına commit adımıyla gelecek. IN_REVIEW'daki görev, DONE olana kadar kapsamını
-meşgul tutar ve çakışan görevleri bekletir.
+Sınırlar: reviewer'a `bash` vermezseniz "kapsam dışı dosya değişti mi" sorusunu `git` ile
+doğrulayamaz; onay bu noktada modelin okumasına dayanır. Kodla kapsam denetimi görev başına
+commit adımıyla gelecek. Onay, kanıtın ilgili kriteri gerçekten gösterip göstermediğini
+denetlemez, yalnız kanıtın var, geçen ve harness kaydı olduğunu denetler; ilgiyi model yargılar.
+IN_REVIEW'daki görev DONE olana kadar kapsamını meşgul tutar ve çakışan görevleri bekletir.
 
 ## Roller ve yazma kapsamı
 

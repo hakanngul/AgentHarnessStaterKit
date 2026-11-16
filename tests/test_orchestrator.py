@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -36,10 +37,21 @@ class ByTask:
         self.seen[task_id] = data["status"]
         if self.exit_code is not None:
             items = data.get("evidence", [])
+            number = len(items) + 1
             items.append(
-                {"id": f"E{len(items) + 1}", "command": "pytest", "exit_code": self.exit_code}
+                {
+                    "id": f"E{number}",
+                    "command": "pytest",
+                    "exit_code": self.exit_code,
+                    "recorded_by": "harness",
+                    "output": f".harness/evidence/{task_id}/E{number}.txt",
+                    "output_sha256": hashlib.sha256(b"ok\n").hexdigest(),
+                }
             )
             data["evidence"] = items
+            out = root / items[-1]["output"]
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(b"ok\n")
             path.write_text(yaml.safe_dump(data))
         for event in self.scripts[task_id]:
             yield event

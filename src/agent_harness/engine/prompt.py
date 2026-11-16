@@ -42,6 +42,11 @@ def task_prompt(task: Task, role: str) -> str:
     return "\n".join(lines)
 
 
+def _flat(text: str) -> str:
+    """One line, so developer-written text cannot fake a line the reviewer must produce."""
+    return " ".join(text.split())
+
+
 def review_prompt(task: Task, role: str) -> str:
     """Instructions for an independent reviewer: verify, never edit, end with a verdict."""
     lines = [
@@ -54,17 +59,19 @@ def review_prompt(task: Task, role: str) -> str:
         f"Task {task.id}: {task.title}",
     ]
     if task.goal.strip():
-        lines += ["", "Goal:", task.goal.strip()]
+        lines += ["", "Goal:", *[f"> {line}" for line in task.goal.strip().splitlines()]]
     lines += ["", "Scope the developer was allowed to change:"]
-    lines += [f"- {entry}" for entry in task.scope] if task.scope else ["- not declared"]
+    lines += [f"- {_flat(entry)}" for entry in task.scope] if task.scope else ["- not declared"]
     lines += ["", "Acceptance criteria:"]
-    lines += [f"- {item.id}: {item.text}" for item in task.acceptance]
+    lines += [f"- {item.id}: {_flat(item.text)}" for item in task.acceptance]
     lines += ["", "Recorded evidence:"]
     for item in task.evidence:
         outcome = "passed" if item.passed else "FAILED"
-        lines.append(f"- {item.id} [{outcome}] {item.command or item.kind}: {item.summary}")
+        who = "harness" if item.recorded_by == "harness" else "agent-written"
+        text = _flat(f"{item.command or item.kind}: {item.summary}")
+        lines.append(f"- {item.id} [{outcome}, {who}] {text}")
         if item.output:
-            lines.append(f"  output file: {item.output}")
+            lines.append(f"  output file: {_flat(item.output)}")
     lines += [
         "",
         "Finish with exactly these lines, nothing after them:",

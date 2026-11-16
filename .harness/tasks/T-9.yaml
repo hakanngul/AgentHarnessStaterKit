@@ -20,30 +20,30 @@ acceptance:
     onay yalnız her kriter kaydedilmiş ve geçen bir kanıta bağlıysa DONE yapar (verified_by
     doldurulur, review approved, defter geçerli kalır); aksi hâlde değişiklik istendi sayılır.
   verified_by:
-  - E1
+  - E4
 - id: AC2
   text: Değişiklik istendiğinde görev READY'ye döner ve reviewer notları sonraki geliştirici
     istemine veri olarak eklenir; ikinci dalga görevi yeniden IN_REVIEW'a getirir.
   verified_by:
-  - E1
+  - E4
 - id: AC3
   text: Karar satırı yoksa ya da review koşusu başarısızsa görev IN_REVIEW'da kalır ve log'a
     yazılır; reviewer kanıtı ya da kabul kriterlerini değiştirirse görev BLOCKED olur.
   verified_by:
-  - E1
+  - E4
 - id: AC4
   text: Yalnız IN_REVIEW görev incelenir; görev sahibi reviewer olamaz; tanımsız rol defteri
     değiştirmez. Bir görevin reddi diğerlerini durdurmaz.
   verified_by:
-  - E1
+  - E4
 - id: AC5
   text: '`harness review [PATH] [--task] [--role] [--max-parallel] [--json]` ve `harness wave
     --review` sonucu gösterir; hepsi DONE olduysa 0, değilse 1 ile çıkar. Testler yalnız unit
     testtir.'
   verified_by:
-  - E1
-  - E2
-  - E3
+  - E4
+  - E5
+  - E6
 evidence:
 - id: E1
   kind: command
@@ -78,8 +78,43 @@ evidence:
   output_sha256: 5143a71867e2bd7dfcd6d76f8603e2f8ef6377cb2f6eac07d725e30b317980cc
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: edfd109fbd65a437ae02465d68eb79882c6becce
+  output: .harness/evidence/T-9/E4.txt
+  output_sha256: 217fcb9854866930b02fb9594af4ab5c8da5c1d34181a7fe411bf7f6885f6c6e
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: edfd109fbd65a437ae02465d68eb79882c6becce
+  output: .harness/evidence/T-9/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: edfd109fbd65a437ae02465d68eb79882c6becce
+  output: .harness/evidence/T-9/E6.txt
+  output_sha256: 5143a71867e2bd7dfcd6d76f8603e2f8ef6377cb2f6eac07d725e30b317980cc
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 review:
-  status: pending
+  status: changes_requested
+  by: reviewer
+  notes: 'Round 1 (read-only reviewer subagent, ran nothing): CHANGES REQUESTED. HIGH the reviewer role could write every task file and only two fields of one task were frozen, so a review could forge DONE, owner or another task. MEDIUM stale, failing-latest or agent-written evidence could back an approval; conflicting verdict lines and developer text could inject a verdict; --task with a non-reviewable task exited 0; a settle crash lost sibling results. LOW lost verified_by, README gaps, test gaps. Fixed afterwards: review runs are read-only in the policy hook, the whole task is frozen and any change blocks it, approval needs harness-recorded passing evidence and no failing latest run, ambiguity fails closed, prompt text is flattened and quoted, explicit --task errors, any settle exception is contained, README corrected. The fixes are not re-reviewed yet.'
 log:
 - 2026-11-16 görev açıldı. Gerçek oturum denemesi (geçici proje, scratchpad) - wave sonrası
   harness review iki görevi DONE yaptı; reviewer git ile kapsam doğrulayamadı (README sınırı).

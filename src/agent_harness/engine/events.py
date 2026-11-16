@@ -16,6 +16,7 @@ class RunRequest:
     effort: str | None = None
     resume: str | None = None  # session id to continue
     max_turns: int | None = None
+    read_only: bool = False  # refuse every file write, e.g. for a review
 
 
 @dataclass(frozen=True)
