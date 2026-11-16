@@ -23,6 +23,10 @@ harness = "agent_harness.cli:app"
 engine = [
     "claude-agent-sdk>=0.2.172,<0.3",
 ]
+server = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+]
 
 [dependency-groups]
 dev = [
@@ -31,6 +35,9 @@ dev = [
     "build>=1,<2",
     "hatchling>=1.26,<2",
     "claude-agent-sdk>=0.2.172,<0.3",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "httpx>=0.27,<1",
 ]
 
 [tool.hatch.build.targets.wheel]

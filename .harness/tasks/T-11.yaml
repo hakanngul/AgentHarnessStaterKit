@@ -1,0 +1,73 @@
+schema_version: 1
+id: T-11
+title: 'Uygulama adım 6a: yerel HTTP sunucusu, salt okunur API ve kimlik doğrulama (harness
+  serve)'
+owner: developer
+status: IN_REVIEW
+goal: Defteri (plan, görevler, check) JSON olarak sunan, yalnız loopback adresinde dinleyen
+  ve her isteği token ile doğrulayan FastAPI sunucusu. Eylemler (wave, review, commit) ve
+  canlı olaylar sonraki görev; bu görev yalnız okur, hiçbir şey yazmaz ve ajan çalıştırmaz.
+scope:
+- src/agent_harness/server.py
+- src/agent_harness/cli.py
+- tests/test_server.py
+- pyproject.toml
+- uv.lock
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: GET /api/plan, /api/check, /api/tasks ve /api/tasks/{id} defterdeki gerçek veriyi
+    JSON döner; geçersiz görev kimliği 404, bozuk defter 422 verir ve hiçbiri dosya yazmaz.
+- id: AC2
+  text: /api/health dışındaki her istek geçerli Bearer token ister (sabit zamanlı karşılaştırma);
+    eksik ya da yanlış token 401 verir.
+- id: AC3
+  text: Host başlığı loopback adı değilse istek 403 ile reddedilir (DNS rebinding); sunucu
+    loopback dışı bir adrese bağlanmayı reddeder.
+- id: AC4
+  text: '`harness serve [PATH] [--port]` token üretip bir kez yazar (HARNESS_TOKEN verilmişse
+    onu kullanır), fastapi/uvicorn yoksa kurulum yolunu söyleyen bir hata verir; bağımlılıklar
+    `server` extra olarak tanımlıdır.'
+- id: AC5
+  text: Testler yalnız unit testtir (TestClient, gerçek ledger dosyaları); pytest, ruff check
+    ve ruff format --check geçer.
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 822 passed in 29.75s
+  commit: d99d068799cae06629f409b4fbca3bd2fc1fdf15
+  output: .harness/evidence/T-11/E1.txt
+  output_sha256: 9a00325f70eac539c9aa4d9828a6b23d97ee36799968c024c788fbc745533ea0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: d99d068799cae06629f409b4fbca3bd2fc1fdf15
+  output: .harness/evidence/T-11/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 59 files already formatted
+  commit: d99d068799cae06629f409b4fbca3bd2fc1fdf15
+  output: .harness/evidence/T-11/E3.txt
+  output_sha256: 98c3e013fccf39091730bb21f579ed3160ed39a17ff3e680b97a11a5a7e45c69
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+log:
+- '2026-11-16 developer: task opened after the owner said "Başla"; first slice is read-only
+  on purpose'
+- '2026-11-16 developer: implemented server.py, serve command, 27 tests; evidence E1-E3 recorded;
+  waiting for independent review'

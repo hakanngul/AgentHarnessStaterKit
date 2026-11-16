@@ -402,6 +402,31 @@ def review_command(
         raise typer.Exit(1)
 
 
+SERVER_HINT = "the server needs its extra: pip install 'agent-harness-starter[server]'"
+
+
+@app.command()
+def serve(
+    path: ProjectPath = Path("."),
+    host: Annotated[str, typer.Option(help="Loopback address to bind.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to listen on.")] = 8765,
+) -> None:
+    """Serve the ledger as a read-only JSON API on loopback; every request needs the token."""
+    import os
+    import secrets
+
+    try:
+        from agent_harness.server import serve as run_server
+    except ImportError:
+        return fail(HarnessError(SERVER_HINT), False)
+    token = os.environ.get("HARNESS_TOKEN") or secrets.token_urlsafe(32)
+    try:
+        console.print(f"http://{host}:{port}  token: {token}")
+        run_server(path, host=host, port=port, token=token)
+    except HarnessError as exc:
+        fail(exc, False)
+
+
 @app.command()
 def scope(
     role: Annotated[str, typer.Argument(help="Role name from .harness/config.yaml.")],

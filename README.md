@@ -340,6 +340,23 @@ Sınırlar:
 - Kimlik git ayarından gelir; eksik olan `user.name`/`user.email` için `Agent Harness
   <harness@localhost>` kullanılır.
 
+## Yerel sunucu (salt okunur)
+
+`harness serve [PATH] [--port 8765]`: defteri JSON olarak sunan FastAPI sunucusu. Ek bağımlılık
+ister: `pip install 'agent-harness-starter[server]'`. Bu ilk dilim yalnız okur; wave, review ve
+commit başlatmaz, canlı olay akışı yoktur (sonraki görev).
+
+- Yalnız loopback'e bağlanır (`127.0.0.1`, `localhost`, `::1`); başka adres reddedilir.
+- `/api/health` dışında her istek `Authorization: Bearer <token>` ister. Token her başlangıçta
+  üretilir ve bir kez yazdırılır; `HARNESS_TOKEN` ortam değişkeni verilirse o kullanılır
+  (en az 16 karakter).
+- `Host` başlığı loopback adı değilse istek 403 alır (DNS rebinding savunması).
+- Uçlar: `GET /api/plan`, `/api/check`, `/api/tasks`, `/api/tasks/{T-n}`. `/docs` kapalı.
+
+Sınırlar: token düz HTTP ile loopback'te gider, TLS yok; aynı makinedeki her süreç token'ı
+bilirse erişir. Token'ı komut satırı geçmişine ya da log'a koyma. Tarayıcıya token'ı verme
+yolu (arayüz) henüz tasarlanmadı.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.
