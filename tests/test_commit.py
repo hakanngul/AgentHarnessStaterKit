@@ -166,7 +166,8 @@ def test_running_it_twice_commits_once(tmp_path):
     commit_done_tasks(root)
     write(root, "src/a/two.py")
     (second,) = commit_done_tasks(root)
-    assert (second.status, second.note) == ("skipped", "already committed")
+    assert second.status == "skipped"
+    assert second.note == "already committed; 1 later change(s) left uncommitted"
     assert untracked(root) == ["??", "src/a/two.py"]
 
 
@@ -188,7 +189,7 @@ def test_staged_changes_are_refused_not_swept_into_a_task_commit(tmp_path):
 
 def test_a_directory_that_is_not_a_git_repository_is_refused(tmp_path):
     root = plain(tmp_path, done("T-1", ["src/a/"]))
-    with pytest.raises(HarnessError, match="git"):
+    with pytest.raises(HarnessError, match="git rev-parse failed"):
         commit_done_tasks(root)
 
 
@@ -208,8 +209,11 @@ def test_the_branch_option_creates_the_branch_and_commits_there(tmp_path):
     commit_done_tasks(root, branch="harness/group-1")
     assert git(root, "branch", "--show-current").strip() == "harness/group-1"
     assert git(root, "log", "-1", "--format=%s", start).strip() == "baseline"
+    git(root, "switch", "-q", start)
     write(root, "src/a/more.py")
-    commit_done_tasks(root, branch="harness/group-1")  # an existing branch is reused
+    results = commit_done_tasks(root, branch="harness/group-1")  # reuses the existing branch
+    assert git(root, "branch", "--show-current").strip() == "harness/group-1"
+    assert results[0].status == "skipped"  # T-1 was committed on that branch already
 
 
 def test_unknown_and_unrequested_tasks(tmp_path):
@@ -279,7 +283,7 @@ def test_commit_command_exits_one_when_blocked(tmp_path):
 def test_commit_command_reports_errors_as_json(tmp_path):
     root = plain(tmp_path, done("T-1", ["src/a/"]))
     out = CliRunner().invoke(cli.app, ["commit", str(root), "--json"])
-    assert out.exit_code == 1 and "git" in out.output
+    assert out.exit_code == 1 and "git rev-parse failed" in out.output
 
 
 def test_a_broad_scope_does_not_swallow_the_files_a_narrower_task_names(tmp_path):
@@ -321,3 +325,194 @@ def test_equal_scopes_go_to_the_lower_task_number():
     assert owner_of("src/a/x.py", {"T-10": ten, "T-2": two, "T-1": one}) == "T-1"
     assert owner_of("src/a/x.py", {"T-10": ten, "T-2": two}) == "T-2"
     assert owner_of("src/zzz.py", {"T-1": one}) is None
+
+
+# --- findings of the independent review ----------------------------------------------
+
+
+def test_a_file_named_like_a_glob_is_staged_literally_and_leaks_nothing(tmp_path):
+    running = task("T-2", status="IN_PROGRESS", scope=["src/wip.py"])
+    root = repo(tmp_path, done("T-1", ["src/"]), running)
+    write(root, "src/*.py", "literal")
+    write(root, "src/wip.py", "work in progress")
+    commit_done_tasks(root)
+    assert files_of(root, "T-1: ") == ["src/*.py"]
+    assert untracked(root) == ["??", "src/wip.py"]
+
+
+@pytest.mark.parametrize("name", ["~notes.txt", "a:b.txt", "$HOME.txt", "100%.txt", "-dash.txt"])
+def test_odd_root_file_names_are_stray_not_owned_by_everybody(tmp_path, name):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    write(root, "src/a/one.py")
+    write(root, name)
+    (result,) = commit_done_tasks(root)
+    assert result.status == "blocked" and name in result.note
+
+
+def test_a_file_name_with_a_wildcard_does_not_widen_ownership(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    write(root, "src/a/one.py")
+    write(root, "src/other/a*b.py")
+    (result,) = commit_done_tasks(root)
+    assert result.status == "blocked" and "src/other/a*b.py" in result.note
+
+
+def test_a_lookalike_prefix_is_not_the_same_directory():
+    model = Task.model_validate(task("T-1", scope=["src/a"]))
+    assert owners("src/a/x.py", {"T-1": model}) == ["T-1"]
+    assert owners("src/ab.py", {"T-1": model}) == []
+    assert owners("src/a.py", {"T-1": model}) == []
+
+
+def test_a_whole_project_scope_owns_everything_but_loses_to_a_narrower_one():
+    from agent_harness.commit import owner_of
+
+    whole = Task.model_validate(task("T-1", scope=["."]))
+    narrow = Task.model_validate(task("T-2", scope=["src/a.py"]))
+    tasks = {"T-1": whole, "T-2": narrow}
+    assert owner_of("README.md", tasks) == "T-1" and owner_of("src/a.py", tasks) == "T-2"
+
+
+def test_a_changed_lock_file_of_the_project_is_not_silently_dropped(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    write(root, "src/a/one.py")
+    write(root, "uv.lock", "changed")
+    (result,) = commit_done_tasks(root)
+    assert result.status == "blocked" and "uv.lock" in result.note
+
+
+def test_a_lock_file_listed_in_a_scope_is_committed(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/", "uv.lock"]))
+    write(root, "src/a/one.py")
+    write(root, "uv.lock", "changed")
+    (result,) = commit_done_tasks(root)
+    assert sorted(result.files) == ["src/a/one.py", "uv.lock"]
+
+
+def test_a_failing_commit_leaves_the_index_clean_and_reports_what_happened(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]), done("T-2", ["src/b/"]), done("T-3", ["src/c/"]))
+    for name in ("src/a/one.py", "src/b/two.py", "src/c/three.py"):
+        write(root, name)
+    hook = root / ".git/hooks/pre-commit"
+    hook.write_text(
+        "#!/bin/sh\nif git diff --cached --name-only | grep -q 'src/b/'; then exit 1; fi\nexit 0\n"
+    )
+    hook.chmod(0o755)
+    results = commit_done_tasks(root)
+    assert [(r.task_id, r.status) for r in results] == [
+        ("T-1", "committed"),
+        ("T-2", "blocked"),
+        ("T-3", "skipped"),
+    ]
+    assert "commit failed" in results[1].note and "not attempted" in results[2].note
+    assert git(root, "diff", "--cached", "--name-only").strip() == ""
+    hook.unlink()
+    again = commit_done_tasks(root)  # nothing is stuck: the rest can now be committed
+    assert [(r.task_id, r.status) for r in again] == [
+        ("T-1", "skipped"),
+        ("T-2", "committed"),
+        ("T-3", "committed"),
+    ]
+
+
+@pytest.mark.parametrize("name", ["-x", "--force", "bad name", "a..b", ""])
+def test_unsafe_branch_names_are_refused_before_anything_changes(tmp_path, name):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    write(root, "src/a/one.py")
+    start = git(root, "branch", "--show-current").strip()
+    with pytest.raises(HarnessError, match="not a valid branch name"):
+        commit_done_tasks(root, branch=name)
+    assert git(root, "branch", "--show-current").strip() == start
+    assert subjects(root) == ["baseline"]
+
+
+def test_a_glob_like_branch_name_does_not_match_an_existing_branch(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    git(root, "branch", "foo-1")
+    write(root, "src/a/one.py")
+    with pytest.raises(HarnessError, match="not a valid branch name"):
+        commit_done_tasks(root, branch="foo*")
+
+
+def test_the_branch_is_not_switched_when_there_is_nothing_to_commit(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    start = git(root, "branch", "--show-current").strip()
+    commit_done_tasks(root, branch="harness/idle")
+    assert git(root, "branch", "--show-current").strip() == start
+
+
+def test_task_one_is_not_confused_with_task_ten_or_a_body_line(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]), done("T-10", ["src/b/"]))
+    write(root, "src/b/ten.py")
+    commit_done_tasks(root, task_ids=["T-10"])
+    write(root, "src/a/one.py")
+    git(root, "add", "src/a/one.py")
+    git(root, "commit", "-qm", "unrelated subject", "-m", "T-1: appears only in the body")
+    write(root, "src/a/two.py")
+    by_task = {r.task_id: r for r in commit_done_tasks(root)}
+    assert by_task["T-1"].status == "committed" and by_task["T-1"].files == ["src/a/two.py"]
+    assert by_task["T-10"].status == "skipped"
+
+
+def test_a_repository_without_commits_can_take_the_first_commit(tmp_path):
+    root = plain(tmp_path, done("T-1", ["src/a/"]))
+    git(root, "init", "-q")
+    git(root, "config", "user.email", "t@example.com")
+    git(root, "config", "user.name", "T")
+    write(root, "src/a/one.py")
+    (root / ".git/info/exclude").write_text(".harness/config.yaml\n")  # not a task's file
+    (result,) = commit_done_tasks(root)
+    assert result.status == "committed" and subjects(root) == ["T-1: Login form"]
+
+
+def test_a_detached_head_is_refused_unless_a_branch_is_given(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    git(root, "checkout", "-q", "--detach")
+    write(root, "src/a/one.py")
+    with pytest.raises(HarnessError, match="HEAD is detached"):
+        commit_done_tasks(root)
+    (result,) = commit_done_tasks(root, branch="harness/rescue")
+    assert result.status == "committed"
+
+
+def test_unmerged_paths_and_nested_repositories_are_refused(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    nested = root / "src/a/inner"
+    nested.mkdir(parents=True)
+    git(nested, "init", "-q")
+    write(nested, "f.txt")
+    with pytest.raises(HarnessError, match="nested repository"):
+        commit_done_tasks(root)
+
+
+def test_the_commit_identity_falls_back_per_missing_setting(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    git(root, "config", "--unset", "user.name")
+    write(root, "src/a/one.py")
+    env_free = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
+    import os
+
+    old = {key: os.environ.get(key) for key in env_free}
+    os.environ.update(env_free)
+    try:
+        commit_done_tasks(root)
+    finally:
+        for key, value in old.items():
+            os.environ.pop(key) if value is None else os.environ.__setitem__(key, value)
+    assert git(root, "log", "-1", "--format=%an <%ae>").strip() == "Agent Harness <t@example.com>"
+
+
+def test_the_stray_check_applies_to_a_single_requested_task_too(tmp_path):
+    root = repo(tmp_path, done("T-1", ["src/a/"]), done("T-2", ["src/b/"]))
+    write(root, "src/a/one.py")
+    write(root, "stray.txt")
+    (result,) = commit_done_tasks(root, task_ids=["T-1"])
+    assert result.status == "blocked" and "stray.txt" in result.note
+
+
+def test_quotes_newlines_and_unicode_in_file_names_survive_status_parsing(tmp_path):
+    root = repo(tmp_path, task("T-1", scope=["src/"]))
+    names = ['src/say "hi".py', "src/new\nline.py", "src/ünïcode ✓.py"]
+    for name in names:
+        write(root, name)
+    assert sorted(changed_files(root)) == sorted(names)

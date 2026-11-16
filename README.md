@@ -299,27 +299,42 @@ IN_REVIEW'daki görev DONE olana kadar kapsamını meşgul tutar ve çakışan g
 
 `harness commit [PATH] [--task T-n] [--branch ad]`: DONE olmuş ve henüz commit'i olmayan her
 görevi ayrı bir commit olarak işler (dal düzeni A: paralel grup tek dalda, görev başına commit).
-`--branch` dalı oluşturur ya da ona geçer. Hiçbir şey push edilmez, merge sende.
+`--branch` dalı oluşturur ya da ona geçer (geçersiz ad, `-` ile başlayan ad ve joker karakter
+reddedilir). Hiçbir şey push edilmez, merge sende.
 
-- Yalnız görevin sahip olduğu dosyalar, açık yol vererek stage edilir: kapsamındaki dosyalar ve
-  kendi defter dosyaları (`.harness/tasks/T-n.yaml`, `.harness/evidence/T-n/`). `git add -A` yok.
+- Yalnız görevin sahip olduğu dosyalar stage edilir: kapsamındaki dosyalar ve kendi defter
+  dosyaları (`.harness/tasks/T-n.yaml`, `.harness/evidence/T-n/`). `git add -A` yok; git
+  `--literal-pathspecs` ile çalışır, yani `src/*.py` adlı bir dosya joker sayılmaz.
 - Bir dosya tek göreve gider: en spesifik kapsam kazanır (`src/` geniş kapsamı, başka görevin
   adıyla andığı `src/api.py`'yi yutmaz), eşitlikte küçük görev numarası. Hâlâ çalışan bir
-  görevin spesifik kapsamındaki dosya commit'lenmez, o göreve bırakılır.
+  görevin spesifik kapsamındaki dosya commit'lenmez, o göreve bırakılır. Dosya yolları gerçek
+  ad olarak karşılaştırılır; `~x`, `a:b` gibi adlar kapsamı genişletmez.
 - **Kapsam denetimi kodla yapılır:** hiçbir görevin kapsamının ya da defter dosyalarının
   açıklamadığı bir değişiklik varsa hiçbir commit atılmaz ve dosya adları söylenir. Paralel
-  görevlerde bunun kimin olduğu bilinemeyeceği için grubun tamamı durur. Testlerin ürettiği
-  `__pycache__`, `*.pyc` ve `*.lock` dosyaları sayılmaz.
-- Aynı komutu tekrar çalıştırmak ikinci commit atmaz (commit mesajı `T-n: ` ile başlar, git
-  geçmişinden bulunur). Dizin git deposunun kökü olmalı; index'te stage edilmiş değişiklik,
-  bozuk defter ya da bilinmeyen görev varsa komut hata verir.
+  görevlerde bunun kimin olduğu bilinemeyeceği için grubun tamamı durur. Yalnız testlerin
+  ürettiği `__pycache__`, `*.pyc` ve defter kilit dosyaları (`.T-n.yaml.lock`) sayılmaz;
+  `uv.lock` gibi proje dosyaları sayılır.
+- Bir görevin commit'i başarısız olursa (örneğin pre-commit hook) stage edilenler geri alınır,
+  o görev `blocked`, sonrakiler `skipped` raporlanır; önceki commit'ler raporda kalır.
+- Aynı komutu tekrar çalıştırmak ikinci commit atmaz: HEAD'den erişilen bir commit'in konusu
+  `T-n: ` ile başlıyorsa görev tamamlanmış sayılır. Sonradan değişen dosyalar commit'lenmez ve
+  notta sayısı yazılır. Hedef dal `--branch` ile verilmişse bu bakış o dalda yapılır.
+- Dizin git deposunun kökü olmalı. Index'te stage edilmiş değişiklik, bozuk defter, bilinmeyen
+  görev, çözülmemiş birleştirme, iç içe depo ve (`--branch` yoksa) detached HEAD hata verir.
+  Hiç commit'i olmayan depoda ilk commit atılabilir.
 - Çıkış kodu 0: engellenen görev yok.
 
-Sınırlar: kapsam eşleşmesi önek temellidir; `src/*.py` gibi joker karakterli kapsam, joker
-öncesi öneki sahiplenir (aşırı geniş). Commit'lemeden önce çalışma ağacında kendi
-değişikliğiniz varsa ve bir görevin kapsamına düşüyorsa o görevle birlikte commit'lenir; ajan
-ekibini temiz bir ağaçta çalıştırın. Kimlik git ayarından gelir, yoksa `Agent Harness
-<harness@localhost>` kullanılır.
+Sınırlar:
+- Kapsam eşleşmesi önek temellidir; `src/*.py` gibi joker karakterli kapsam, joker öncesi
+  öneki sahiplenir (aşırı geniş). `.`, `**`, mutlak ya da `..` içeren bir kapsam tüm projeyi
+  sahiplenir; bu görev en düşük öncelikli sahiptir ama kapsam denetimini fiilen kapatır, böyle
+  kapsamdan kaçının.
+- Commit'lemeden önce çalışma ağacında kendi değişikliğiniz varsa ve bir görevin kapsamına
+  düşüyorsa o görevle birlikte commit'lenir; ajan ekibini temiz bir ağaçta çalıştırın.
+- Git, deponun kendi `.git/config` ve hook'larıyla çalışır; kabuk erişimi olan bir ajan hook
+  yerleştirirse bu komut onu kendi yetkisiyle çalıştırır. Güvenmediğiniz projede çalıştırmayın.
+- Kimlik git ayarından gelir; eksik olan `user.name`/`user.email` için `Agent Harness
+  <harness@localhost>` kullanılır.
 
 ## Roller ve yazma kapsamı
 
