@@ -667,18 +667,26 @@ def test_a_failed_commit_still_names_git_commit_when_the_identity_options_are_ad
     assert "git -c failed" not in result.note
 
 
-def test_a_git_command_that_times_out_is_a_clear_error(monkeypatch, tmp_path):
-    import subprocess
+def test_a_git_command_that_times_out_is_a_clear_error_and_leaves_no_survivors(
+    monkeypatch, tmp_path
+):
+    import time
 
     from agent_harness import commit
 
-    seen = {}
-
-    def hung(command, **kwargs):
-        seen["timeout"] = kwargs.get("timeout")
-        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
-
-    monkeypatch.setattr(commit.subprocess, "run", hung)
-    with pytest.raises(HarnessError, match=r"git commit timed out after 120 s"):
-        commit._run(tmp_path, "-c", "user.name=x", "commit", "-m", "m")
-    assert seen["timeout"] == commit.GIT_TIMEOUT == 120
+    root = repo(tmp_path, task("T-1", "DONE"))
+    marker = tmp_path / "late"
+    hook = root / ".git/hooks/pre-commit"
+    hook.parent.mkdir(exist_ok=True)
+    # a grandchild that would touch the marker after the timeout, and a hook that hangs
+    hook.write_text(f"#!/bin/sh\n(sleep 2; touch {marker}) &\nsleep 30\n")
+    hook.chmod(0o755)
+    write(root, "src/a/one.py")
+    git(root, "add", "-A")
+    monkeypatch.setattr(commit, "GIT_TIMEOUT", 1)
+    started = time.monotonic()
+    with pytest.raises(HarnessError, match=r"git commit timed out after 1 s"):
+        commit._run(root, "-c", "user.name=x", "-c", "user.email=x@x", "commit", "-m", "m")
+    assert time.monotonic() - started < 10
+    time.sleep(2.5)
+    assert not marker.exists()  # the hook's background child was stopped with git

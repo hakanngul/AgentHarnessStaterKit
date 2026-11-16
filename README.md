@@ -366,7 +366,7 @@ ve 1 ile çıkar (sunucuda 409).
   defteri yazan bir `to_thread` işi bitene kadar sürebilir; yazımlar görev başına `O_EXCL`
   kilidiyle sıralı kalır, pencere küçüktür. İptal edilemeyen `commit` job'ı ise kilit
   bırakıldıktan sonra git çağrısını (en çok 120 sn) sürdürebilir; eşzamanlı ikinci commit'i
-  git'in `index.lock`'u reddeder. Zaman aşımına uğrayan git'in torunları öldürülmez. Tutucu notu (kim, pid) kilit alındıktan hemen
+  git'in `index.lock`'u reddeder. Zaman aşımında git ve başlattığı hook'lar (süreç grubu) öldürülür; Windows'ta yalnız git. Tutucu notu (kim, pid) kilit alındıktan hemen
   sonra yazılır; o anda okuyan biri "holder unknown" görebilir, hata yine doğrudur.
 
 ## Yerel sunucu

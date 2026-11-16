@@ -6,6 +6,8 @@ account for blocks every commit, because with parallel tasks nobody can say whos
 Only the files a task owns are staged, by literal path; nothing is pushed.
 """
 
+import os
+import signal
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -34,22 +36,44 @@ class CommitResult:
     files: list[str] = field(default_factory=list)
 
 
+def _kill_group(process: subprocess.Popen) -> None:
+    """Stop git and everything it started; the project lock is released right after."""
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        else:  # pragma: no cover - Windows: only git itself
+            process.kill()
+    except OSError:
+        pass  # already gone
+
+
 def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
     """git with literal pathspecs: a file named `*.py` or `:(top)x` is just a file name."""
     name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
+    command = ["git", "--literal-pathspecs", *args]
     try:
-        done = subprocess.run(
-            ["git", "--literal-pathspecs", *args],
+        # own process group on POSIX, so a timeout can stop hooks and helpers too
+        process = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
+            command,
             cwd=root,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=False,
-            timeout=GIT_TIMEOUT,
+            start_new_session=os.name == "posix",
         )
-    except subprocess.TimeoutExpired as exc:  # e.g. a hook that never returns
-        raise HarnessError(f"git {name} timed out after {GIT_TIMEOUT} s") from exc
     except OSError as exc:
         raise HarnessError(f"git is not available: {exc}") from exc
+    try:
+        stdout, stderr = process.communicate(timeout=GIT_TIMEOUT)
+    except subprocess.TimeoutExpired as exc:  # e.g. a hook that never returns
+        _kill_group(process)
+        process.communicate()
+        raise HarnessError(f"git {name} timed out after {GIT_TIMEOUT} s") from exc
+    except BaseException:
+        _kill_group(process)
+        process.communicate()
+        raise
+    done = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     if check and done.returncode != 0:
         raise HarnessError(f"git {name} failed: {(done.stderr or done.stdout).strip()[:300]}")
     return done

@@ -124,3 +124,6 @@ log:
   1.0 s for a 1 s timeout with a sleeping grandchild on POSIX. #4 (claim ownership keyed on
   exception type) ACCEPTED, very unlikely behind the entry-point lock. #5 (holder note window)
   ACCEPTED, cosmetic, documented.'
+- '2026-11-16 reviewer round 2: APPROVED. Codex P2 (git timeout kills only git, descendants outlive
+  the lock) verified real for hooks that fork: fixed with a process group kill (POSIX), test with a
+  hook whose background child must not survive; mutation (kill only git) caught.'
