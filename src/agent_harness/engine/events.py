@@ -47,6 +47,11 @@ class RateLimit:
 
 
 @dataclass(frozen=True)
+class Waiting:
+    seconds: float  # pause before the session is resumed after a usage limit
+
+
+@dataclass(frozen=True)
 class Finished:
     ok: bool
     session_id: str | None = None
@@ -57,4 +62,4 @@ class Finished:
     http_status: int | None = None
 
 
-Event = Started | Text | ToolUse | ToolDenied | RateLimit | Finished
+Event = Started | Text | ToolUse | ToolDenied | RateLimit | Waiting | Finished

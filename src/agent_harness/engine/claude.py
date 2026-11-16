@@ -67,7 +67,7 @@ def translate(message: Any, sdk: Any) -> list[Event]:
     return []
 
 
-def build_options(request: RunRequest, sdk: Any, can_use_tool: Any) -> Any:
+def build_options(request: RunRequest, sdk: Any, can_use_tool: Any, hooks: Any = None) -> Any:
     return sdk.ClaudeAgentOptions(
         cwd=str(request.cwd),
         model=request.model,
@@ -77,6 +77,7 @@ def build_options(request: RunRequest, sdk: Any, can_use_tool: Any) -> Any:
         permission_mode="default",
         can_use_tool=can_use_tool,
         setting_sources=["project"],
+        hooks=hooks,
     )
 
 
@@ -89,14 +90,34 @@ class ClaudeEngine:
         config = load_config(root)
         denied: list[Event] = []
 
-        async def can_use_tool(tool: str, tool_input: dict, context: Any) -> Any:
+        def verdict_for(tool: str, tool_input: dict) -> Any:
             verdict = check_tool(config, request.role, root, tool, tool_input)
+            if not verdict.allowed:
+                denied.append(ToolDenied(tool, verdict.reason))
+            return verdict
+
+        async def pre_tool_use(input_data: dict, tool_use_id: Any, context: Any) -> dict:
+            # Runs before permission rules, so allow rules in the project's own settings
+            # cannot shadow the policy the way they can shadow `can_use_tool`.
+            verdict = verdict_for(input_data["tool_name"], input_data["tool_input"])
+            if verdict.allowed:
+                return {}
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": verdict.reason,
+                }
+            }
+
+        async def can_use_tool(tool: str, tool_input: dict, context: Any) -> Any:
+            verdict = verdict_for(tool, tool_input)
             if verdict.allowed:
                 return sdk.PermissionResultAllow()
-            denied.append(ToolDenied(tool, verdict.reason))
             return sdk.PermissionResultDeny(message=verdict.reason)
 
-        options = build_options(request, sdk, can_use_tool)
+        hooks = {"PreToolUse": [sdk.HookMatcher(hooks=[pre_tool_use])]}
+        options = build_options(request, sdk, can_use_tool, hooks)
         async with sdk.ClaudeSDKClient(options=options) as client:
             await client.query(request.prompt)
             async for message in client.receive_response():

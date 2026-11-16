@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agent_harness.engine.events import Finished, RateLimit, RunRequest, Started, Text
+from agent_harness.engine.events import Finished, RateLimit, RunRequest, Started, Text, Waiting
 from agent_harness.engine.prompt import RESUME_PROMPT, task_prompt
 from agent_harness.engine.runner import LIMIT_FALLBACK_WAIT, LIMIT_MARGIN, prepare, run_task
 from agent_harness.filesystem import HarnessError
@@ -302,3 +302,69 @@ def test_ledger_is_not_modified_by_a_run(tmp_path):
     before = {p: p.read_bytes() for p in path.rglob("*") if p.is_file()}
     run(path, FakeEngine([Started("s1"), ok()]))
     assert before == {p: p.read_bytes() for p in path.rglob("*") if p.is_file()}
+
+
+# --- engine failures and visible waits --------------------------------------------
+
+
+class RaisingEngine:
+    def __init__(self, *events, error: Exception):
+        self.events, self.error = events, error
+
+    async def run(self, request, root):
+        for event in self.events:
+            yield event
+        raise self.error
+
+
+def test_engine_exception_becomes_a_failed_outcome_with_the_session_kept(tmp_path):
+    engine = RaisingEngine(Started("s9"), Text("hi"), error=RuntimeError("cli crashed"))
+    outcome, slept = run(project(tmp_path, task()), engine)
+    assert outcome.status == "failed"
+    assert outcome.error == "RuntimeError: cli crashed"
+    assert (outcome.session_id, slept) == ("s9", [])
+    assert [type(e).__name__ for e in outcome.events] == ["Started", "Text"]
+
+
+def test_engine_exception_before_any_event_still_fails_cleanly(tmp_path):
+    outcome, _ = run(project(tmp_path, task()), RaisingEngine(error=OSError("no cli")))
+    assert (outcome.status, outcome.error, outcome.session_id) == (
+        "failed",
+        "OSError: no cli",
+        None,
+    )
+
+
+def test_engine_exception_after_a_resume_is_reported_as_failed(tmp_path):
+    class Flaky:
+        calls = 0
+
+        async def run(self, request, root):
+            Flaky.calls += 1
+            if Flaky.calls == 1:
+                yield Started("s1")
+                yield limited("s1")
+            else:
+                raise ConnectionError("lost")
+
+    outcome, slept = run(project(tmp_path, task()), Flaky())
+    assert (outcome.status, outcome.sessions, len(slept)) == ("failed", 2, 1)
+    assert "ConnectionError" in outcome.error and outcome.session_id == "s1"
+
+
+def test_waiting_is_announced_before_sleeping(tmp_path):
+    order: list[str] = []
+    seen: list = []
+
+    async def sleep(seconds: float) -> None:
+        order.append(f"sleep {seconds}")
+
+    def listener(event) -> None:
+        seen.append(event)
+        if isinstance(event, Waiting):
+            order.append("waiting event")
+
+    engine = FakeEngine([RateLimit("rejected", 1100), limited()], [ok()])
+    outcome, _ = run(project(tmp_path, task()), engine, sleep=sleep, on_event=listener)
+    assert order == ["waiting event", f"sleep {100 + LIMIT_MARGIN}"]
+    assert Waiting(100 + LIMIT_MARGIN) in outcome.events and Waiting(100 + LIMIT_MARGIN) in seen

@@ -203,24 +203,41 @@ roles:
     bash: ["uv run pytest", "ruff check"]   # ajanın sormadan çalıştırabildiği komutlar
 ```
 
-Ajan insansız çalıştığı için her izin sorusunu rol politikası yanıtlar:
+Ajan insansız çalıştığı için her araç çağrısını rol politikası karara bağlar. Varsayılan red; izin
+verilenler şunlardır.
 
 - Dosya yazan araçlar (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) rolün yazma
-  kapsamıyla sınırlıdır; `harness scope` ile aynı kural.
-- `Bash` yalnız `bash` listesindeki önekle başlayan tek komutu çalıştırır. `;`, `&`, `|`,
-  `<`, `>`, `` ` ``, `$(` ve satır sonu içeren komutlar reddedilir.
-- MCP araçları reddedilir: proje ayarları dosya yazan sunucular ekleyebilir.
-- Diğer yerleşik araçlar (okuma, arama) serbesttir.
+  kapsamı içinde; `harness scope` ile aynı kural.
+- Bilinen okuma araçları (`Read`, `Glob`, `Grep`, `LS`, `TodoWrite`, `Task`, `Skill`...),
+  yalnız proje klasörünün içindeki yollar için.
+- `Bash` yalnız `bash` listesindeki önekle başlayan tek komut. `;`, `&`, `|`, `<`, `>`,
+  `` ` ``, `$(` ve satır sonu içeren komutlar reddedilir. `harness evidence run T-1 -- KOMUT`
+  yalnız `--` sonrasındaki KOMUT da listedeyse geçer; yoksa kanıt komutu her şeyi çalıştırma
+  yolu olurdu.
+- Reddedilenler: MCP araçları (proje ayarları dosya yazan sunucu ekleyebilir), ağ araçları
+  (`WebFetch`, `WebSearch`) ve politikanın tanımadığı her araç.
 
-Kullanım limiti dolunca koşu hatayla biter; çalıştırıcı, motorun bildirdiği sıfırlanma
-zamanına (yoksa 5 dakikaya) kadar bekler ve aynı oturumu sürdürür. `--max-resumes`
-(varsayılan 3) aşılırsa ya da bekleme 6 saati geçecekse beklemeden `rate_limited` döner.
+Politika iki yerden bağlanır: `PreToolUse` hook'u ve izin geri çağrımı. Hook, projenin kendi
+`.claude/settings.json` dosyasındaki bir izin kuralının (ör. `Bash(*)`) geri çağrımı
+atlamasını engeller. Rol politikasının yaptığı reddi proje ayarları geri alamaz.
 
-Sınırlar: Bu bir sandbox değildir. İzinli bir komut (ör. test çalıştırıcı) dosya yazabilir
-ve `ruff check --fix` gibi bayraklar kapsam dışını değiştirebilir; `bash` listesine yalnız
-zararsız komutlar yazın. Ajan proje ayarlarını (`.claude/settings.json`, hook'lar,
-yetenekler) yükler. Gerçek Claude oturumu henüz denenmedi: motor yalnız sahte SDK ve
-sahte motorla birim testlerden geçti.
+Kullanım limiti dolunca koşu hatayla biter; çalıştırıcı "bekleniyor" olayını yazdırır,
+motorun bildirdiği sıfırlanma zamanına (yoksa 5 dakikaya) kadar bekler ve aynı oturumu
+sürdürür. `--max-resumes` (varsayılan 3) aşılırsa ya da bekleme 6 saati geçecekse
+beklemeden `rate_limited` döner. Motor ya da SDK hata fırlatırsa koşu `failed` döner;
+oturum kimliği ve olaylar korunur.
+
+Sınırlar:
+
+- Bu bir sandbox değildir. İzinli bir komut dosya yazabilir ve bayraklar kapsam dışını
+  değiştirebilir (`ruff check --fix`, `pytest --junitxml=/yol`). `bash` listesine yalnız
+  zararsız komutlar yazın, bayraklı biçimleri de düşünün.
+- Okuma kuralı yalnız yola bakar; proje içindeki bir symlink dışarıyı gösterebilir.
+- Ajan proje ayarlarını (`.claude/settings.json`, CLAUDE.md, hook'lar, yetenekler) yükler.
+- Devam eden oturumda `cost_usd` ve `turns` toplamının tekrar saymayabileceği doğrulanmadı.
+- Bekleme sırasında Ctrl-C temiz bir `failed` sonucu vermez.
+- Gerçek Claude oturumu henüz denenmedi: motor yalnız sahte SDK ve sahte motorla birim
+  testlerden geçti.
 
 ## Roller ve yazma kapsamı
 

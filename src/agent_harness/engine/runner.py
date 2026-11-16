@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from agent_harness.check import inspect_ledger
-from agent_harness.engine.events import Event, Finished, RateLimit, RunRequest, Started
+from agent_harness.engine.events import Event, Finished, RateLimit, RunRequest, Started, Waiting
 from agent_harness.engine.prompt import RESUME_PROMPT, task_prompt
 from agent_harness.filesystem import HarnessError, project_root
 
@@ -76,6 +76,12 @@ def _hit_limit(finished: Finished, limit: RateLimit | None) -> bool:
     return finished.http_status == 429 or (limit is not None and limit.status == "rejected")
 
 
+def _record(outcome: "RunOutcome", event: Event, on_event: Callable[[Event], None] | None) -> None:
+    outcome.events.append(event)
+    if on_event is not None:
+        on_event(event)
+
+
 async def run_task(
     path: Path,
     task_id: str,
@@ -94,16 +100,18 @@ async def run_task(
         outcome.sessions += 1
         limit: RateLimit | None = None
         finished: Finished | None = None
-        async for event in engine.run(request, root):
-            outcome.events.append(event)
-            if on_event is not None:
-                on_event(event)
-            if isinstance(event, Started):
-                outcome.session_id = event.session_id
-            elif isinstance(event, RateLimit):
-                limit = event
-            elif isinstance(event, Finished):
-                finished = event
+        try:
+            async for event in engine.run(request, root):
+                _record(outcome, event, on_event)
+                if isinstance(event, Started):
+                    outcome.session_id = event.session_id
+                elif isinstance(event, RateLimit):
+                    limit = event
+                elif isinstance(event, Finished):
+                    finished = event
+        except Exception as exc:  # engine and process errors are not HarnessError
+            outcome.error = f"{type(exc).__name__}: {exc}"
+            return outcome
         if finished is None:
             outcome.error = "the engine stopped without a result"
             return outcome
@@ -121,6 +129,7 @@ async def run_task(
         if outcome.sessions > max_resumes or outcome.session_id is None or wait > max_wait:
             outcome.status = "rate_limited"
             return outcome
+        _record(outcome, Waiting(wait), on_event)
         await sleep(wait)
         outcome.waited_seconds += wait
         request = replace(request, resume=outcome.session_id, prompt=RESUME_PROMPT)

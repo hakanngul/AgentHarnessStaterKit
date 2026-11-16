@@ -158,8 +158,10 @@ def test_bash_without_a_command_is_denied(tool_input):
 # --- everything else --------------------------------------------------------------
 
 
-@pytest.mark.parametrize("tool", ["Read", "Grep", "Glob", "WebSearch", "TodoWrite"])
-def test_read_and_search_tools_are_allowed(tool):
+@pytest.mark.parametrize(
+    "tool", ["Read", "Grep", "Glob", "LS", "TodoWrite", "Task", "Agent", "Skill", "BashOutput"]
+)
+def test_read_only_tools_are_allowed(tool):
     assert verdict(tool, {"anything": "x"}).allowed
 
 
@@ -173,3 +175,89 @@ def test_unknown_role_is_denied_for_every_tool():
 def test_mcp_tools_are_denied(tool):
     result = verdict(tool, {"path": "src/a.py"})
     assert not result.allowed and "MCP" in result.reason
+
+
+@pytest.mark.parametrize("tool", ["PowerShell", "KillShell", "SomeFutureTool", "", "bash"])
+def test_unknown_tools_are_denied_by_default(tool):
+    result = verdict(tool, {"command": "ls", "file_path": "src/a.py"})
+    assert not result.allowed and "allow list" in result.reason
+
+
+@pytest.mark.parametrize("tool", ["WebFetch", "WebSearch"])
+def test_network_tools_are_denied(tool):
+    result = verdict(tool, {"url": "https://example.com", "query": "x"})
+    assert not result.allowed and "network" in result.reason
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input"),
+    [
+        ("Read", {"file_path": "/etc/passwd"}),
+        ("Read", {"file_path": "~/.ssh/id_rsa"}),
+        ("Read", {"file_path": "../secrets.txt"}),
+        ("Read", {"file_path": "/proj/../etc/passwd"}),
+        ("Read", {"file_path": "/projx/file"}),
+        ("Glob", {"pattern": "*", "path": "/"}),
+        ("Grep", {"pattern": "x", "path": "/home"}),
+        ("LS", {"path": "/tmp"}),
+        ("NotebookRead", {"notebook_path": "/other/n.ipynb"}),
+    ],
+)
+def test_reads_outside_the_project_are_denied(tool, tool_input):
+    result = verdict(tool, tool_input)
+    assert not result.allowed and "inside the project" in result.reason
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input"),
+    [
+        ("Read", {"file_path": "/proj/src/app.py"}),
+        ("Read", {"file_path": "src/app.py"}),
+        ("Read", {"file_path": "/proj/docs/readme.md"}),
+        ("Glob", {"pattern": "**/*.py", "path": "/proj"}),
+        ("Glob", {"pattern": "**/*.py", "path": "."}),
+        ("Grep", {"pattern": "x"}),
+        ("Grep", {"pattern": "x", "path": "src"}),
+        ("LS", {"path": "/proj/src"}),
+    ],
+)
+def test_reads_inside_the_project_are_allowed(tool, tool_input):
+    assert verdict(tool, tool_input).allowed
+
+
+# --- harness evidence run ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "harness evidence run T-1 -- uv run pytest",
+        "harness evidence run T-1 --cwd app -- uv run pytest -q tests/",
+        "uv run harness evidence run T-1 -- ruff check .",
+    ],
+)
+def test_evidence_run_is_allowed_when_the_inner_command_is_listed(command):
+    assert verdict("Bash", {"command": command}).allowed
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "harness evidence run T-1 -- rm -rf /",
+        "harness evidence run T-1 -- harness evidence run T-1 -- rm x",
+        "harness evidence run T-1",
+        "harness evidence run T-1 --",
+        "harness evidence run T-1 -- uv run pytest; rm -rf /",
+        "harness evidence run T-1 -- uv run pytest && rm x",
+        "harness evidence runx T-1 -- uv run pytest",
+        "harness evidence",
+        "harness check .",
+    ],
+)
+def test_evidence_run_cannot_smuggle_an_unlisted_command(command):
+    assert not verdict("Bash", {"command": command}).allowed
+
+
+def test_evidence_run_needs_a_bash_list():
+    command = "harness evidence run T-1 -- uv run pytest"
+    assert not verdict("Bash", {"command": command}, role="reviewer").allowed

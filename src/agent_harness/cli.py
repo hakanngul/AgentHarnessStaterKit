@@ -179,6 +179,8 @@ def _describe(event) -> str | None:
         return f"[{event.name}] {detail}".rstrip()
     if isinstance(event, events.ToolDenied):
         return f"[denied {event.name}] {event.reason}"
+    if isinstance(event, events.Waiting):
+        return f"[usage limit] waiting {int(event.seconds)}s, then resuming the session"
     if isinstance(event, events.RateLimit) and event.status != "allowed":
         return f"[usage limit {event.status}] resets at {event.resets_at}"
     return None
