@@ -175,14 +175,23 @@ class JobManager:
         job.emit(None, f"{job.kind} started")
         try:
             job.result = await self._execute(job, params)
-            status, error = "done", None
         except asyncio.CancelledError:
-            status, error = "cancelled", None
+            self._finish(job, "cancelled", None)
+            raise  # the task itself ends cancelled; cancel() and shutdown() expect that
         except (HarnessError, OSError, UnicodeError) as exc:
-            status, error = "failed", str(exc)[:MAX_TEXT]
+            self._finish(job, "failed", str(exc)[:MAX_TEXT])
         except Exception as exc:  # noqa: BLE001 - a job must never take the server down
-            status, error = "failed", f"internal error: {type(exc).__name__}"
-        # no await from here on, so a stream that sees the status also sees the last event
+            self._finish(job, "failed", f"internal error: {type(exc).__name__}")
+        except BaseException:
+            self._finish(job, "failed", "interrupted")  # never leave a job 'running' forever
+            raise
+        else:
+            self._finish(job, "done", None)
+
+    @staticmethod
+    def _finish(job: Job, status: str, error: str | None) -> None:
+        """Record the end of a job. Never awaits, so a stream that sees the status also sees
+        the last event."""
         job.status, job.error, job.finished = status, error, _now()
         job.emit(None, f"{job.kind} {status}" + (f": {error}" if error else ""))
 
@@ -220,7 +229,8 @@ class JobManager:
                 self.root, engine, task_ids=p.tasks, role=p.reviewer, **options
             )
             ok = all(r.status == "DONE" and r.recorded for r in reviews)
-            return {"ok": ok, "reviews": _review_rows(reviews)}
+            # the same shape `harness review --json` prints
+            return {"ok": ok, "reviewed": len(reviews), "tasks": _review_rows(reviews)}
 
         results = await run_wave(self.root, engine, **options)
         rows = [

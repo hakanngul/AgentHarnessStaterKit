@@ -19,20 +19,24 @@ scope:
 - .harness/
 acceptance:
 - id: AC1
-  text: POST /api/jobs token ister, yalnız application/json kabul eder (aksi 415), bilinmeyen
-    alan ya da sınır dışı değer ve türe uymayan parametre 422 verir, geçerli istek 202 ile
-    iş kimliği döner; aktif iş varken ikinci istek 409 alır.
+  text: POST /api/jobs token ister, yalnız tam olarak application/json kabul eder (aksi 415,
+    bildirilen büyük gövde 413), bilinmeyen alan ya da sınır dışı değer ve türe uymayan parametre
+    422 verir, geçerli istek 202 ile iş kimliği döner; aktif iş varken ikinci istek 409 alır.
 - id: AC2
   text: İş, CLI ile aynı fonksiyonları (run_wave, review_all, commit_done_tasks) enjekte edilen
-    engine ile çalıştırır; HarnessError, OSError ve engine kurulum hatası işi failed yapar
-    ve mesajı taşır, 500 vermez; sonuç CLI çıktısıyla aynı satırları içerir.
+    engine ile çalıştırır; HarnessError, OSError, UnicodeError ve engine kurulum hatası işi
+    failed yapar ve mesajı taşır, beklenmeyen hata ve BaseException işi failed yapar (iş asla
+    sonsuza dek running kalmaz), 500 vermez; sonuç CLI --json çıktısıyla aynı biçimde ve aynı
+    satırlardadır.
 - id: AC3
   text: GET /api/jobs/{id}/events SSE akışı sıralı id ile olayları verir, after ya da Last-Event-ID
     ile kaldığı yerden sürer, iş bitince kapanır; olay tamponu ve olay metni sınırlıdır; bilinmeyen
     iş 404.
 - id: AC4
-  text: POST /api/jobs/{id}/cancel çalışan işi iptal eder ve wave görevleri READY'ye döner;
-    biten işte 409; sunucu kapanırken çalışan iş iptal edilir ve kapanış takılmaz.
+  text: POST /api/jobs/{id}/cancel çalışan wave ya da review'ı iptal eder ve wave görevleri
+    READY'ye döner; commit işi iptal edilemez (409); biten işte 409. Sunucu kapanırken açık
+    bir olay akışı varken bile süreç grace süresi (3 sn) içinde kapanır, çalışan iş iptal
+    edilir (commit bitirilir) ve görevler READY'ye döner; bu gerçek uvicorn ile test edilir.
 - id: AC5
   text: GET /api/jobs ve /api/jobs/{id} durum, parametre ve sonucu verir; tutulan iş sayısı
     sınırlıdır. Testler yalnız unit testtir (sahte engine, gerçek ledger dosyaları); pytest,
@@ -71,9 +75,56 @@ evidence:
   output_sha256: 26a51376cc4243c378ac84b9c475a7900ec6b6acfdf1191f09d0c4af5e6aca36
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 919 passed in 32.44s
+  commit: 37bb4242813af485c8cc1904a86818c983d7cb79
+  output: .harness/evidence/T-12/E4.txt
+  output_sha256: 9a6111f426022c5642bc94bf32678fb96125d4b2645295566558e87338cc3a1e
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 37bb4242813af485c8cc1904a86818c983d7cb79
+  output: .harness/evidence/T-12/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 62 files already formatted
+  commit: 37bb4242813af485c8cc1904a86818c983d7cb79
+  output: .harness/evidence/T-12/E6.txt
+  output_sha256: 26a51376cc4243c378ac84b9c475a7900ec6b6acfdf1191f09d0c4af5e6aca36
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+review:
+  status: changes_requested
+  by: reviewer
+  notes: 'Round 1: no critical defect in the job state machine. Found: (1) shutdown hangs
+    while an SSE stream is open (confirmed with real uvicorn: test waited 20 s) -> 3 s grace
+    period, tested with a real server; (2) GET /api/jobs read the job table from a worker
+    thread -> async handlers; (3) no test raised OSError inside a job; (4) lifecycle tests
+    lacked a timeout guard and a running-commit shutdown test; (5) review result shape differed
+    from the CLI -> aligned; (6) stale read-only docstring and CLI help; (7) README cap wording;
+    (8) exact content-type, Content-Length pre-check, BaseException handler. Sonar: CancelledError
+    now re-raised after bookkeeping, lifespan cleanup in try/finally. All proven by mutation
+    checks.'
 log:
 - '2026-11-16 developer: task opened after the owner said "başla"; token hand-off for browsers
   deferred to the UI task on purpose'
 - '2026-11-16 developer: implemented jobs.py, job endpoints, SSE; 51 unit tests; stream race
   found and fixed (slow test exposed it); real uvicorn SSE smoke ok; evidence E1-E3; waiting
   for independent review'
+- '2026-11-16 developer: round-1 review and Sonar findings fixed; waiting for a narrow second
+  review'

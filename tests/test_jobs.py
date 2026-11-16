@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -126,6 +127,9 @@ def test_a_review_job_passes_its_options_to_review_all(monkeypatch, tmp_path):
     assert calls[0]["task_ids"] == ["T-1"] and calls[0]["role"] == "qa"
     assert calls[0]["max_parallel"] == 2 and calls[0]["max_resumes"] == 3
     assert job["status"] == "done" and job["result"]["ok"] is True
+    # the same shape `harness review --json` prints
+    assert job["result"]["reviewed"] == 1 and job["result"]["tasks"][0]["task"] == "T-1"
+    assert "reviews" not in job["result"]
 
 
 def test_a_commit_job_passes_tasks_and_branch_and_reports_blocked(monkeypatch, tmp_path):
@@ -499,3 +503,180 @@ def test_events_emitted_while_the_reader_is_busy_are_not_missed(monkeypatch):
 
     seen = asyncio.run(asyncio.wait_for(run(), 3))
     assert seen == ["first", "second", "wave done"]
+
+
+def test_an_error_thrown_into_the_lifespan_still_stops_the_running_job(tmp_path):
+    """Starlette resumes the lifespan normally on shutdown, so the error has to be thrown into
+    it by hand: that is what a cancelled or crashed server does."""
+    root = project(tmp_path, task("T-1"))
+    app = create_app(root, TOKEN, engine_factory=Blocking)
+
+    async def run():
+        with pytest.raises(RuntimeError, match="boom"):
+            async with app.router.lifespan_context(app):
+                app.state.jobs.start(JobParams.model_validate({"kind": "wave"}))
+                await asyncio.sleep(0.2)
+                raise RuntimeError("boom")
+        job = next(iter(app.state.jobs.jobs.values()))
+        # checked before asyncio.run tears the loop down and cancels leftovers by itself
+        return job.status, status_of(root, "T-1")
+
+    assert asyncio.run(run()) == ("cancelled", "READY")
+
+
+def test_a_cancelled_job_task_ends_cancelled_after_its_bookkeeping(tmp_path):
+    async def run():
+        manager = JobManager(tmp_path, lambda: Blocking())
+        project(tmp_path, task("T-1"))
+        job = manager.start(JobParams.model_validate({"kind": "wave"}))
+        await asyncio.sleep(0.2)
+        assert job.status == "running"
+        job.task.cancel()
+        results = await asyncio.gather(job.task, return_exceptions=True)
+        return job, results[0]
+
+    job, outcome = asyncio.run(run())
+    assert isinstance(outcome, asyncio.CancelledError)  # re-raised, not swallowed
+    assert job.status == "cancelled" and job.events[-1]["text"] == "wave cancelled"
+
+
+def run_real_server(app, port):
+    import uvicorn
+
+    from agent_harness.server import uvicorn_options
+
+    server = uvicorn.Server(uvicorn.Config(app, **uvicorn_options("127.0.0.1", port)))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.time() + 10
+    while not server.started and time.time() < deadline:
+        time.sleep(0.05)
+    assert server.started, "the test server did not start"
+    return server, thread
+
+
+def test_stopping_the_real_server_with_an_open_event_stream_does_not_hang(tmp_path):
+    """uvicorn waits for open connections before it runs the lifespan shutdown; an event
+    stream of a running job never ends by itself, so without a grace period it would wait
+    forever and the job would never be cancelled."""
+    import socket
+
+    import httpx
+
+    root = project(tmp_path, task("T-1"))
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    app = create_app(root, TOKEN, engine_factory=Blocking)
+    server, thread = run_real_server(app, port)
+    client = httpx.Client(base_url=f"http://127.0.0.1:{port}", headers=AUTH, timeout=30)
+    job_id = client.post("/api/jobs", json=WAVE).json()["id"]
+    got_first_event = threading.Event()
+
+    def read_stream():
+        try:
+            with client.stream("GET", f"/api/jobs/{job_id}/events") as response:
+                for line in response.iter_lines():
+                    if line.startswith("data: "):
+                        got_first_event.set()
+        except httpx.HTTPError:
+            pass  # the server closed the connection on shutdown
+
+    reader = threading.Thread(target=read_stream, daemon=True)
+    reader.start()
+    assert got_first_event.wait(10)
+    server.should_exit = True
+    thread.join(20)
+    assert not thread.is_alive(), "the server hung on shutdown with an open stream"
+    assert status_of(root, "T-1") == "READY"  # the wave was cancelled and released its task
+
+
+@pytest.mark.parametrize(
+    "error",
+    [OSError("disk full"), UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad byte")],
+)
+def test_an_os_or_unicode_error_inside_a_job_fails_it_with_the_message(
+    monkeypatch, tmp_path, error
+):
+    def broken_commit(root, *, task_ids, branch):
+        raise error
+
+    monkeypatch.setattr(jobs_module, "commit_done_tasks", broken_commit)
+    root = project(tmp_path, task("T-1"))
+    with make_client(root) as api:
+        job_id = start(api, {"kind": "commit"}).json()["id"]
+        events_of(api, job_id)
+        job = view(api, job_id)
+    assert job["status"] == "failed" and "internal error" not in job["error"]
+    assert str(error)[:20] in job["error"]
+
+
+def test_shutdown_lets_a_running_commit_finish_instead_of_cancelling_it(monkeypatch, tmp_path):
+    gate = threading.Event()
+    done = []
+
+    def slow_commit(root, *, task_ids, branch):
+        gate.wait(10)
+        done.append(True)
+        return [CommitResult("T-1", "committed", sha="abc")]
+
+    monkeypatch.setattr(jobs_module, "commit_done_tasks", slow_commit)
+
+    async def run():
+        manager = JobManager(tmp_path, lambda: None)
+        job = manager.start(JobParams.model_validate({"kind": "commit"}))
+        await asyncio.sleep(0.1)
+        asyncio.get_running_loop().call_later(0.3, gate.set)
+        await manager.shutdown()
+        return job
+
+    job = asyncio.run(asyncio.wait_for(run(), 10))
+    assert job.status == "done" and done == [True]
+
+
+class Halt(BaseException):
+    """Not an Exception; asyncio itself would abort the loop on KeyboardInterrupt or SystemExit."""
+
+
+def test_a_base_exception_does_not_leave_a_job_running(monkeypatch, tmp_path):
+    def interrupted(root, *, task_ids, branch):
+        raise Halt
+
+    monkeypatch.setattr(jobs_module, "commit_done_tasks", interrupted)
+
+    async def run():
+        manager = JobManager(tmp_path, lambda: None)
+        job = manager.start(JobParams.model_validate({"kind": "commit"}))
+        await asyncio.gather(job.task, return_exceptions=True)
+        return job, manager.active()
+
+    job, active = asyncio.run(run())
+    assert job.status == "failed" and job.error == "interrupted" and active is None
+
+
+def test_the_job_table_is_only_read_on_the_event_loop(tmp_path):
+    import inspect
+
+    root = project(tmp_path, task("T-1"))
+    app = create_app(root, TOKEN)
+    routes = {
+        (r.path, tuple(sorted(r.methods))): r.endpoint for r in app.routes if hasattr(r, "methods")
+    }
+    for key in (("/api/jobs", ("GET",)), ("/api/jobs/{job_id}", ("GET",))):
+        assert inspect.iscoroutinefunction(routes[key]), key  # a threadpool read could race
+
+
+def test_the_content_type_must_be_exactly_json_and_a_declared_size_is_checked(tmp_path):
+    root = project(tmp_path, task("T-1"))
+    with make_client(root) as api:
+        for bad in ("application/jsonx", "application/json5", "text/application/json"):
+            response = api.post(
+                "/api/jobs", headers={**AUTH, "Content-Type": bad}, content=b'{"kind":"wave"}'
+            )
+            assert response.status_code == 415, bad
+        charset = {**AUTH, "Content-Type": "Application/JSON; charset=utf-8"}
+        assert (
+            api.post("/api/jobs", headers=charset, content=b'{"kind":"commit"}').status_code == 202
+        )
+        big = {**AUTH, "Content-Type": "application/json", "Content-Length": "999999"}
+        assert api.post("/api/jobs", headers=big, content=b"{}").status_code in (413, 400)

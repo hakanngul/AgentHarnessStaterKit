@@ -362,23 +362,30 @@ bir karar mantığı eklemez.
   `tasks`, `branch`. Türe uymayan ya da bilinmeyen alan, yanlış tip (`"3"` sayı değildir) 422
   alır. Aynı anda tek iş çalışır; ikincisi 409 alır.
 - `GET /api/jobs`, `GET /api/jobs/{id}`: durum (`running`, `done`, `failed`, `cancelled`),
-  parametreler, sonuç (CLI çıktısıyla aynı satırlar) ve hata. `done` işin bittiği anlamına gelir,
-  sonuç için `result.ok` bakılır. Bellekte en çok 20 bitmiş iş tutulur.
+  parametreler, sonuç ve hata. Sonuç CLI'nin `--json` çıktısıyla aynı biçimdedir: wave için
+  `{ok, started, tasks[, reviews]}`, review için `{ok, reviewed, tasks}`, commit için
+  `{ok, tasks}`. `done` işin bittiği anlamına gelir, sonuç için `result.ok` bakılır. Bellekte en
+  çok 20 iş tutulur (çalışan dahil); önce en eski bitmiş olan atılır.
 - `GET /api/jobs/{id}/events` (SSE): sıralı `id` ile olaylar, `?after=N` ya da `Last-Event-ID` ile
   kaldığı yerden devam eder, iş bitince kapanır. İş başına en çok 2000 olay ve olay başına 500
   karakter tutulur; `after` eski kalırsa akış en eski tutulan olaydan sürer. Tarayıcıda
   `EventSource` Authorization başlığı gönderemez; `fetch` ile akış okunur.
 - `POST /api/jobs/{id}/cancel`: wave ya da review'ı iptal eder, yarım kalan görevler READY'ye
   döner. Commit işi kısa bir iş parçacığında koşar, iptal edilemez (409). Sunucu kapanırken
-  çalışan wave iptal edilir, commit bitirilir.
+  açık akışlar en çok 3 saniye beklenir (uvicorn açık bağlantıları bu süre sonunda keser), sonra
+  çalışan wave ya da review iptal edilir ve commit bitirilir. Uzun süren bir git komutu kapanışı
+  geciktirir.
 
-Sınırlar: iş başlatabilmek ajan çalıştırabilmek demektir (rol politikası yine geçerli); token'ı
-bilen herkes bunu yapabilir. İşler bellekte tutulur, sunucu yeniden başlarsa geçmiş kaybolur ve
-defter tek gerçek kaynaktır; süreç `kill -9` ile öldürülürse IN_PROGRESS kalan görev elle
-düzeltilmelidir. Tarayıcı arayüzü için token'ı güvenle verme yolu henüz yok. Token düz HTTP ile loopback'te gider, TLS yok; Host ve token denetimi aynı
-makinedeki başka bir sürece karşı koruma değildir, token'ı bilen her süreç erişir. Hata
-mesajları yetkili istemciye dosya yolu içerebilir (okunamayan dosyalar için yol gizlenir). Token'ı komut satırı geçmişine ya da log'a koyma. Tarayıcıya token'ı verme
-yolu (arayüz) henüz tasarlanmadı.
+Sınırlar:
+- İş başlatabilmek ajan çalıştırabilmek demektir (rol politikası yine geçerli); token'ı bilen
+  herkes bunu yapabilir. Token'ı komut satırı geçmişine ya da log'a koyma.
+- İşler bellekte tutulur; sunucu yeniden başlarsa geçmiş kaybolur ve defter tek gerçek kaynaktır.
+  Süreç `kill -9` ile öldürülürse IN_PROGRESS kalan görev elle düzeltilmelidir.
+- Token düz HTTP ile loopback'te gider, TLS yok. Host ve token denetimi aynı makinedeki başka bir
+  sürece karşı koruma değildir; token'ı bilen her süreç erişir.
+- Hata mesajları yetkili istemciye dosya yolu ya da git çıktısı içerebilir (okunamayan görev
+  dosyalarında yol gizlenir).
+- Tarayıcı arayüzü için token'ı güvenle verme yolu henüz tasarlanmadı.
 
 ## Roller ve yazma kapsamı
 

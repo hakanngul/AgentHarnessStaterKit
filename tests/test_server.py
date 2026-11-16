@@ -351,6 +351,10 @@ def test_serve_hands_the_loopback_host_and_port_to_uvicorn(monkeypatch, tmp_path
     serve(root, host="127.0.0.1", port=9123, token=TOKEN)
     assert len(fake.calls) == 1
     assert fake.calls[0][1]["host"] == "127.0.0.1" and fake.calls[0][1]["port"] == 9123
+    from agent_harness.server import uvicorn_options
+
+    assert fake.calls[0][1] == uvicorn_options("127.0.0.1", 9123)  # incl. the grace period
+    assert fake.calls[0][1]["timeout_graceful_shutdown"] == 3
 
 
 def test_serve_without_uvicorn_names_the_extra(monkeypatch, tmp_path):

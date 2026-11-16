@@ -393,7 +393,10 @@ def serve(
     host: Annotated[str, typer.Option(help="Loopback address to bind.")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on.")] = 8765,
 ) -> None:
-    """Serve the ledger as a read-only JSON API on loopback; every request needs the token."""
+    """Serve the ledger and background jobs (wave, review, commit) as a JSON API on loopback.
+
+    Every request needs the token; a job can start agents, so keep the token private.
+    """
     import os
     import secrets
 

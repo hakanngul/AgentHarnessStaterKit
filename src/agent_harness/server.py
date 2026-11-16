@@ -1,8 +1,9 @@
-"""Local HTTP server: a read-only JSON view of the ledger.
+"""Local HTTP server: a JSON view of the ledger and background jobs (wave, review, commit).
 
 The server is a thin layer over the same functions the CLI uses. It listens on loopback
 only and every request needs the bearer token, because a page in any browser tab can reach
-`localhost`. This slice never writes and never starts an agent.
+`localhost`. The read routes never write; a job can start agents, so the token is the key to
+that. Job state lives in memory and the ledger stays the source of truth.
 """
 
 import json
@@ -29,6 +30,7 @@ from agent_harness.schedule import plan
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 MIN_TOKEN = 16
 MAX_BODY = 10_000
+GRACEFUL_SHUTDOWN = 3  # seconds uvicorn waits for open connections before it cancels them
 TASK_ID = re.compile(r"T-[0-9]+")
 HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE | re.ASCII)
 
@@ -88,8 +90,10 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        yield
-        await jobs.shutdown()
+        try:
+            yield
+        finally:  # also when the app body fails, so no job is left running
+            await jobs.shutdown()
 
     app = FastAPI(
         title="Agent harness",
@@ -163,8 +167,12 @@ def create_app(
 
     @app.post("/api/jobs", status_code=202, dependencies=[Depends(authorize)])
     async def start_job(request: Request) -> dict:
-        if not request.headers.get("content-type", "").lower().startswith("application/json"):
+        media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if media_type != "application/json":
             raise HTTPException(415, "send application/json")
+        declared = request.headers.get("content-length", "")
+        if declared.isascii() and declared.isdigit() and int(declared) > MAX_BODY:
+            raise HTTPException(413, "the request body is too large")
         body = await request.body()
         if len(body) > MAX_BODY:
             raise HTTPException(413, "the request body is too large")
@@ -182,9 +190,10 @@ def create_app(
             raise HTTPException(409, str(exc)) from exc
         return {"id": job.id, "status": job.status}
 
+    # async on purpose: they read the job table, which only the event loop may touch
     @app.get("/api/jobs", dependencies=[Depends(authorize)])
-    def list_jobs() -> list[dict]:
-        return [job.view() for job in reversed(jobs.jobs.values())]
+    async def list_jobs() -> list[dict]:
+        return [job.view() for job in reversed(list(jobs.jobs.values()))]
 
     def find_job(job_id: str):
         job = jobs.get(job_id)
@@ -193,7 +202,7 @@ def create_app(
         return job
 
     @app.get("/api/jobs/{job_id}", dependencies=[Depends(authorize)])
-    def get_job(job_id: str) -> dict:
+    async def get_job(job_id: str) -> dict:
         return find_job(job_id).view()
 
     @app.get("/api/jobs/{job_id}/events", dependencies=[Depends(authorize)])
@@ -229,6 +238,16 @@ def create_app(
     return app
 
 
+def uvicorn_options(host: str, port: int) -> dict:
+    """How the server is run; tests start a real server with exactly these options."""
+    return {
+        "host": host,
+        "port": port,
+        "log_level": "warning",
+        "timeout_graceful_shutdown": GRACEFUL_SHUTDOWN,
+    }
+
+
 def serve(project: Path, *, host: str, port: int, token: str) -> None:
     """Run the server until interrupted. Needs the `server` extra."""
     require_loopback(host)
@@ -240,4 +259,4 @@ def serve(project: Path, *, host: str, port: int, token: str) -> None:
         raise HarnessError(
             "the server needs its extra: pip install 'agent-harness-starter[server]'"
         ) from exc
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    uvicorn.run(app, **uvicorn_options(host, port))
