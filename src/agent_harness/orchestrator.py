@@ -32,6 +32,7 @@ class WaveResult:
     outcome: RunOutcome
     status: str  # the ledger status the task was left in
     note: str = ""
+    recorded: bool = True  # False: the ledger could not take the status; fix it by hand
 
 
 def set_status(
@@ -92,12 +93,13 @@ def _settle(root: Path, task_id: str, outcome: RunOutcome, before: set[str]) -> 
     return "BLOCKED", f"agent run failed: {detail}"
 
 
-def _release(root: Path, task_id: str, status: str, reason: str) -> None:
-    """Best-effort move out of IN_PROGRESS; never raises, so cleanup cannot hide the cause."""
+def _release(root: Path, task_id: str, status: str, reason: str) -> bool:
+    """Best-effort move out of IN_PROGRESS; True if it was recorded. Never raises."""
     try:
         set_status(root, task_id, status, reason=reason, note=reason, expect=("IN_PROGRESS",))
     except Exception:  # noqa: BLE001
-        pass
+        return False
+    return True
 
 
 async def run_wave(
@@ -120,9 +122,9 @@ async def run_wave(
     before: dict[str, set[str]] = {}
     try:
         for task in report.start[:max_parallel]:
-            before[task.id] = _evidence_ids(root, task.id)
             set_status(root, task.id, "IN_PROGRESS", note="started", expect=("READY",))
             chosen.append(task.id)
+            before[task.id] = _evidence_ids(root, task.id)
     except BaseException:
         for task_id in chosen:  # all or nothing: do not strand tasks that will never run
             _release(root, task_id, "READY", "start aborted before any task ran")
@@ -135,22 +137,32 @@ async def run_wave(
 
         extra = {"sleep": sleep} if sleep is not None else {}
         try:
-            outcome = await run_task(
-                root, task_id, engine, on_event=listener, **extra, **run_options
-            )
-        except asyncio.CancelledError:
-            _release(root, task_id, "READY", "wave cancelled before the task finished")
+            try:
+                outcome = await run_task(
+                    root, task_id, engine, on_event=listener, **extra, **run_options
+                )
+            except Exception as exc:  # one task must not stop its siblings
+                outcome = RunOutcome(status="failed", task_id=task_id, role="", error=str(exc))
+            recorded = True
+            try:
+                status, note = await asyncio.to_thread(
+                    _settle, root, task_id, outcome, before[task_id]
+                )
+                await asyncio.to_thread(
+                    set_status,
+                    root,
+                    task_id,
+                    status,
+                    reason=note,
+                    note=note,
+                    expect=("IN_PROGRESS",),
+                )
+            except Exception as exc:  # the ledger could not take the result
+                status, note = "BLOCKED", f"could not record the result: {exc}"[:MAX_REASON]
+                recorded = _release(root, task_id, status, note)
+            return WaveResult(task_id, outcome, status, note, recorded)
+        except BaseException:  # cancellation, Ctrl-C: do not leave the task IN_PROGRESS
+            _release(root, task_id, "READY", "wave interrupted before the task was settled")
             raise
-        except Exception as exc:  # one task must not stop its siblings
-            outcome = RunOutcome(status="failed", task_id=task_id, role="", error=str(exc))
-        try:
-            status, note = await asyncio.to_thread(_settle, root, task_id, outcome, before[task_id])
-            await asyncio.to_thread(
-                set_status, root, task_id, status, reason=note, note=note, expect=("IN_PROGRESS",)
-            )
-        except Exception as exc:  # the ledger could not take the result: do not strand the task
-            status, note = "BLOCKED", f"could not record the result: {exc}"[:MAX_REASON]
-            _release(root, task_id, status, note)
-        return WaveResult(task_id, outcome, status, note)
 
     return list(await asyncio.gather(*(one(task_id) for task_id in chosen)))

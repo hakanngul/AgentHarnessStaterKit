@@ -335,3 +335,48 @@ def test_events_are_tagged_with_their_task(tmp_path):
         on_event=lambda task_id, event: seen.append((task_id, event)),
     )
     assert {task_id for task_id, _ in seen} == {"T-1", "T-2"}
+
+
+def test_cancelling_the_wave_releases_running_tasks(tmp_path):
+    class Hanging(ByTask):
+        async def run(self, request, root):
+            yield Started("s")
+            await asyncio.sleep(60)
+
+    root = project(tmp_path, task())
+
+    async def go():
+        runner = asyncio.create_task(run_wave(root, Hanging({"T-1": []})))
+        for _ in range(100):
+            if status_of(root, "T-1")["status"] == "IN_PROGRESS":
+                break
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
+        runner.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await runner
+
+    asyncio.run(go())
+    saved = status_of(root, "T-1")
+    assert saved["status"] == "READY" and "interrupted" in saved["log"][-1]
+
+
+def test_an_unrecorded_result_is_reported_and_fails_the_wave_command(tmp_path, monkeypatch):
+    import json
+
+    import agent_harness.orchestrator as orchestrator
+
+    real = orchestrator.set_status
+
+    def failing(root, task_id, status, **kw):
+        if status != "IN_PROGRESS" or kw.get("expect") != ("READY",):
+            raise HarnessError("disk full")  # nothing after the claim can be written
+        return real(root, task_id, status, **kw)
+
+    monkeypatch.setattr(orchestrator, "set_status", failing)
+    root = project(tmp_path, task())
+    out = _cli(monkeypatch, root, ByTask({"T-1": ok()}), "--json")
+    assert out.exit_code == 1
+    report = json.loads(out.output)
+    assert report["tasks"][0]["recorded"] is False
+    assert status_of(root, "T-1")["status"] == "IN_PROGRESS"  # reported, not hidden
