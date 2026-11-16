@@ -1,25 +1,28 @@
 # Current task
 
-Status: Faz 2 DONE (T-2, T-3, T-4); review approved; PR #2 awaits merge.
-Structured status lives in `.harness/tasks/T-2.yaml` .. `T-4.yaml`.
+Status: Yaşam döngüsü L1 (T-5) DONE, review approved; PR #3 awaits merge.
+Faz 2 (T-2..T-4) is merged.
 
 ## Goal and scope
 
-Faz 2 of docs/plans/team-system.md: `harness evidence run`, role write scopes in
-config with `harness scope`, and a Claude Code PreToolUse hook with `harness hook
-install`. Out of scope: stack packs (Faz 3), upgrade (Faz 4), version bump.
+L1 of docs/plans/lifecycle.md: optional `workflow` phases in the config, `phase` on
+tasks, and a phase gate in `harness check`. Out of scope: default workflow and phase
+roles in `init` (L2), orchestrator command (L3), engine adapter and UI (L4), stack
+packs (Faz 3), upgrade (Faz 4), version bump.
 
 ## Acceptance criteria
 
-Faz 2 AC1–AC6 in docs/plans/team-system.md, mirrored in the T-2..T-4 task files.
+AC1–AC6 in `.harness/tasks/T-5.yaml`.
 
 ## Required checks
 
 Run through `harness evidence run <task> -- <command>`: uv run --frozen pytest -q;
 ruff check .; ruff format --check .; python -m build --no-isolation; harness
-validate . --json. Then `harness check .`.
+validate . --json; harness check . --json. Wheel smoke test in a fresh venv for
+template or generation changes.
 
 ## Product decisions and blockers
 
-No hook is installed in this repository: the session must not edit its own Claude
-settings. Open for the maintainer: three PR threads listed in PROGRESS.md.
+Needed from the user before L2 and L4: the default phase list and roles `init` should
+install; how the engine runs (local `claude -p` on the user's login, or an API key);
+the form of the management UI. No hook is installed in this repository.

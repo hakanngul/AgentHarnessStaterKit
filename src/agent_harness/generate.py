@@ -67,7 +67,10 @@ def render(config: HarnessConfig) -> dict[str, str]:
         )
         for target, source in TEMPLATES.items()
     }
-    rendered[CONFIG_PATH] = yaml.safe_dump(config.model_dump(), sort_keys=False, allow_unicode=True)
+    # exclude_none keeps an unset workflow out of the file instead of writing `workflow: null`.
+    rendered[CONFIG_PATH] = yaml.safe_dump(
+        config.model_dump(exclude_none=True), sort_keys=False, allow_unicode=True
+    )
     manifest = Manifest(files={name: sha256(text.encode()) for name, text in rendered.items()})
     rendered[MANIFEST_PATH] = manifest.model_dump_json(indent=2) + "\n"
     return rendered

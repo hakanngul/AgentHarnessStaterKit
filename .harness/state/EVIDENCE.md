@@ -33,11 +33,27 @@ Maintainer decisions (2026-11-10): the subprocess audit finding is by design and
 suppressed inline with its justification; redaction stays heuristic; settings.json
 concurrency is not addressed.
 
+## Yaşam döngüsü L1 (T-5, PR #3)
+
+Final tree 6614863, recorded with `harness evidence run` (E8–E11): pytest 380 passed;
+ruff check and format clean; `harness validate . --json` ok. E4 build and E6
+`harness check . --json` are from d8e9e7e; later commits changed tests and docs only.
+E7 (manual): wheel from d8e9e7e in a fresh venv outside the checkout; implement without
+a spec task rejected, rejected while the spec is IN_PROGRESS, accepted once it is DONE;
+task without phase rejected under `require_phase`. That run first found `init` writing
+`workflow: null` (fixed in 1ca1628 with a test that fails on the previous code).
+Mutation check (not in the ledger): removing the gate call fails 18 tests; dropping
+upward propagation in `_reachable_phases` fails 1.
+Review: two read-only reviewer subagents, both APPROVED; details in T-5.yaml. The last
+commit of test and doc fixes was not re-reviewed.
+
 ## Not tested / limits
 
 - Python 3.11 and 3.13 run only in CI. Windows is not tested; process-group kill is POSIX.
 - Real Claude Code sessions are not tested; whether subagent events carry agent_type is
   not confirmed by docs. The hook does not see Bash writes.
+- The phase gate is only as strong as the config: loosening the workflow is not
+  detected, and a workflow has not been tried on a real project yet.
 - Evidence is produced locally: the hash detects later edits, not fabrication.
   Redaction is heuristic. Reviewer identity in `review.by` is self-declared.
 

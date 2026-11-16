@@ -1,0 +1,192 @@
+schema_version: 1
+id: T-5
+title: 'Yaşam döngüsü 1: config''te workflow fazları ve check faz kapısı'
+owner: developer
+status: DONE
+goal: Projenin yaşam döngüsü fazları (ör. spec, design, implement) config'te tanımlanır; bir
+  görev, gerektirdiği fazların görevlerine bağlı değilse ilerleyemez. Kapıyı ajan talimatı
+  değil `harness check` uygular.
+scope:
+- src/agent_harness/models.py
+- src/agent_harness/check.py
+- src/agent_harness/templates/skill.md.j2
+- schemas/
+- tests/
+- README.md
+- docs/
+acceptance:
+- id: AC1
+  text: config.yaml opsiyonel `workflow` (phases, require_phase) kabul eder; faz adları benzersizdir
+    ve `requires` yalnız daha önce tanımlı fazlara bakar; workflow'suz eski config'ler geçerli
+    kalır.
+  verified_by:
+  - E8
+- id: AC2
+  text: Görev opsiyonel `phase` taşır; config'te tanımlı olmayan faz ve workflow yokken verilen
+    faz `check` hatasıdır.
+  verified_by:
+  - E8
+- id: AC3
+  text: READY/IN_PROGRESS/IN_REVIEW/DONE durumundaki fazlı görev, fazının gerektirdiği her
+    faz için depends_on zincirinde o fazda bir göreve ulaşamıyorsa `check` hata verir; BACKLOG/BLOCKED
+    görev engellenmez.
+  verified_by:
+  - E8
+  - E7
+- id: AC4
+  text: '`require_phase: true` iken fazsız görev (CANCELLED hariç) `check` hatasıdır.'
+  verified_by:
+  - E8
+  - E7
+- id: AC5
+  text: Yayımlanan JSON şemaları modellerle eşleşir; mevcut 0.1.0 kurulumları ve bu reponun
+    defteri `validate` ve `check`'ten geçmeye devam eder.
+  verified_by:
+  - E8
+  - E11
+  - E6
+- id: AC6
+  text: Kurulu wheel ile temiz bir projede faz kapısı uçtan uca çalışır (spec'siz implement
+    reddedilir, spec DONE olunca kabul edilir).
+  verified_by:
+  - E7
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 379 passed in 17.55s
+  commit: d8e9e7e6c7ce8e8a1c7a715ad4a49141081d5c2f
+  output: .harness/evidence/T-5/E1.txt
+  output_sha256: dbdb5eb03136b8c320e79924f483935302fe964174364feeb4343d0b8d53bf8c
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: d8e9e7e6c7ce8e8a1c7a715ad4a49141081d5c2f
+  output: .harness/evidence/T-5/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 40 files already formatted
+  commit: d8e9e7e6c7ce8e8a1c7a715ad4a49141081d5c2f
+  output: .harness/evidence/T-5/E3.txt
+  output_sha256: cb0e6ebacd5c1156e591a533f643410ad55f5e0635b2dfc16df674a87bc6de7e
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: d8e9e7e6c7ce8e8a1c7a715ad4a49141081d5c2f
+  output: .harness/evidence/T-5/E4.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: '"Manifest schema and file list are valid"'
+  commit: d8e9e7e6c7ce8e8a1c7a715ad4a49141081d5c2f
+  output: .harness/evidence/T-5/E5.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen harness check . --json
+  cwd: .
+  exit_code: 0
+  summary: '"decisions_pending": 0'
+  commit: d8e9e7e6c7ce8e8a1c7a715ad4a49141081d5c2f
+  output: .harness/evidence/T-5/E6.txt
+  output_sha256: b3a95cd6c3dc7d76683c8f8426923f86ebea0326d74aa40561293b4ae637202f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E7
+  kind: manual
+  result: pass
+  summary: 'Wheel built from d8e9e7e installed with uv into a fresh venv outside the checkout:
+    init writes no workflow key; validate accepts an appended workflow; check rejects implement
+    without a spec task (exit 1), rejects it while the spec is IN_PROGRESS (exit 1), accepts
+    it once the spec is DONE (exit 0), rejects a task without phase under require_phase (exit
+    1).'
+  output: .harness/evidence/T-5/wheel-smoke.txt
+  recorded_at: '2026-11-16'
+- id: E8
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 380 passed in 18.00s
+  commit: 66148633b6193166a12cdff93237568458c0e6e6
+  output: .harness/evidence/T-5/E8.txt
+  output_sha256: e74e63ff8f20010cc9d13ec747bb95f5d1d4c868040f35687306b4f1f6c5957f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 66148633b6193166a12cdff93237568458c0e6e6
+  output: .harness/evidence/T-5/E9.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 40 files already formatted
+  commit: 66148633b6193166a12cdff93237568458c0e6e6
+  output: .harness/evidence/T-5/E10.txt
+  output_sha256: cb0e6ebacd5c1156e591a533f643410ad55f5e0635b2dfc16df674a87bc6de7e
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: '"Manifest schema and file list are valid"'
+  commit: 66148633b6193166a12cdff93237568458c0e6e6
+  output: .harness/evidence/T-5/E11.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+log:
+- 2026-11-16 görev açıldı; plan docs/plans/lifecycle.md
+- '2026-11-16 wheel smoke found init writing ''workflow: null'' (duplicate key once a workflow
+  is appended); fixed in 1ca1628 with a regression test'
+- '2026-11-16 review of 69ef9b3 approved with 6 follow-ups: reachable sets bounded to defined
+  phases, limits documented, tests added (d8e9e7e)'
+- '2026-11-16 delta review of 1ca1628 + d8e9e7e approved with 4 low findings and a nit: docs
+  corrected, two tests rewritten (6614863); final-tree evidence E8-E11; DONE'
+review:
+  status: approved
+  by: reviewer
+  notes: 'Two independent read-only reviewer subagents in this session; they read code and
+    evidence files and ran no commands. Round 1 on 69ef9b3: APPROVED, 1 medium (missing evidence,
+    since recorded) and 5 low findings; fixed or documented in d8e9e7e. The reachable-set
+    filter is a memory bound, not a behaviour fix, so no test fails on the previous code for
+    it. Round 2 on 1ca1628 + d8e9e7e: APPROVED, 4 low findings and a nit; fixed in 6614863.
+    6614863 itself (tests and docs only, no source change) was not re-reviewed. PR bots: Codex
+    found nothing on 1ca1628; SonarCloud gate passed; Sourcery was over its quota and CodeRabbit
+    does not review this repository.'

@@ -1,0 +1,24 @@
+# T-5 wheel smoke: wheel built from d8e9e7e6c7ce8e8a1c7a715ad4a49141081d5c2f, installed with uv into a fresh venv outside the checkout
+$ harness --version
+0.1.0
+$ harness init proj
+exit=0
+$ grep -c workflow proj/.harness/config.yaml
+0
+$ harness check proj   # no workflow, empty ledger
+exit=0
+$ harness validate proj   # workflow appended to config
+  "ok": true,
+  "errors": [],
+exit=0
+$ harness check proj   # implement IN_PROGRESS, no spec task
+  .harness/tasks/T-2.yaml: IN_PROGRESS in phase 'implement' but no 'spec' task is reachable through depends_on; add the dependency or use BLOCKED or BACKLOG until that phase is done
+exit=1
+$ harness check proj   # implement depends on spec, spec still IN_PROGRESS
+  .harness/tasks/T-2.yaml: IN_PROGRESS but dependency T-1 is IN_PROGRESS; use BLOCKED or BACKLOG until it is satisfied
+exit=1
+$ harness check proj   # spec DONE
+exit=0
+$ harness check proj   # task without phase under require_phase
+  .harness/tasks/T-3.yaml: .harness/config.yaml requires every task to name a phase
+exit=1

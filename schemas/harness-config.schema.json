@@ -1,5 +1,36 @@
 {
   "$defs": {
+    "PhaseConfig": {
+      "additionalProperties": false,
+      "description": "One lifecycle phase. `requires` names phases a task must build on.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9-]{0,39}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Description",
+          "type": "string"
+        },
+        "requires": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]{0,39}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Requires",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "PhaseConfig",
+      "type": "object"
+    },
     "RoleConfig": {
       "additionalProperties": false,
       "description": "Write scope for one role. Globs are project-relative; deny wins over write.",
@@ -32,6 +63,31 @@
         }
       },
       "title": "RoleConfig",
+      "type": "object"
+    },
+    "WorkflowConfig": {
+      "additionalProperties": false,
+      "description": "Lifecycle phases enforced by `harness check` through task dependencies.",
+      "properties": {
+        "phases": {
+          "items": {
+            "$ref": "#/$defs/PhaseConfig"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Phases",
+          "type": "array"
+        },
+        "require_phase": {
+          "default": false,
+          "title": "Require Phase",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "phases"
+      ],
+      "title": "WorkflowConfig",
       "type": "object"
     }
   },
@@ -83,6 +139,17 @@
       },
       "title": "Roles",
       "type": "object"
+    },
+    "workflow": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkflowConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

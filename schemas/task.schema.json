@@ -245,6 +245,19 @@
       "title": "Status",
       "type": "string"
     },
+    "phase": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9-]{0,39}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Phase"
+    },
     "goal": {
       "default": "",
       "maxLength": 4000,

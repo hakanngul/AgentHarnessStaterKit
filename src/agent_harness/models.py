@@ -49,6 +49,51 @@ class RoleConfig(BaseModel):
         return values
 
 
+PhaseName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9-]{0,39}$")]
+
+
+class PhaseConfig(BaseModel):
+    """One lifecycle phase. `requires` names phases a task must build on."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: PhaseName
+    description: Annotated[str, Field(max_length=500)] = ""
+    requires: list[PhaseName] = Field(default_factory=list, max_length=50)
+
+
+class WorkflowConfig(BaseModel):
+    """Lifecycle phases enforced by `harness check` through task dependencies."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    phases: Annotated[list[PhaseConfig], Field(min_length=1, max_length=50)]
+    # When true, every task except CANCELLED ones must name a phase.
+    require_phase: bool = False
+
+    @model_validator(mode="after")
+    def check_phases(self) -> "WorkflowConfig":
+        seen: set[str] = set()
+        for phase in self.phases:
+            if phase.name in seen:
+                raise ValueError(f"duplicate phase name: {phase.name!r}")
+            if len(phase.requires) != len(set(phase.requires)):
+                raise ValueError(f"phase {phase.name!r} lists a required phase twice")
+            # Only earlier phases may be required, so the phase graph cannot cycle.
+            for required in phase.requires:
+                if required not in seen:
+                    raise ValueError(
+                        f"phase {phase.name!r} requires {required!r}, "
+                        "which is not defined before it"
+                    )
+            seen.add(phase.name)
+        return self
+
+    def requires(self, name: str) -> list[str] | None:
+        """Required phases of a phase, or None when the phase is not defined."""
+        return next((phase.requires for phase in self.phases if phase.name == name), None)
+
+
 class HarnessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -59,6 +104,7 @@ class HarnessConfig(BaseModel):
     adapter: Literal["claude-code"] = "claude-code"
     technologies: list[str] = Field(default_factory=list)
     roles: dict[RoleName, RoleConfig] = Field(default_factory=dict)
+    workflow: WorkflowConfig | None = None
 
     @field_validator("project_name")
     @classmethod
@@ -170,6 +216,8 @@ class Task(BaseModel):
     title: Name
     owner: Name
     status: TaskStatus
+    # Lifecycle phase from the config's `workflow`; `check` enforces its requirements.
+    phase: PhaseName | None = None
     goal: Annotated[str, Field(max_length=4000)] = ""
     scope: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list)
     depends_on: list[Reference] = Field(default_factory=list)
