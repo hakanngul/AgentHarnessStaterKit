@@ -1,6 +1,6 @@
 # Current task
 
-Status: T-7..T-11 DONE (motor, dalga, reviewer, görev başına commit, salt okunur sunucu). Sıradaki: sunucuya eylemler ve canlı olaylar.
+Status: T-7..T-12 DONE (motor, dalga, reviewer, commit, sunucu, sunucuda işler ve canlı olaylar). Sıradaki: proje çalışma kilidi (T-13), sonra arayüz.
 
 ## Goal and scope
 

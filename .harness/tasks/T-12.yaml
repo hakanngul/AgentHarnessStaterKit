@@ -3,7 +3,7 @@ id: T-12
 title: 'Uygulama adım 6b: sunucuda eylemler (wave, review, commit) arka plan işi olarak ve
   canlı olay akışı'
 owner: developer
-status: IN_REVIEW
+status: DONE
 goal: 'Sunucudan wave, review ve commit başlatmak: tek aktif iş, JSON gövde, sınırlı parametre,
   SSE ile sıralı canlı olaylar, iptal ve temiz kapanış. Aynı orkestratör fonksiyonları kullanılır;
   sunucu yeni bir karar mantığı eklemez. Tarayıcı için token hand-off bu görevde yok (arayüz
@@ -23,26 +23,38 @@ acceptance:
     büyük gövde 413 ve gövde sınıra kadar okunur, yükleme bitmesi beklenmez), bilinmeyen alan
     ya da sınır dışı değer ve türe uymayan parametre 422 verir, geçerli istek 202 ile iş kimliği
     döner; aktif iş varken ikinci istek 409 alır.
+  verified_by:
+  - E10
 - id: AC2
   text: İş, CLI ile aynı fonksiyonları (run_wave, review_all, commit_done_tasks) enjekte edilen
     engine ile çalıştırır; HarnessError, OSError, UnicodeError ve engine kurulum hatası işi
     failed yapar ve mesajı taşır, beklenmeyen hata ve BaseException işi failed yapar (iş asla
     sonsuza dek running kalmaz), 500 vermez; sonuç CLI --json çıktısıyla aynı biçimde ve aynı
     satırlardadır.
+  verified_by:
+  - E10
 - id: AC3
   text: GET /api/jobs/{id}/events SSE akışı sıralı id ile olayları verir, after ya da Last-Event-ID
     ile kaldığı yerden sürer, iş bitince kapanır; olay tamponu ve olay metni sınırlıdır; bilinmeyen
     iş 404.
+  verified_by:
+  - E10
 - id: AC4
   text: POST /api/jobs/{id}/cancel çalışan wave ya da review'ı iptal eder ve wave görevleri
     READY'ye döner; commit işi iptal edilemez (409); biten işte 409. Sunucu kapanırken açık
     bir olay akışı varken bile süreç grace süresi (3 sn) içinde kapanır, çalışan iş iptal
     edilir (commit bitirilir) ve görevler READY'ye döner; bu gerçek uvicorn ile test edilir.
+  verified_by:
+  - E10
 - id: AC5
   text: GET /api/jobs ve /api/jobs/{id} durum, parametre ve sonucu verir; tutulan iş sayısı
     sınırlıdır. Testler unit testtir (sahte engine, gerçek ledger dosyaları); yalnız kapanış
     testi gerçek bir uvicorn sunucusu ve yerel soket açar; pytest, ruff check ve ruff format
     --check geçer.
+  verified_by:
+  - E10
+  - E11
+  - E12
 evidence:
 - id: E1
   kind: command
@@ -143,18 +155,51 @@ evidence:
   output_sha256: 26a51376cc4243c378ac84b9c475a7900ec6b6acfdf1191f09d0c4af5e6aca36
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 923 passed in 30.42s
+  commit: ca3cb54ea60d3421a35f0cbb164756c111567a98
+  output: .harness/evidence/T-12/E10.txt
+  output_sha256: 6ccb677da9a72857fc1445735567742e4a0be0486ccb65df7df72a91a5bf1774
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: ca3cb54ea60d3421a35f0cbb164756c111567a98
+  output: .harness/evidence/T-12/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 62 files already formatted
+  commit: ca3cb54ea60d3421a35f0cbb164756c111567a98
+  output: .harness/evidence/T-12/E12.txt
+  output_sha256: 26a51376cc4243c378ac84b9c475a7900ec6b6acfdf1191f09d0c4af5e6aca36
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 review:
-  status: changes_requested
+  status: approved
   by: reviewer
-  notes: 'Round 1: no critical defect in the job state machine. Found: (1) shutdown hangs
-    while an SSE stream is open (confirmed with real uvicorn: test waited 20 s) -> 3 s grace
-    period, tested with a real server; (2) GET /api/jobs read the job table from a worker
-    thread -> async handlers; (3) no test raised OSError inside a job; (4) lifecycle tests
-    lacked a timeout guard and a running-commit shutdown test; (5) review result shape differed
-    from the CLI -> aligned; (6) stale read-only docstring and CLI help; (7) README cap wording;
-    (8) exact content-type, Content-Length pre-check, BaseException handler. Sonar: CancelledError
-    now re-raised after bookkeeping, lifespan cleanup in try/finally. All proven by mutation
-    checks.'
+  notes: 'Round 3 (fresh read-only reviewer, delta since the round-2 approval): APPROVED,
+    no blocking defect. Round 2 had approved the job manager, shutdown with an open stream
+    (real uvicorn), cancel and result shapes. Rounds 1-2 found a real shutdown hang with open
+    SSE streams, a thread-unsafe job list, CancelledError handling and test gaps; all fixed
+    and proven by mutation checks. After the last approval only a Content-Length digit guard
+    and boundary tests were added (low findings of the final review, mutation-proven, not
+    reviewed again). Accepted limits: no lock between CLI and server, a cancel racing a ledger
+    write, no engine deadline, token hand-off for a browser UI. Bot findings triaged on the
+    PR.'
 log:
 - '2026-11-16 developer: task opened after the owner said "başla"; token hand-off for browsers
   deferred to the UI task on purpose'
@@ -166,3 +211,4 @@ log:
 - '2026-11-16 developer: bot findings triaged (body cap while reading, huge Last-Event-ID,
   README review-cancel wording, SSE id lines fixed; wave-claim race and shared git index deferred
   to a project run lock task); tests strengthened'
+- '2026-11-16 orchestrator: review by reviewer: approved'
