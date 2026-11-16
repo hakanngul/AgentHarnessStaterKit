@@ -17,30 +17,30 @@ acceptance:
   text: Her DONE görev, commit'i yoksa, yalnız sahip olduğu dosyalarla (kapsamı ve kendi defter
     dosyaları) ayrı bir commit olur; açık yol verilerek stage edilir ve hiçbir şey push edilmez.
   verified_by:
-  - E7
+  - E10
 - id: AC2
   text: Bir dosya tek göreve gider, en spesifik kapsam kazanır, eşitlikte küçük görev numarası;
     geniş kapsam başka görevin adıyla andığı dosyayı yutmaz; çalışan görevin dosyası commit'lenmez.
   verified_by:
-  - E7
+  - E10
 - id: AC3
   text: Hiçbir görevin açıklamadığı değişiklik varsa hiçbir commit atılmaz ve dosya adları
     söylenir; üretilen dosyalar (pycache, pyc, lock) sayılmaz.
   verified_by:
-  - E7
+  - E10
 - id: AC4
   text: Aynı komutun ikinci çalıştırması commit atmaz; depo kökü değilse, index'te stage edilmiş
     değişiklik, bozuk defter ya da bilinmeyen görev varsa hata verir; --branch dalı oluşturur
     ya da kullanır.
   verified_by:
-  - E7
+  - E10
 - id: AC5
   text: '`harness commit [PATH] [--task] [--branch] [--json]` sonucu gösterir; engellenen
     görev yoksa 0, varsa 1 ile çıkar. Testler yalnız unit testtir, gerçek git deposunda çalışır.'
   verified_by:
-  - E7
-  - E8
-  - E9
+  - E10
+  - E11
+  - E12
 evidence:
 - id: E1
   kind: command
@@ -186,8 +186,17 @@ review:
     LOW unmerged paths, nested repositories, trust boundary, identity fallback, weak tests.
     All fixed afterwards (literal pathspecs, literal path matching, index reset with partial
     results, narrow generated filter, subject-exact check on the target branch, branch name
-    validation, unborn and detached HEAD handling) with 28 new tests; the fixes are not re-reviewed
-    yet.'
+    validation, unborn and detached HEAD handling) with 28 new tests; the round-1 fixes were
+    then re-reviewed. Round 2: CHANGES REQUESTED, minor: the .lock rule hid dotted lock files
+    outside the ledger, cancelled tasks still owned files, the error named `git -c`, a rev-parse
+    failure after a successful commit lost results, an identity test overclaimed. Round 3:
+    CHANGES REQUESTED. HIGH the claimed _committed fix (an unborn branch is told apart from
+    a real git error) was NOT in the code: my scripted replacement silently did not match
+    after reformatting and I reported it as done without checking. MEDIUM ignoring CANCELLED
+    tasks also dropped their own ledger files from ownership (regression). LOW a test that
+    did not exercise its fix, no email-only identity test. All fixed for real and checked
+    by mutation: the log-failure and cancelled-ledger tests fail on the old code and pass
+    on the new. The round-3 fixes are not re-reviewed yet.'
 log:
 - 2026-11-16 görev açıldı. Gerçek oturum denemesi (geçici proje) bir hata buldu - geniş kapsamlı
   T-1 diğer görevlerin dosyalarını yutuyordu; en spesifik sahip kuralı ile düzeltildi ve gerçek
