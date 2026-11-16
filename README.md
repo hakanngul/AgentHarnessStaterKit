@@ -253,6 +253,36 @@ Sınırlar:
 - Gerçek Claude oturumu henüz denenmedi: motor yalnız sahte SDK ve sahte motorla birim
   testlerden geçti.
 
+## Paralel dalga ve bağımsız review
+
+`harness wave [PATH] [--max-parallel N] [--review]`: `harness next`in "başlayabilir" dediği
+görevleri (en çok `--max-parallel`, varsayılan 3) aynı anda çalıştırır ve her koşunun
+sonucunu deftere yazar. Durumu yalnız bu komut değiştirir; ajanlar değiştirmez.
+
+- Başlamadan önce görev READY'den IN_PROGRESS'e alınır (başkası araya girdiyse alınmaz).
+- Biten görev, koşu sırasında kaydedilmiş en az bir yeni ve geçen kanıtı varsa
+  IN_REVIEW'a gider. Kanıtsızsa ya da hata verdiyse BLOCKED olur ve gerekçe yazılır.
+  Kullanım limitine takılan görev READY'ye döner. Yarıda kesilen dalga görevleri
+  READY'ye bırakır.
+- Çıkış kodu 0: hepsi IN_REVIEW'a ulaştı ve defter yazıldı.
+
+`harness review [PATH] [--task T-n] [--role reviewer]` (ya da `wave --review`): IN_REVIEW
+görevleri reviewer rolüyle inceletir. Reviewer yalnız okur; kararını kendi yazmaz. Cevabını
+`VERDICT: APPROVED|CHANGES_REQUESTED` satırıyla ve her kabul kriteri için kanıt satırıyla
+(`AC1: E1`) bitirir. Karar kodla işlenir:
+
+- Onay yalnız her kriter kaydedilmiş, geçen bir kanıta bağlanırsa kabul edilir. Görev DONE
+  olur ve `verified_by` doldurulur. Eksik onay "değişiklik istendi" sayılır.
+- Değişiklik istenirse görev READY'ye döner, reviewer'ın notları bir sonraki geliştirici
+  istemine veri olarak eklenir.
+- Görev sahibi kendi görevini inceleyemez. Reviewer kanıtı ya da kriterleri değiştirirse
+  görev BLOCKED olur. Karar satırı yoksa ya da koşu başarısızsa görev IN_REVIEW'da kalır.
+
+Sınırlar: reviewer `bash` kullanamaz, bu yüzden "kapsam dışı dosya değişti mi" sorusunu
+`git` ile doğrulayamaz; onay bu noktada modelin okumasına dayanır. Kodla kapsam denetimi
+görev başına commit adımıyla gelecek. IN_REVIEW'daki görev, DONE olana kadar kapsamını
+meşgul tutar ve çakışan görevleri bekletir.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.

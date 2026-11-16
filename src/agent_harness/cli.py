@@ -238,6 +238,10 @@ def wave_command(
     max_resumes: Annotated[
         int, typer.Option(min=0, help="How often to resume after a usage limit.")
     ] = 3,
+    review: Annotated[
+        bool, typer.Option("--review", help="Run the reviewer on tasks that reach IN_REVIEW.")
+    ] = False,
+    reviewer: Annotated[str, typer.Option(help="Role that reviews with --review.")] = "reviewer",
     output_json: JsonFlag = False,
 ) -> None:
     """Run every task `harness next` would start, in parallel, and record how each ended.
@@ -247,6 +251,7 @@ def wave_command(
     import asyncio
 
     from agent_harness.orchestrator import run_wave
+    from agent_harness.review import review_all
 
     try:
         engine = make_engine()
@@ -264,6 +269,19 @@ def wave_command(
                 max_resumes=max_resumes,
             )
         )
+        reviews = []
+        if review:
+            reviews = asyncio.run(
+                review_all(
+                    path,
+                    engine,
+                    task_ids=[r.task_id for r in results if r.status == "IN_REVIEW"],
+                    role=reviewer,
+                    max_parallel=max_parallel,
+                    on_event=printer,
+                    max_resumes=max_resumes,
+                )
+            )
     except (HarnessError, OSError, UnicodeError) as exc:
         fail(exc, output_json)
     tasks = [
@@ -278,7 +296,76 @@ def wave_command(
         for r in results
     ]
     ok = all(r.status == "IN_REVIEW" and r.recorded for r in results)
-    emit({"ok": ok, "started": len(results), "tasks": tasks}, output_json)
+    payload = {"ok": ok, "started": len(results), "tasks": tasks}
+    if review:
+        payload["reviews"] = _review_rows(reviews)
+        ok = ok and all(r.status == "DONE" and r.recorded for r in reviews)
+        payload["ok"] = ok
+    emit(payload, output_json)
+    if not ok:
+        raise typer.Exit(1)
+
+
+def _review_rows(reviews) -> list[dict]:
+    return [
+        {
+            "task": r.task_id,
+            "verdict": r.verdict,
+            "status": r.status,
+            "cost_usd": r.outcome.cost_usd,
+            "note": r.note,
+            "recorded": r.recorded,
+        }
+        for r in reviews
+    ]
+
+
+@app.command("review")
+def review_command(
+    path: ProjectPath = Path("."),
+    task: Annotated[
+        list[str] | None, typer.Option("--task", help="Review only this task; repeatable.")
+    ] = None,
+    role: Annotated[
+        str, typer.Option(help="Role that reviews; never the task owner.")
+    ] = "reviewer",
+    max_parallel: Annotated[int, typer.Option(min=1, help="Most reviews at once.")] = 3,
+    max_resumes: Annotated[
+        int, typer.Option(min=0, help="How often to resume after a usage limit.")
+    ] = 3,
+    output_json: JsonFlag = False,
+) -> None:
+    """Have the reviewer role judge IN_REVIEW tasks: approved ones become DONE.
+
+    Changes requested send the task back to READY with the reviewer's notes. An approval
+    counts only if every acceptance criterion is backed by passing evidence.
+    """
+    import asyncio
+
+    from agent_harness.review import review_all
+
+    try:
+        engine = make_engine()
+        printer = (
+            None
+            if output_json
+            else (lambda t, e: (line := _describe(e)) and console.print(f"{t}: {line}"))
+        )
+        reviews = asyncio.run(
+            review_all(
+                path,
+                engine,
+                task_ids=task,
+                role=role,
+                max_parallel=max_parallel,
+                on_event=printer,
+                max_resumes=max_resumes,
+            )
+        )
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    ok = all(r.status == "DONE" and r.recorded for r in reviews)
+    emit({"ok": ok, "reviewed": len(reviews), "tasks": _review_rows(reviews)}, output_json)
     if not ok:
         raise typer.Exit(1)
 

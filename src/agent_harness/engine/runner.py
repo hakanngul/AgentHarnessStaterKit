@@ -16,6 +16,7 @@ from agent_harness.check import inspect_ledger
 from agent_harness.engine.events import Event, Finished, RateLimit, RunRequest, Started, Waiting
 from agent_harness.engine.prompt import RESUME_PROMPT, task_prompt
 from agent_harness.filesystem import HarnessError, project_root
+from agent_harness.models import Task
 
 RUNNABLE = ("READY", "IN_PROGRESS")
 LIMIT_FALLBACK_WAIT = 300.0  # seconds, when the engine reports no reset time
@@ -41,7 +42,14 @@ class RunOutcome:
     events: list[Event] = field(default_factory=list, repr=False)
 
 
-def prepare(path: Path, task_id: str, role: str | None = None) -> tuple[Path, RunRequest]:
+def prepare(
+    path: Path,
+    task_id: str,
+    role: str | None = None,
+    *,
+    runnable: tuple[str, ...] = RUNNABLE,
+    prompt_for: Callable[[Task, str], str] = task_prompt,
+) -> tuple[Path, RunRequest]:
     """Validate that a task may run and build its first request; raise HarnessError if not."""
     root = project_root(path)
     report, tasks, _, config = inspect_ledger(root)
@@ -50,8 +58,8 @@ def prepare(path: Path, task_id: str, role: str | None = None) -> tuple[Path, Ru
     task = tasks.get(task_id)
     if task is None:
         raise HarnessError(f"unknown task {task_id!r}")
-    if task.status not in RUNNABLE:
-        raise HarnessError(f"{task_id} is {task.status}; only READY or IN_PROGRESS tasks run")
+    if task.status not in runnable:
+        raise HarnessError(f"{task_id} is {task.status}; only {' or '.join(runnable)} tasks run")
     role = role or task.owner.strip()
     role_config = config.roles.get(role) if config else None
     if role_config is None:
@@ -59,7 +67,7 @@ def prepare(path: Path, task_id: str, role: str | None = None) -> tuple[Path, Ru
     request = RunRequest(
         cwd=root,
         role=role,
-        prompt=task_prompt(task, role),
+        prompt=prompt_for(task, role),
         model=role_config.model,
         effort=role_config.effort,
     )
@@ -88,13 +96,15 @@ async def run_task(
     engine: Engine,
     *,
     role: str | None = None,
+    runnable: tuple[str, ...] = RUNNABLE,
+    prompt_for: Callable[[Task, str], str] = task_prompt,
     max_resumes: int = 3,
     max_wait: float = 6 * 3600,
     on_event: Callable[[Event], None] | None = None,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     clock: Callable[[], float] = time.time,
 ) -> RunOutcome:
-    root, request = prepare(path, task_id, role)
+    root, request = prepare(path, task_id, role, runnable=runnable, prompt_for=prompt_for)
     outcome = RunOutcome(status="failed", task_id=task_id, role=request.role)
     while True:
         outcome.sessions += 1

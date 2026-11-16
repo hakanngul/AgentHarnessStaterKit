@@ -35,19 +35,19 @@ class WaveResult:
     recorded: bool = True  # False: the ledger could not take the status; fix it by hand
 
 
-def set_status(
+def _update(
     root: Path,
     task_id: str,
-    status: str,
+    mutate: Callable[[dict], None],
     *,
-    reason: str = "",
     note: str,
     expect: tuple[str, ...] | None = None,
 ) -> None:
-    """Move a task to `status` and append a log line, under the task's lock.
+    """Edit a task under its lock: `mutate` changes the data, a log line is appended.
 
-    With `expect`, the move happens only if the task is still in one of those statuses, so
-    a task someone else changed in the meantime is not overwritten.
+    With `expect`, the edit happens only if the task is still in one of those statuses, so
+    a task someone else changed in the meantime is not overwritten. The result is
+    validated before it is written.
     """
     task_path = managed_path(root, f"{TASKS_DIR}/{task_id}.yaml")
     with _task_lock(task_path):
@@ -55,11 +55,7 @@ def set_status(
         if expect is not None and current.status not in expect:
             raise HarnessError(f"{task_id} is {current.status}, expected {' or '.join(expect)}")
         data = current.model_dump(mode="json", exclude_unset=True)
-        data["status"] = status
-        if status == "BLOCKED":
-            data["reason"] = reason
-        else:
-            data.pop("reason", None)
+        mutate(data)
         line = f"{dt.date.today()} orchestrator: {note}"[:2000]
         data["log"] = [*data.get("log", []), line][-MAX_LOG:]
         text = yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=88)
@@ -70,6 +66,27 @@ def set_status(
         except ValidationError as exc:
             raise HarnessError(f"refusing to write an invalid {task_id}: {exc}") from exc
         _write_atomic(task_path, text)
+
+
+def set_status(
+    root: Path,
+    task_id: str,
+    status: str,
+    *,
+    reason: str = "",
+    note: str,
+    expect: tuple[str, ...] | None = None,
+) -> None:
+    """Move a task to `status` and append a log line, under the task's lock."""
+
+    def mutate(data: dict) -> None:
+        data["status"] = status
+        if status == "BLOCKED":
+            data["reason"] = reason
+        else:
+            data.pop("reason", None)
+
+    _update(root, task_id, mutate, note=note, expect=expect)
 
 
 def _evidence_ids(root: Path, task_id: str) -> set[str]:
