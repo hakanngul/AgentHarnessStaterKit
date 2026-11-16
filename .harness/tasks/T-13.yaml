@@ -78,15 +78,49 @@ evidence:
   output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 947 passed in 32.81s
+  commit: 7dbb998eed81cab199a33aeb021ebc5218c39493
+  output: .harness/evidence/T-13/E4.txt
+  output_sha256: 106f1ebc481827c70ef4a78de2fdedae4e9f8abfce853d405ffe86bb38072744
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 7dbb998eed81cab199a33aeb021ebc5218c39493
+  output: .harness/evidence/T-13/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 7dbb998eed81cab199a33aeb021ebc5218c39493
+  output: .harness/evidence/T-13/E6.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 log:
 - '2026-11-16 developer: task opened; follows the T-12 review findings (wave claim race, shared
   git index, git without timeout); flock chosen over an O_EXCL file because a crash must not
   leave a lock behind'
 - '2026-11-16 developer: runlock.py, CLI and server integration, run_wave claim fix, git timeout;
   24 new tests; every fix mutation-checked; waiting for independent review'
-- '2026-11-16 reviewer: CHANGES_REQUESTED. #1 (one-lock test could not fail; the review never ran)
-  FIXED: test now asserts the review phase ran locked, mutation (review dedented out of the lock)
-  caught. #2 (cancel releases lock while a to_thread write may finish) ACCEPTED, documented in
-  README. #3 (git timeout vs grandchild holding the pipe) REFUTED: measured 1.0 s for a 1 s timeout
-  with a sleeping grandchild on POSIX. #4 (claim ownership keyed on exception type) ACCEPTED, very
-  unlikely behind the entry-point lock. #5 (holder note window) ACCEPTED, cosmetic, documented.'
+- '2026-11-16 reviewer: CHANGES_REQUESTED. #1 (one-lock test could not fail; the review never
+  ran) FIXED: test now asserts the review phase ran locked, mutation (review dedented out
+  of the lock) caught. #2 (cancel releases lock while a to_thread write may finish) ACCEPTED,
+  documented in README. #3 (git timeout vs grandchild holding the pipe) REFUTED: measured
+  1.0 s for a 1 s timeout with a sleeping grandchild on POSIX. #4 (claim ownership keyed on
+  exception type) ACCEPTED, very unlikely behind the entry-point lock. #5 (holder note window)
+  ACCEPTED, cosmetic, documented.'
