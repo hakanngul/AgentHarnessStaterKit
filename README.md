@@ -295,6 +295,32 @@ commit adımıyla gelecek. Onay, kanıtın ilgili kriteri gerçekten gösterip g
 denetlemez, yalnız kanıtın var, geçen ve harness kaydı olduğunu denetler; ilgiyi model yargılar.
 IN_REVIEW'daki görev DONE olana kadar kapsamını meşgul tutar ve çakışan görevleri bekletir.
 
+## Görev başına commit ve kapsam denetimi
+
+`harness commit [PATH] [--task T-n] [--branch ad]`: DONE olmuş ve henüz commit'i olmayan her
+görevi ayrı bir commit olarak işler (dal düzeni A: paralel grup tek dalda, görev başına commit).
+`--branch` dalı oluşturur ya da ona geçer. Hiçbir şey push edilmez, merge sende.
+
+- Yalnız görevin sahip olduğu dosyalar, açık yol vererek stage edilir: kapsamındaki dosyalar ve
+  kendi defter dosyaları (`.harness/tasks/T-n.yaml`, `.harness/evidence/T-n/`). `git add -A` yok.
+- Bir dosya tek göreve gider: en spesifik kapsam kazanır (`src/` geniş kapsamı, başka görevin
+  adıyla andığı `src/api.py`'yi yutmaz), eşitlikte küçük görev numarası. Hâlâ çalışan bir
+  görevin spesifik kapsamındaki dosya commit'lenmez, o göreve bırakılır.
+- **Kapsam denetimi kodla yapılır:** hiçbir görevin kapsamının ya da defter dosyalarının
+  açıklamadığı bir değişiklik varsa hiçbir commit atılmaz ve dosya adları söylenir. Paralel
+  görevlerde bunun kimin olduğu bilinemeyeceği için grubun tamamı durur. Testlerin ürettiği
+  `__pycache__`, `*.pyc` ve `*.lock` dosyaları sayılmaz.
+- Aynı komutu tekrar çalıştırmak ikinci commit atmaz (commit mesajı `T-n: ` ile başlar, git
+  geçmişinden bulunur). Dizin git deposunun kökü olmalı; index'te stage edilmiş değişiklik,
+  bozuk defter ya da bilinmeyen görev varsa komut hata verir.
+- Çıkış kodu 0: engellenen görev yok.
+
+Sınırlar: kapsam eşleşmesi önek temellidir; `src/*.py` gibi joker karakterli kapsam, joker
+öncesi öneki sahiplenir (aşırı geniş). Commit'lemeden önce çalışma ağacında kendi
+değişikliğiniz varsa ve bir görevin kapsamına düşüyorsa o görevle birlikte commit'lenir; ajan
+ekibini temiz bir ağaçta çalıştırın. Kimlik git ayarından gelir, yoksa `Agent Harness
+<harness@localhost>` kullanılır.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.

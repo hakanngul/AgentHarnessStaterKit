@@ -320,6 +320,38 @@ def _review_rows(reviews) -> list[dict]:
     ]
 
 
+@app.command("commit")
+def commit_command(
+    path: ProjectPath = Path("."),
+    task: Annotated[
+        list[str] | None, typer.Option("--task", help="Commit only this task; repeatable.")
+    ] = None,
+    branch: Annotated[
+        str | None, typer.Option(help="Switch to (or create) this branch first.")
+    ] = None,
+    output_json: JsonFlag = False,
+) -> None:
+    """Commit every DONE task that has no commit yet, one commit per task; nothing is pushed.
+
+    Only the files a task owns (its scope and its ledger files) are staged. A change that
+    no task accounts for blocks all commits.
+    """
+    from agent_harness.commit import commit_done_tasks
+
+    try:
+        results = commit_done_tasks(path, task_ids=task, branch=branch)
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    ok = all(r.status != "blocked" for r in results)
+    rows = [
+        {"task": r.task_id, "status": r.status, "sha": r.sha, "files": r.files, "note": r.note}
+        for r in results
+    ]
+    emit({"ok": ok, "tasks": rows}, output_json)
+    if not ok:
+        raise typer.Exit(1)
+
+
 @app.command("review")
 def review_command(
     path: ProjectPath = Path("."),
