@@ -338,20 +338,19 @@ def test_events_are_tagged_with_their_task(tmp_path):
 
 
 def test_cancelling_the_wave_releases_running_tasks(tmp_path):
+    running = asyncio.Event()
+
     class Hanging(ByTask):
         async def run(self, request, root):
             yield Started("s")
+            running.set()  # the engine is now running; only then is the wave cancelled
             await asyncio.sleep(60)
 
     root = project(tmp_path, task())
 
     async def go():
         runner = asyncio.create_task(run_wave(root, Hanging({"T-1": []})))
-        for _ in range(100):
-            if status_of(root, "T-1")["status"] == "IN_PROGRESS":
-                break
-            await asyncio.sleep(0.01)
-        await asyncio.sleep(0.05)
+        await asyncio.wait_for(running.wait(), 5)
         runner.cancel()
         with pytest.raises(asyncio.CancelledError):
             await runner

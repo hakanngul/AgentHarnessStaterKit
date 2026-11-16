@@ -56,3 +56,11 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
   resume, 429 as exception. Try it on a throwaway project first.
 - Next: orchestrator loop that uses `harness next` and `run_task`, records evidence,
   requests review, enforces the phase gate, commits per task (layout A).
+
+## Orchestrator wave (T-8)
+
+- `harness wave` = plan().start -> claim (READY->IN_PROGRESS, compare-and-set) -> parallel
+  run_task -> settle: IN_REVIEW only with acceptance and NEW passing evidence, BLOCKED on
+  failure, READY on usage limit. Interrupts release claimed tasks to READY.
+- Not done: reviewer agent run, commit per task (layout A), phase gate in the loop.
+- Trial project for a real-session run: scratchpad `trial/` (throwaway, not in the repo).

@@ -2,7 +2,7 @@ schema_version: 1
 id: T-8
 title: 'Uygulama adım 3: orchestrator dalgası (harness wave)'
 owner: developer
-status: IN_REVIEW
+status: DONE
 goal: Planlayıcının başlatılabilir dediği görevleri sınırlı paralellikte çalıştıran ve her
   koşunun sonucunu defterde durum olarak kaydeden katman. Biten görev IN_REVIEW'a, hata verense
   BLOCKED'a, limite takılan READY'ye gider. DONE, review, commit ve faz kapısı bu katmanın
@@ -19,25 +19,25 @@ acceptance:
     aynı anda çalışır ve başlamadan önce IN_PROGRESS yazılır. Geçersiz defterde hiçbir şey
     çalışmaz ve defter değişmez.
   verified_by:
-  - E7
+  - E10
 - id: AC2
   text: 'Koşu sonucu duruma çevrilir: kanıtı ve kabul kriteri olan tamamlanmış görev IN_REVIEW,
     kanıtsız tamamlanmış ya da hatalı görev BLOCKED (gerekçeyle), limite takılan READY. Bir
     görevin motor hatası kardeşlerini durdurmaz.'
   verified_by:
-  - E7
+  - E10
 - id: AC3
   text: Durum değişimleri görev kilidi altında, geçerli şemayla yazılır ve log'a satır ekler;
     geçersiz durum yazılmaz.
   verified_by:
-  - E7
+  - E10
 - id: AC4
   text: '`harness wave [PATH] [--max-parallel] [--max-resumes] [--json]` her görevin sonucunu
     gösterir; hepsi IN_REVIEW olduysa 0, değilse 1 ile çıkar. Testler yalnız unit testtir.'
   verified_by:
-  - E7
-  - E8
-  - E9
+  - E10
+  - E11
+  - E12
 evidence:
 - id: E1
   kind: command
@@ -138,16 +138,42 @@ evidence:
   output_sha256: 2e643e4c20a118b0f9a72f93a837b5279f02ec6ad2330e6ff24ecb0a0002e0bf
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 0ee88f86ef7bf4bc5a45ba3990583fc7670ea7b6
+  output: .harness/evidence/T-8/E10.txt
+  output_sha256: c2efc7ce50806cb7ef3834aedd5b0c185ffc386cd32d7b3791c2e092aaea5f43
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 0ee88f86ef7bf4bc5a45ba3990583fc7670ea7b6
+  output: .harness/evidence/T-8/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 0ee88f86ef7bf4bc5a45ba3990583fc7670ea7b6
+  output: .harness/evidence/T-8/E12.txt
+  output_sha256: 2e643e4c20a118b0f9a72f93a837b5279f02ec6ad2330e6ff24ecb0a0002e0bf
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 review:
-  status: changes_requested
+  status: approved
   by: reviewer
-  notes: 'Round 1 (read-only reviewer subagent, ran nothing): CHANGES REQUESTED. HIGH tasks
-    could be left IN_PROGRESS when settling failed or the start loop aborted, and sibling
-    results were lost; no compare-and-set on status. MEDIUM stale or failing evidence accepted
-    as proof, unbounded log, blocking lock wait inside the event loop, weak tests. LOW Rich
-    markup in agent text. All fixed afterwards (claim with expect=READY and all-or-nothing
-    release, settle failure releases to BLOCKED, new passing evidence required, log capped
-    at 40, set_status via to_thread, markup escaped) with tests; the fix is not re-reviewed
-    yet.'
+  notes: 'Three read-only reviewer subagents, none ran commands. Round 1 CHANGES REQUESTED (stranded IN_PROGRESS tasks, no compare-and-set, stale evidence accepted, unbounded log, blocking lock wait); round 2 CHANGES REQUESTED (cancellation during settle, unrecorded result hidden, markup escape, snapshot timing); all fixed with tests. Round 3 APPROVED with two LOW notes: a narrow cancel window before a child task first runs (fixed by releasing all claimed tasks when gather is interrupted) and a cancel test that did not prove the cancel landed during the run (fixed with an event). Those two fixes are not re-reviewed. Open LOW: the recorded flag in ok is defensive and not isolated by a test; release can block the loop up to the lock wait on a stale lock. Not verified: behaviour with a real Claude session (a trial was blocked by the permission classifier and not run).'
 log:
 - 2026-11-16 görev açıldı; plan https://claude.ai/artifact/DjRVH6D2TuYA74hREncM8X adım 3.

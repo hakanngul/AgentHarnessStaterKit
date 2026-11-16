@@ -28,3 +28,8 @@ agents. The user must first choose the branch layout for parallel work.
 
 DONE. 656 unit tests, ruff clean, 3 independent review rounds (all fixed). Never run
 against a real Claude session. Next: orchestrator loop.
+
+## 2026-11-16 T-8 orchestrator wave
+
+DONE. 684 unit tests, ruff clean, three review rounds (last APPROVED). Not run against a
+real Claude session. Next: real-session trial (needs permission), then FastAPI server.

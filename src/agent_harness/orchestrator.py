@@ -122,8 +122,8 @@ async def run_wave(
     before: dict[str, set[str]] = {}
     try:
         for task in report.start[:max_parallel]:
+            chosen.append(task.id)  # before the claim, so an interrupt in it still releases it
             set_status(root, task.id, "IN_PROGRESS", note="started", expect=("READY",))
-            chosen.append(task.id)
             before[task.id] = _evidence_ids(root, task.id)
     except BaseException:
         for task_id in chosen:  # all or nothing: do not strand tasks that will never run
@@ -165,4 +165,9 @@ async def run_wave(
             _release(root, task_id, "READY", "wave interrupted before the task was settled")
             raise
 
-    return list(await asyncio.gather(*(one(task_id) for task_id in chosen)))
+    try:
+        return list(await asyncio.gather(*(one(task_id) for task_id in chosen)))
+    except BaseException:  # a child cancelled before its first step never reached its own handler
+        for task_id in chosen:
+            _release(root, task_id, "READY", "wave interrupted before the task was settled")
+        raise

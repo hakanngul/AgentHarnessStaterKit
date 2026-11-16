@@ -1,22 +1,23 @@
 # Current task
 
-Status: Uygulama adım 1, motor adapter (T-7) DONE, review approved. Sıradaki adım:
-orchestrator döngüsü (görev seç, paralel başlat, kanıt, review, kapı).
+Status: Uygulama adım 1 (motor, T-7) ve adım 2 (orchestrator dalgası, T-8) DONE, review
+approved. Sıradaki: gerçek Claude oturumunda deneme (izin bekliyor), sonra FastAPI.
 
 ## Goal and scope
 
-T-7: Claude Agent SDK üstünde, rol politikasıyla kısıtlı, kullanım limitini bekleyen
-`harness run`. Kapsam dışı: orchestrator, FastAPI sunucu, React arayüz, masaüstü kabuğu.
+T-8: `harness wave` planlayıcının başlatılabilir dediği görevleri paralel çalıştırır ve
+sonucu deftere yazar (IN_REVIEW, BLOCKED, READY). Kapsam dışı: reviewer ajanını otomatik
+çalıştırma, görev başına commit, faz kapısını işletme, sunucu, arayüz.
 
 ## Acceptance criteria
 
-AC1-AC6 in `.harness/tasks/T-7.yaml`.
+AC1-AC4 in `.harness/tasks/T-8.yaml`.
 
 ## Required checks
 
-Unit tests only (owner decision): uv run --frozen pytest -q; ruff check .; ruff format
---check .; harness validate; harness check. Run via `harness evidence run`.
+Unit tests only (owner decision): pytest, ruff check, ruff format --check, harness check.
 
 ## Product decisions and blockers
 
-User decisions: docs/plans/lifecycle.md (branch layout A decided). No blocker.
+Gerçek Claude denemesi: izin sınıflandırıcısı `harness run` komutunu reddetti; kullanıcı
+karar verecek. Dal düzeni A karar verildi (docs/plans/lifecycle.md).
