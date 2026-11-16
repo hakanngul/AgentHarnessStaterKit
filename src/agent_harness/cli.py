@@ -416,12 +416,19 @@ def serve(
     import secrets
 
     try:
+        from agent_harness.server import check_port, check_token, require_loopback
         from agent_harness.server import serve as run_server
     except ImportError:
         return fail(HarnessError(SERVER_HINT), False)
-    token = os.environ.get("HARNESS_TOKEN") or secrets.token_urlsafe(32)
-    try:
-        console.print(f"http://{host}:{port}  token: {token}")
+    given = os.environ.get("HARNESS_TOKEN")
+    token = given or secrets.token_urlsafe(32)
+    try:  # validate first, so nothing secret is printed for a start that cannot happen
+        require_loopback(host)
+        check_port(port)
+        check_token(token)
+        typer.echo(f"listening on {host}:{port}")
+        if not given:  # a token the user supplied is never echoed back
+            typer.echo(f"token: {token}")
         run_server(path, host=host, port=port, token=token)
     except HarnessError as exc:
         fail(exc, False)

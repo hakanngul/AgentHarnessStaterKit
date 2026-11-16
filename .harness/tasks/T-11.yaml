@@ -18,17 +18,20 @@ scope:
 acceptance:
 - id: AC1
   text: GET /api/plan, /api/check, /api/tasks ve /api/tasks/{id} defterdeki gerçek veriyi
-    JSON döner; geçersiz görev kimliği 404, bozuk defter 422 verir ve hiçbiri dosya yazmaz.
+    JSON döner; geçersiz görev kimliği 404 verir, okunamayan ya da bozuk görev dosyası 422
+    (listede o satır `error` alanı taşır, diğerleri görünür kalır), bozuk defter plan ve check
+    gövdesinde errors olarak raporlanır; hiçbiri 500 vermez, dosya yazmaz ve yol sızdırmaz.
 - id: AC2
   text: /api/health dışındaki her istek geçerli Bearer token ister (sabit zamanlı karşılaştırma);
     eksik ya da yanlış token 401 verir.
 - id: AC3
-  text: Host başlığı loopback adı değilse istek 403 ile reddedilir (DNS rebinding); sunucu
-    loopback dışı bir adrese bağlanmayı reddeder.
+  text: Host başlığı katı biçimde loopback adı (isteğe bağlı sayısal port) değilse istek token
+    bakılmadan 403 ile reddedilir (DNS rebinding); sunucu loopback dışı bir adrese ya da geçersiz
+    porta bağlanmayı reddeder ve uvicorn'a yalnız doğrulanmış host/port verilir.
 - id: AC4
-  text: '`harness serve [PATH] [--port]` token üretip bir kez yazar (HARNESS_TOKEN verilmişse
-    onu kullanır), fastapi/uvicorn yoksa kurulum yolunu söyleyen bir hata verir; bağımlılıklar
-    `server` extra olarak tanımlıdır.'
+  text: '`harness serve [PATH] [--port]` her şeyi doğruladıktan sonra yalnız kendi ürettiği
+    token''ı bir kez yazar (HARNESS_TOKEN verilmişse onu yazmaz ve kullanır), fastapi/uvicorn
+    yoksa kurulum yolunu söyleyen bir hata verir; bağımlılıklar `server` extra olarak tanımlıdır.'
 - id: AC5
   text: Testler yalnız unit testtir (TestClient, gerçek ledger dosyaları); pytest, ruff check
     ve ruff format --check geçer.
@@ -66,8 +69,51 @@ evidence:
   output_sha256: 98c3e013fccf39091730bb21f579ed3160ed39a17ff3e680b97a11a5a7e45c69
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 855 passed in 28.79s
+  commit: 87228bf2690899a8611d24dc3099fd4cbf7bba4e
+  output: .harness/evidence/T-11/E4.txt
+  output_sha256: 226235e301c174e0d3e04809da272ed078bb126a134769304d29e8f7f6d2bc64
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 87228bf2690899a8611d24dc3099fd4cbf7bba4e
+  output: .harness/evidence/T-11/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 59 files already formatted
+  commit: 87228bf2690899a8611d24dc3099fd4cbf7bba4e
+  output: .harness/evidence/T-11/E6.txt
+  output_sha256: 98c3e013fccf39091730bb21f579ed3160ed39a17ff3e680b97a11a5a7e45c69
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+review:
+  status: changes_requested
+  by: reviewer
+  notes: 'Round 1: no auth bypass or write path found. Requested: (1) OSError/UnicodeError
+    not handled, (2) AC1 only partly tested, (3) weak never-writes snapshot, (4) uvicorn host
+    never asserted, (5) token printed before validation and echoed from env. All five fixed,
+    plus strict Host regex, ASCII-only task ids, port range. Each fix proven by a mutation
+    check (revert the fix, a test fails). Sonar S5332 on the http:// banner removed by printing
+    host:port only.'
 log:
 - '2026-11-16 developer: task opened after the owner said "Başla"; first slice is read-only
   on purpose'
 - '2026-11-16 developer: implemented server.py, serve command, 27 tests; evidence E1-E3 recorded;
   waiting for independent review'
+- '2026-11-16 developer: round-1 findings fixed; waiting for a narrow second review'

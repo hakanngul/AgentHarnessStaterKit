@@ -348,13 +348,16 @@ commit başlatmaz, canlı olay akışı yoktur (sonraki görev).
 
 - Yalnız loopback'e bağlanır (`127.0.0.1`, `localhost`, `::1`); başka adres reddedilir.
 - `/api/health` dışında her istek `Authorization: Bearer <token>` ister. Token her başlangıçta
-  üretilir ve bir kez yazdırılır; `HARNESS_TOKEN` ortam değişkeni verilirse o kullanılır
-  (en az 16 karakter).
-- `Host` başlığı loopback adı değilse istek 403 alır (DNS rebinding savunması).
+  üretilir ve doğrulamalar geçtikten sonra bir kez yazdırılır; `HARNESS_TOKEN` ortam
+  değişkeni verilirse o kullanılır (en az 16 karakter) ve geri yazdırılmaz.
+- `Host` başlığı katı biçimde `localhost`, `127.0.0.1` ya da `[::1]` (isteğe bağlı sayısal port)
+  değilse istek token bakılmadan 403 alır (DNS rebinding savunması). `127.0.0.1` tercih edilir:
+  `localhost` ad çözümlemesine bağlıdır.
 - Uçlar: `GET /api/plan`, `/api/check`, `/api/tasks`, `/api/tasks/{T-n}`. `/docs` kapalı.
 
-Sınırlar: token düz HTTP ile loopback'te gider, TLS yok; aynı makinedeki her süreç token'ı
-bilirse erişir. Token'ı komut satırı geçmişine ya da log'a koyma. Tarayıcıya token'ı verme
+Sınırlar: token düz HTTP ile loopback'te gider, TLS yok; Host ve token denetimi aynı
+makinedeki başka bir sürece karşı koruma değildir, token'ı bilen her süreç erişir. Hata
+mesajları yetkili istemciye dosya yolu içerebilir (okunamayan dosyalar için yol gizlenir). Token'ı komut satırı geçmişine ya da log'a koyma. Tarayıcıya token'ı verme
 yolu (arayüz) henüz tasarlanmadı.
 
 ## Roller ve yazma kapsamı

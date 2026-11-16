@@ -7,7 +7,12 @@ from fastapi import testclient as fastapi_testclient
 from test_engine_runner import project, task
 
 from agent_harness.filesystem import HarnessError
-from agent_harness.server import create_app, host_name, require_loopback
+from agent_harness.server import (
+    check_port,
+    create_app,
+    is_loopback_host,
+    require_loopback,
+)
 
 TOKEN = "t" * 32
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
@@ -17,8 +22,14 @@ def client(root: Path, token: str = TOKEN):
     return fastapi_testclient.TestClient(create_app(root, token), base_url="http://localhost")
 
 
-def snapshot(root: Path) -> dict[str, bytes]:
-    return {str(p): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+def snapshot(root: Path) -> dict[str, tuple]:
+    """Every file and directory with size and mtime, so any created or touched entry shows."""
+    entries = {}
+    for item in sorted(root.rglob("*")):
+        info = item.stat()
+        content = item.read_bytes() if item.is_file() else None
+        entries[str(item)] = (item.is_dir(), info.st_size, info.st_mtime_ns, content)
+    return entries
 
 
 def test_plan_tasks_and_check_return_the_real_ledger(tmp_path):
@@ -54,6 +65,8 @@ def test_unknown_or_malformed_task_ids_are_404(tmp_path):
     assert api.get("/api/tasks/T-9", headers=AUTH).status_code == 404
     assert api.get("/api/tasks/not-a-task", headers=AUTH).status_code == 404
     assert api.get("/api/tasks/T-1.yaml", headers=AUTH).status_code == 404
+    assert api.get("/api/tasks/T-%D9%A1", headers=AUTH).status_code == 404  # Arabic-Indic digit
+    assert api.get("/api/tasks/T-1%0A", headers=AUTH).status_code == 404
     assert api.get("/api/tasks/..%2Fconfig", headers=AUTH).status_code == 404
 
 
@@ -105,12 +118,42 @@ def test_a_foreign_host_header_is_403_even_with_the_right_token(tmp_path):
         assert api.get("/api/plan", headers={**AUTH, "Host": host}).status_code == 200, host
 
 
-def test_host_name_parsing():
-    assert host_name("localhost:8765") == "localhost"
-    assert host_name("[::1]:8765") == "::1"
-    assert host_name("[::1]") == "::1"
-    assert host_name("") == ""
-    assert host_name("a:b:c") == "a:b:c"  # not a valid host:port, so not loopback either
+@pytest.mark.parametrize(
+    "header",
+    [
+        "localhost",
+        "localhost:8765",
+        "127.0.0.1:1",
+        "[::1]:8765",
+        "[::1]",
+        "LOCALHOST",
+        " localhost ",
+    ],
+)
+def test_well_formed_loopback_hosts_are_accepted(header):
+    assert is_loopback_host(header)
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "",
+        "evil.example",
+        "localhost.",
+        "localhost:abc",
+        "localhost:",
+        "localhost:123456",
+        "[::1]junk",
+        "[::1",
+        "::1",
+        "a:b:c",
+        "localhost@evil",
+        "127.0.0.1.evil.example",
+        "127.0.0.2",
+    ],
+)
+def test_malformed_or_foreign_hosts_are_rejected(header):
+    assert not is_loopback_host(header)
 
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "192.168.1.5", "example.com", "", "::"])  # noqa: S104
@@ -228,3 +271,152 @@ def test_serve_really_binds_loopback_only_and_refuses_others(tmp_path):
     root = project(tmp_path, task("T-1"))
     with pytest.raises(HarnessError, match="loopback"):
         serve(root, host="0.0.0.0", port=1, token=TOKEN)  # noqa: S104
+
+
+def test_unreadable_files_are_422_or_an_error_row_never_a_500(tmp_path):
+    root = project(tmp_path, task("T-1"), task("T-2"))
+    (root / ".harness/tasks/T-2.yaml").write_bytes(b"\xff\xfe\x00 not utf-8 \x80")
+    api = client(root)
+    one = api.get("/api/tasks/T-2", headers=AUTH)
+    assert one.status_code == 422 and str(root) not in one.text
+    rows = api.get("/api/tasks", headers=AUTH)
+    assert rows.status_code == 200 and rows.json()[0]["id"] == "T-1" and "error" in rows.json()[1]
+    for url in ("/api/plan", "/api/check"):
+        assert api.get(url, headers=AUTH).status_code in (200, 422), url
+
+
+def test_a_corrupt_ledger_is_reported_in_the_plan_and_check_bodies(tmp_path):
+    root = project(tmp_path, task("T-1"), task("T-2"))
+    (root / ".harness/tasks/T-2.yaml").write_text("id: [unclosed")
+    api = client(root)
+    plan = api.get("/api/plan", headers=AUTH)
+    check = api.get("/api/check", headers=AUTH)
+    assert plan.status_code == 200 and plan.json()["errors"] and plan.json()["start"] == []
+    assert check.status_code == 200 and check.json()["errors"]
+
+
+def test_a_missing_config_is_422_not_a_crash(tmp_path):
+    root = project(tmp_path, task("T-1"))
+    (root / ".harness/config.yaml").unlink()
+    api = client(root)
+    for url in ("/api/plan", "/api/check"):
+        assert api.get(url, headers=AUTH).status_code in (200, 422), url
+
+
+def test_auth_edge_cases(tmp_path):
+    api = client(project(tmp_path, task("T-1")))
+    assert api.get("/api/plan", headers={"Authorization": f"bearer {TOKEN}"}).status_code == 200
+    assert api.get("/api/plan", headers={"Authorization": "Bearer "}).status_code == 401
+    assert api.get("/api/plan", headers={"Authorization": f"Basic {TOKEN}"}).status_code == 401
+    assert api.head("/api/plan").status_code in (401, 405)
+    assert api.options("/api/plan").status_code in (401, 405)
+    assert api.options("/api/plan", headers={"Origin": "http://evil.example"}).status_code in (
+        401,
+        405,
+    )
+    got = api.options("/api/plan", headers={"Origin": "http://evil.example"})
+    assert "access-control-allow-origin" not in got.headers  # no CORS: pages cannot read it
+
+
+def test_a_foreign_host_is_refused_before_the_token_is_looked_at(tmp_path):
+    api = fastapi_testclient.TestClient(create_app(project(tmp_path, task("T-1")), TOKEN))
+    wrong = {"Authorization": "Bearer wrong", "Host": "evil.example"}
+    assert api.get("/api/plan", headers=wrong).status_code == 403
+
+
+def test_the_port_must_be_a_real_port():
+    for port in (0, -1, 65536):
+        with pytest.raises(HarnessError, match="port"):
+            check_port(port)
+    check_port(1)
+    check_port(65535)
+
+
+class FakeUvicorn:
+    def __init__(self):
+        self.calls = []
+
+    def run(self, app, **kwargs):
+        self.calls.append((app, kwargs))
+
+
+def test_serve_hands_the_loopback_host_and_port_to_uvicorn(monkeypatch, tmp_path):
+    import sys
+
+    from agent_harness.server import serve
+
+    fake = FakeUvicorn()
+    monkeypatch.setitem(sys.modules, "uvicorn", fake)
+    root = project(tmp_path, task("T-1"))
+    serve(root, host="127.0.0.1", port=9123, token=TOKEN)
+    assert len(fake.calls) == 1
+    assert fake.calls[0][1]["host"] == "127.0.0.1" and fake.calls[0][1]["port"] == 9123
+
+
+def test_serve_without_uvicorn_names_the_extra(monkeypatch, tmp_path):
+    import sys
+
+    from agent_harness.server import serve
+
+    monkeypatch.setitem(sys.modules, "uvicorn", None)  # `import uvicorn` raises ImportError
+    root = project(tmp_path, task("T-1"))
+    with pytest.raises(HarnessError, match=r"agent-harness-starter\[server\]"):
+        serve(root, host="127.0.0.1", port=9123, token=TOKEN)
+
+
+def test_serve_never_echoes_a_token_the_user_supplied(monkeypatch, tmp_path):
+    secret = "s3cret-" + "x" * 30
+    result, calls = run_serve(monkeypatch, tmp_path, token=secret)
+    assert result.exit_code == 0 and secret not in result.output and "token:" not in result.output
+    assert calls[0][1]["token"] == secret
+
+
+def test_serve_prints_nothing_secret_when_the_start_is_refused(monkeypatch, tmp_path):
+    for args, env in ((["--host", "0.0.0.0"], None), (["--port", "0"], None), ([], "short")):  # noqa: S104
+        result, calls = run_serve(monkeypatch, tmp_path, *args, token=env)
+        assert result.exit_code == 1 and calls == [], args
+        assert "token:" not in result.output, args
+
+
+def test_the_banner_has_no_scheme_and_a_plain_token_line(monkeypatch, tmp_path):
+    result, calls = run_serve(monkeypatch, tmp_path)
+    lines = result.output.strip().splitlines()
+    assert (
+        lines[0] == "listening on 127.0.0.1:8765" and lines[1] == f"token: {calls[0][1]['token']}"
+    )
+    assert "http://" not in result.output
+
+
+@pytest.mark.parametrize(
+    "error",
+    [PermissionError("/secret/path/T-2.yaml"), UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")],
+)
+def test_an_os_or_unicode_error_is_422_or_an_error_row_without_the_path(
+    monkeypatch, tmp_path, error
+):
+    from agent_harness import server
+
+    root = project(tmp_path, task("T-1"), task("T-2"))
+    real = server._load_task
+
+    def flaky(path):
+        if path.name == "T-2.yaml":
+            raise error
+        return real(path)
+
+    monkeypatch.setattr(server, "_load_task", flaky)
+    api = client(root)
+    one = api.get("/api/tasks/T-2", headers=AUTH)
+    assert one.status_code == 422 and "/secret/path" not in one.text
+    rows = api.get("/api/tasks", headers=AUTH)
+    assert rows.status_code == 200
+    assert "status" in rows.json()[0] and "error" in rows.json()[1]
+    assert "/secret/path" not in rows.text
+
+
+def test_the_task_id_pattern_takes_ascii_digits_only():
+    from agent_harness.server import TASK_ID
+
+    assert TASK_ID.fullmatch("T-12")
+    for bad in ("T-\u0661", "T-", "t-1", "T-1\n", "T-1.yaml", "T-1/.."):
+        assert TASK_ID.fullmatch(bad) is None, bad

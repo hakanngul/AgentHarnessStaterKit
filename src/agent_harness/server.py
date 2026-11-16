@@ -23,15 +23,13 @@ from agent_harness.schedule import plan
 
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 MIN_TOKEN = 16
-TASK_ID = re.compile(r"T-\d+")
+TASK_ID = re.compile(r"T-[0-9]+")
+HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE)
 
 
-def host_name(header: str) -> str:
-    """The host part of a Host header, without port or brackets."""
-    value = header.strip().lower()
-    if value.startswith("["):
-        return value[1:].split("]", 1)[0]
-    return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
+def is_loopback_host(header: str) -> bool:
+    """True only for a well-formed loopback Host header (name, optional numeric port)."""
+    return HOST.fullmatch(header.strip()) is not None
 
 
 def require_loopback(host: str) -> None:
@@ -57,10 +55,19 @@ def _summary(task: Task) -> dict:
     }
 
 
-def create_app(project: Path, token: str) -> FastAPI:
-    """The app for one project; `token` is the shared secret every request must carry."""
+def check_token(token: str) -> None:
     if len(token) < MIN_TOKEN:
         raise HarnessError(f"the token must be at least {MIN_TOKEN} characters")
+
+
+def check_port(port: int) -> None:
+    if not 1 <= port <= 65535:
+        raise HarnessError("the port must be between 1 and 65535")
+
+
+def create_app(project: Path, token: str) -> FastAPI:
+    """The app for one project; `token` is the shared secret every request must carry."""
+    check_token(token)
     root = project_root(project)
     app = FastAPI(title="Agent harness", docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
@@ -74,13 +81,18 @@ def create_app(project: Path, token: str) -> FastAPI:
 
     @app.middleware("http")
     async def only_loopback_hosts(request: Request, call_next):
-        if host_name(request.headers.get("host", "")) not in LOOPBACK:
+        if not is_loopback_host(request.headers.get("host", "")):
             return JSONResponse({"detail": "host not allowed"}, status_code=403)
         return await call_next(request)
 
     @app.exception_handler(HarnessError)
     async def harness_error(_: Request, exc: HarnessError) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    @app.exception_handler(OSError)
+    @app.exception_handler(UnicodeError)
+    async def unreadable(_: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse({"detail": "a ledger file could not be read"}, status_code=422)
 
     @app.get("/api/health")
     def health() -> dict:
@@ -107,6 +119,8 @@ def create_app(project: Path, token: str) -> FastAPI:
                 rows.append(_summary(_load_task(managed_path(root, f"{TASKS_DIR}/{task_id}.yaml"))))
             except HarnessError as exc:  # one broken file must not hide the others
                 rows.append({"id": task_id, "error": str(exc)})
+            except (OSError, UnicodeError):
+                rows.append({"id": task_id, "error": "the file could not be read"})
         return rows
 
     @app.get("/api/tasks/{task_id}", dependencies=[Depends(authorize)])
@@ -124,6 +138,7 @@ def create_app(project: Path, token: str) -> FastAPI:
 def serve(project: Path, *, host: str, port: int, token: str) -> None:
     """Run the server until interrupted. Needs the `server` extra."""
     require_loopback(host)
+    check_port(port)
     app = create_app(project, token)
     try:
         import uvicorn
