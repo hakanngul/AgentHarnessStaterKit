@@ -50,3 +50,11 @@ Real trial: four tasks committed one per task on a group branch. Next: FastAPI s
 DONE. 859 unit tests, ruff clean, three review rounds (last APPROVED). `harness serve`:
 loopback only, bearer token, strict Host check, read-only JSON (plan, check, tasks).
 Verified against a real uvicorn process. Next: actions (wave, review, commit) and live events.
+
+## 2026-11-16 T-12 server jobs
+
+DONE. 923 unit tests, ruff clean, three review rounds (last APPROVED) plus bot triage on PR #6.
+Wave, review and commit run as background jobs with SSE events, cancel and shutdown (a real
+uvicorn test covers shutdown with an open stream). Never run against a real Claude session
+through the server. Next: project run lock (CLI and server must not work on one project at
+once; fixes the wave-claim race and the shared git index), then the UI.

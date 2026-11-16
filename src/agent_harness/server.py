@@ -1,28 +1,37 @@
-"""Local HTTP server: a read-only JSON view of the ledger.
+"""Local HTTP server: a JSON view of the ledger and background jobs (wave, review, commit).
 
 The server is a thin layer over the same functions the CLI uses. It listens on loopback
 only and every request needs the bearer token, because a page in any browser tab can reach
-`localhost`. This slice never writes and never starts an agent.
+`localhost`. The read routes never write; a job can start agents, so the token is the key to
+that. Job state lives in memory and the ledger stays the source of truth.
 """
 
+import json
 import re
 import secrets
+from collections.abc import Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import ValidationError
 
 from agent_harness.check import TASKS_DIR
 from agent_harness.check import check as check_ledger
 from agent_harness.evidence import _load_task
 from agent_harness.filesystem import HarnessError, managed_path, project_root
+from agent_harness.jobs import Busy, JobManager, JobParams, NotRunning
 from agent_harness.models import Task
 from agent_harness.schedule import plan
 
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 MIN_TOKEN = 16
+MAX_BODY = 10_000
+MAX_ID_DIGITS = 18
+GRACEFUL_SHUTDOWN = 3  # seconds uvicorn waits for open connections before it cancels them
 TASK_ID = re.compile(r"T-[0-9]+")
 HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE | re.ASCII)
 
@@ -65,11 +74,36 @@ def check_port(port: int) -> None:
         raise HarnessError("the port must be between 1 and 65535")
 
 
-def create_app(project: Path, token: str) -> FastAPI:
+def default_engine() -> object:
+    """The engine the CLI uses; resolved late so tests and the CLI can replace it."""
+    from agent_harness import cli
+
+    return cli.make_engine()
+
+
+def create_app(
+    project: Path, token: str, *, engine_factory: Callable[[], object] | None = None
+) -> FastAPI:
     """The app for one project; `token` is the shared secret every request must carry."""
     check_token(token)
     root = project_root(project)
-    app = FastAPI(title="Agent harness", docs_url=None, redoc_url=None, openapi_url=None)
+    jobs = JobManager(root, engine_factory or default_engine)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        try:
+            yield
+        finally:  # also when the app body fails, so no job is left running
+            await jobs.shutdown()
+
+    app = FastAPI(
+        title="Agent harness",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
+    app.state.jobs = jobs
     bearer = HTTPBearer(auto_error=False)
 
     def authorize(
@@ -132,7 +166,98 @@ def create_app(project: Path, token: str) -> FastAPI:
             raise HTTPException(404, "no such task")
         return _load_task(path).model_dump(mode="json")
 
+    @app.post("/api/jobs", status_code=202, dependencies=[Depends(authorize)])
+    async def start_job(request: Request) -> dict:
+        media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if media_type != "application/json":
+            raise HTTPException(415, "send application/json")
+        declared = request.headers.get("content-length", "")
+        if declared.isascii() and declared.isdigit():
+            # a number with more digits than any real size is too large (and int() would balk)
+            if len(declared) > MAX_ID_DIGITS or int(declared) > MAX_BODY:
+                raise HTTPException(413, "the request body is too large")
+        chunks, total = [], 0
+        async for chunk in request.stream():  # stop reading at the cap, not after the upload
+            total += len(chunk)
+            if total > MAX_BODY:
+                raise HTTPException(413, "the request body is too large")
+            chunks.append(chunk)
+        body = b"".join(chunks)
+        try:
+            params = JobParams.model_validate_json(body)
+        except ValidationError as exc:
+            problems = [
+                {"field": ".".join(str(part) for part in e["loc"]), "problem": e["msg"]}
+                for e in exc.errors(include_input=False)
+            ]
+            raise HTTPException(422, problems) from exc
+        try:
+            job = jobs.start(params)
+        except Busy as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return {"id": job.id, "status": job.status}
+
+    # async on purpose: they read the job table, which only the event loop may touch
+    @app.get("/api/jobs", dependencies=[Depends(authorize)])
+    async def list_jobs() -> list[dict]:
+        return [job.view() for job in reversed(list(jobs.jobs.values()))]
+
+    def find_job(job_id: str):
+        job = jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404, "no such job")
+        return job
+
+    @app.get("/api/jobs/{job_id}", dependencies=[Depends(authorize)])
+    async def get_job(job_id: str) -> dict:
+        return find_job(job_id).view()
+
+    @app.get("/api/jobs/{job_id}/events", dependencies=[Depends(authorize)])
+    async def job_events(
+        job_id: str,
+        after: Annotated[int, Query(ge=0)] = 0,
+        last_event_id: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        job = find_job(job_id)
+        if (
+            last_event_id
+            and last_event_id.isascii()
+            and last_event_id.isdigit()
+            and len(last_event_id) <= MAX_ID_DIGITS  # a longer one is not a real event id
+        ):
+            after = max(after, int(last_event_id))
+
+        async def frames():
+            async for event in jobs.stream(job, after):
+                if event is None:
+                    yield ": keepalive\n\n"
+                else:
+                    yield f"id: {event['id']}\ndata: {json.dumps(event)}\n\n"
+
+        return StreamingResponse(
+            frames(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+        )
+
+    @app.post("/api/jobs/{job_id}/cancel", dependencies=[Depends(authorize)])
+    async def cancel_job(job_id: str) -> dict:
+        job = find_job(job_id)
+        try:
+            await jobs.cancel(job)
+        except NotRunning as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return job.view()
+
     return app
+
+
+def uvicorn_options(host: str, port: int) -> dict:
+    """How the server is run; tests start a real server with exactly these options."""
+    return {
+        "host": host,
+        "port": port,
+        "log_level": "warning",
+        "timeout_graceful_shutdown": GRACEFUL_SHUTDOWN,
+    }
 
 
 def serve(project: Path, *, host: str, port: int, token: str) -> None:
@@ -146,4 +271,4 @@ def serve(project: Path, *, host: str, port: int, token: str) -> None:
         raise HarnessError(
             "the server needs its extra: pip install 'agent-harness-starter[server]'"
         ) from exc
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    uvicorn.run(app, **uvicorn_options(host, port))

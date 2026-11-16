@@ -91,3 +91,13 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
   texts may contain file paths; no way yet to hand the token to a browser UI.
 - Next: T-12 actions as background jobs (wave, review, commit) with SSE events; the UI
   token hand-off must be designed before the React UI.
+
+## Server jobs (T-12)
+
+- `POST /api/jobs` wave | review | commit; one job at a time; SSE events; cancel; shutdown with
+  a 3 s grace period. Same functions as the CLI, no new decision logic.
+- Known: no lock between CLI and server (wave claim race in `run_wave`: a run that loses a claim
+  releases the winner's task; shared git index in commit; git subprocesses have no timeout).
+  Plan T-13: one project run lock held for the whole wave/review/commit, plus a git timeout.
+- Not done: token hand-off for a browser UI (cookie + Origin check design), real-session trial
+  through the server, job deadline for a stalled engine.

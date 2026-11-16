@@ -340,11 +340,12 @@ Sınırlar:
 - Kimlik git ayarından gelir; eksik olan `user.name`/`user.email` için `Agent Harness
   <harness@localhost>` kullanılır.
 
-## Yerel sunucu (salt okunur)
+## Yerel sunucu
 
 `harness serve [PATH] [--port 8765]`: defteri JSON olarak sunan FastAPI sunucusu. Ek bağımlılık
-ister: `pip install 'agent-harness-starter[server]'`. Bu ilk dilim yalnız okur; wave, review ve
-commit başlatmaz, canlı olay akışı yoktur (sonraki görev).
+ister: `pip install 'agent-harness-starter[server]'`. Defteri okur ve wave, review ve commit'i
+arka plan işi olarak başlatır; kararı yine CLI'nin kullandığı fonksiyonlar verir, sunucu yeni
+bir karar mantığı eklemez.
 
 - Yalnız loopback'e bağlanır (`127.0.0.1`, `localhost`, `::1`); başka adres reddedilir.
 - `/api/health` dışında her istek `Authorization: Bearer <token>` ister. Token her başlangıçta
@@ -353,12 +354,45 @@ commit başlatmaz, canlı olay akışı yoktur (sonraki görev).
 - `Host` başlığı katı biçimde `localhost`, `127.0.0.1` ya da `[::1]` (isteğe bağlı sayısal port)
   değilse istek token bakılmadan 403 alır (DNS rebinding savunması). `127.0.0.1` tercih edilir:
   `localhost` ad çözümlemesine bağlıdır.
-- Uçlar: `GET /api/plan`, `/api/check`, `/api/tasks`, `/api/tasks/{T-n}`. `/docs` kapalı.
+- Okuma uçları: `GET /api/plan`, `/api/check`, `/api/tasks`, `/api/tasks/{T-n}`. `/docs` kapalı.
+- İşler: `POST /api/jobs` (yalnız `application/json`, en çok 10 KB) gövdesi
+  `{"kind": "wave" | "review" | "commit", ...}` ile bir iş başlatır ve 202 ile kimliğini döner.
+  Seçenekler türe göre: wave için `max_parallel` (1-8), `max_resumes` (0-10), `review`,
+  `reviewer`; review için `max_parallel`, `max_resumes`, `reviewer`, `tasks`; commit için
+  `tasks`, `branch`. Türe uymayan ya da bilinmeyen alan, yanlış tip (`"3"` sayı değildir) 422
+  alır. Aynı anda tek iş çalışır; ikincisi 409 alır.
+- `GET /api/jobs`, `GET /api/jobs/{id}`: durum (`running`, `done`, `failed`, `cancelled`),
+  parametreler, sonuç ve hata. Sonuç CLI'nin `--json` çıktısıyla aynı biçimdedir: wave için
+  `{ok, started, tasks[, reviews]}`, review için `{ok, reviewed, tasks}`, commit için
+  `{ok, tasks}`. `done` işin bittiği anlamına gelir, sonuç için `result.ok` bakılır. Bellekte en
+  çok 20 iş tutulur (çalışan dahil); önce en eski bitmiş olan atılır.
+- `GET /api/jobs/{id}/events` (SSE): sıralı `id` ile olaylar, `?after=N` ya da `Last-Event-ID` ile
+  kaldığı yerden devam eder, iş bitince kapanır. İş başına en çok 2000 olay ve olay başına 500
+  karakter tutulur; `after` eski kalırsa akış en eski tutulan olaydan sürer. Tarayıcıda
+  `EventSource` Authorization başlığı gönderemez; `fetch` ile akış okunur.
+- `POST /api/jobs/{id}/cancel`: wave ya da review'ı iptal eder. Wave'in yarım kalan görevleri
+  READY'ye döner; review görevleri sahiplenmediği için iptal edilen review'ın görevleri
+  IN_REVIEW'da kalır. Commit işi kısa bir iş parçacığında koşar, iptal edilemez (409). Sunucu kapanırken
+  açık akışlar en çok 3 saniye beklenir (uvicorn açık bağlantıları bu süre sonunda keser), sonra
+  çalışan wave ya da review iptal edilir ve commit bitirilir. Uzun süren bir git komutu kapanışı
+  geciktirir.
 
-Sınırlar: token düz HTTP ile loopback'te gider, TLS yok; Host ve token denetimi aynı
-makinedeki başka bir sürece karşı koruma değildir, token'ı bilen her süreç erişir. Hata
-mesajları yetkili istemciye dosya yolu içerebilir (okunamayan dosyalar için yol gizlenir). Token'ı komut satırı geçmişine ya da log'a koyma. Tarayıcıya token'ı verme
-yolu (arayüz) henüz tasarlanmadı.
+Sınırlar:
+- İş başlatabilmek ajan çalıştırabilmek demektir (rol politikası yine geçerli); token'ı bilen
+  herkes bunu yapabilir. Token'ı komut satırı geçmişine ya da log'a koyma.
+- İşler bellekte tutulur; sunucu yeniden başlarsa geçmiş kaybolur ve defter tek gerçek kaynaktır.
+  Süreç `kill -9` ile öldürülürse IN_PROGRESS kalan görev elle düzeltilmelidir.
+- Token düz HTTP ile loopback'te gider, TLS yok. Host ve token denetimi aynı makinedeki başka bir
+  sürece karşı koruma değildir; token'ı bilen her süreç erişir.
+- Hata mesajları yetkili istemciye dosya yolu ya da git çıktısı içerebilir (okunamayan görev
+  dosyalarında yol gizlenir).
+- Kilit yok: CLI ve sunucu aynı projede aynı anda wave ya da commit çalıştırırsa birbirinin
+  görevini ya da git index'ini bozabilir. Aynı anda yalnız tek aktör (CLI ya da sunucu) kullan.
+- Bir iptal, defter yazımı sürerken gelirse o yazım tamamlanabilir; iş `cancelled` görünür ama
+  görev gerçekten bitmiş durumda kalır (defter tutarlı kalır).
+- Takılan bir engine işi çalışıyor gösterir ve yeni işi 409 ile engeller; iptal uç noktası yuvayı
+  boşaltır. İş süresi sınırı yok.
+- Tarayıcı arayüzü için token'ı güvenle verme yolu henüz tasarlanmadı.
 
 ## Roller ve yazma kapsamı
 
