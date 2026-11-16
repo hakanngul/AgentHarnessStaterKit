@@ -115,7 +115,73 @@ evidence:
     a spec makes next report the check error and exit 1, as check does.'
   output: .harness/evidence/T-6/wheel-smoke.txt
   recorded_at: '2026-11-16'
-log:
-- 2026-11-16 görev açıldı; plan docs/plans/lifecycle.md (L3)
+- id: E8
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 431 passed in 18.15s
+  commit: 56d9972543b474f1820de6b5c5fc8fabb82dc501
+  output: .harness/evidence/T-6/E8.txt
+  output_sha256: 43e09f42892c8d6b21fdf038f6bdc5389b90fa2558d8299f68a4dc1eee941c81
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 56d9972543b474f1820de6b5c5fc8fabb82dc501
+  output: .harness/evidence/T-6/E9.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 42 files already formatted
+  commit: 56d9972543b474f1820de6b5c5fc8fabb82dc501
+  output: .harness/evidence/T-6/E10.txt
+  output_sha256: 505dc7c2a10562495c9430689d1fe5e6753b5f766a90efacc3676a7a42eea6e1
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: 56d9972543b474f1820de6b5c5fc8fabb82dc501
+  output: .harness/evidence/T-6/E11.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: '"Manifest schema and file list are valid"'
+  commit: 56d9972543b474f1820de6b5c5fc8fabb82dc501
+  output: .harness/evidence/T-6/E12.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E13
+  kind: command
+  command: uv run --frozen harness check . --json
+  cwd: .
+  exit_code: 0
+  summary: '"decisions_pending": 0'
+  commit: 56d9972543b474f1820de6b5c5fc8fabb82dc501
+  output: .harness/evidence/T-6/E13.txt
+  output_sha256: c434490bd5b25897df5d4c331d900e634456713c8e828e1030828bfe47b1a895
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 review:
   status: pending
+log:
+- 2026-11-16 görev açıldı; plan docs/plans/lifecycle.md (L3)
