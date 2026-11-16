@@ -1,0 +1,44 @@
+schema_version: 1
+id: T-6
+title: 'Yaşam döngüsü 3: harness next ile sıradaki işi hesaplama'
+owner: developer
+status: IN_PROGRESS
+goal: Orchestrator'ın çekirdeği. Defterden hangi görevlerin şimdi başlayabileceğini, hangilerinin
+  neyi beklediğini ve hangilerinin aynı anda çalışabileceğini hesaplar. Hiçbir şey çalıştırmaz
+  ve defteri değiştirmez.
+scope:
+- src/agent_harness/schedule.py
+- src/agent_harness/check.py
+- src/agent_harness/models.py
+- src/agent_harness/cli.py
+- src/agent_harness/templates/skill.md.j2
+- tests/
+- README.md
+- docs/
+- AGENTS.md
+acceptance:
+- id: AC1
+  text: '`harness next [PATH] [--json]` defteri değiştirmez ve komut çalıştırmaz; `check`
+    hata veriyorsa aynı hataları gösterir, plan üretmez ve 1 ile çıkar.'
+- id: AC2
+  text: READY görevler `start` listesinde, IN_PROGRESS/IN_REVIEW görevler `running` listesinde,
+    bağımlılıkları ve faz gereksinimi karşılanmış BACKLOG görevler `unblocked` listesinde
+    görünür.
+- id: AC3
+  text: Bağımlılığı ya da faz gereksinimi karşılanmamış BACKLOG görevler ve BLOCKED görevler
+    `waiting` listesinde nedenleriyle görünür; PENDING kararlar, bekleten görevlerle birlikte
+    listelenir.
+- id: AC4
+  text: Kapsamı (scope) çalışan ya da aynı turda başlatılan bir görevle kesişen READY görev
+    `start` yerine `held` listesine, kesiştiği görevlerle birlikte girer; kapsamı boş görev
+    yalnız tek başına başlatılır.
+- id: AC5
+  text: Sıralama görev numarasına göredir (T-2, T-10'dan önce) ve çıktı aynı defter için
+    hep aynıdır.
+- id: AC6
+  text: Kurulu wheel ile temiz bir projede `harness next` uçtan uca çalışır; mevcut komutların
+    davranışı değişmez.
+log:
+- 2026-11-17 görev açıldı; plan docs/plans/lifecycle.md (L3)
+review:
+  status: pending

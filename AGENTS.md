@@ -17,6 +17,11 @@ when the user explicitly requests one.
 5. Run `harness check` before marking work DONE. Update PROGRESS.md and HANDOFF.md
    before ending a long task or changing sessions.
 
+State your own technical opinion on every decision. When the user's request or
+assumption is wrong or risky, say so plainly, explain why, and offer an alternative
+before acting; if the user still decides otherwise, follow it and record the risk.
+Separate what you verified from what you estimate.
+
 Never claim skipped or unrun checks passed. Never store credentials in memory files.
 Ask for missing product decisions that block work; continue independent work.
 Deployments, destructive changes, and external messages require user authorization.

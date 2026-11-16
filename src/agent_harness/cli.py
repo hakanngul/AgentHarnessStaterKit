@@ -17,8 +17,9 @@ from agent_harness.filesystem import HarnessError, project_root
 from agent_harness.generate import initialize
 from agent_harness.hooks import install as install_hook
 from agent_harness.hooks import run_pre_tool_use
-from agent_harness.models import Report
+from agent_harness.models import PlanReport, Report
 from agent_harness.roles import decide, load_config
+from agent_harness.schedule import plan as plan_next
 from agent_harness.validate import validate as check_project
 
 app = typer.Typer(
@@ -45,7 +46,7 @@ def fail(exc: Exception, as_json: bool) -> None:
     raise typer.Exit(1)
 
 
-def report_result(report: Report, as_json: bool) -> None:
+def report_result(report: Report | PlanReport, as_json: bool) -> None:
     emit({"ok": report.ok, **report.model_dump()}, as_json)
     if not report.ok:
         raise typer.Exit(1)
@@ -151,6 +152,12 @@ def evidence_run(
     )
     if not item.passed:
         raise typer.Exit(1)
+
+
+@app.command("next")
+def next_tasks(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> None:
+    """Show which tasks can start now and what the others wait for; runs nothing."""
+    report_result(plan_next(path), output_json)
 
 
 @app.command()

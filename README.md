@@ -148,6 +148,27 @@ kapsamı dışında tutun. Mevcut bir deftere
 `require_phase: true` eklemek fazsız eski görevleri de hataya düşürür; onlara
 gereksinimsiz bir faz verin. Plan: [docs/plans/lifecycle.md](docs/plans/lifecycle.md).
 
+## Sıradaki iş
+
+```bash
+harness next /path/to/project --json
+```
+
+Defterden hangi görevlerin şimdi başlayabileceğini hesaplar; hiçbir şey çalıştırmaz ve
+defteri değiştirmez. `check` hata veriyorsa aynı hataları gösterir, plan üretmez ve 1
+ile çıkar. Listeler: `running` (IN_PROGRESS, IN_REVIEW), `start` (şimdi başlatılabilecek
+READY görevler), `held` (kapsamı çalışan ya da aynı turda başlayan bir görevle kesişen
+READY görevler), `unblocked` (bağımlılıkları tamam, READY yapılabilecek BACKLOG görevler),
+`waiting` (nedenleriyle bekleyenler), `decisions` (PENDING kararlar ve beklettikleri).
+
+İki görev ancak `scope` alanları kesişmiyorsa birlikte başlatılır. Kesişim yol
+öneklerine bakar ve temkinlidir: `src/api/*.py` ile `src/api/v1/` kesişir sayılır.
+`scope` yazılmamış görev her şeye dokunuyor kabul edilir ve yalnız tek başına başlar.
+Sıra görev numarasına göredir; kesişmede küçük numara önce başlar.
+
+Sınırlar: `scope` beyandır; görevin gerçekten yalnız o yollara yazdığını rolün yazma
+kapsamı ve review denetler. `next` öncelik, tahmin ya da rol kapasitesi bilmez.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.
