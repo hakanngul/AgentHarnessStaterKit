@@ -231,6 +231,57 @@ def run_command(
         raise typer.Exit(1)
 
 
+@app.command("wave")
+def wave_command(
+    path: ProjectPath = Path("."),
+    max_parallel: Annotated[int, typer.Option(min=1, help="Most tasks to run at once.")] = 3,
+    max_resumes: Annotated[
+        int, typer.Option(min=0, help="How often to resume after a usage limit.")
+    ] = 3,
+    output_json: JsonFlag = False,
+) -> None:
+    """Run every task `harness next` would start, in parallel, and record how each ended.
+
+    Finished tasks go to IN_REVIEW, failed ones to BLOCKED, rate-limited ones back to READY.
+    """
+    import asyncio
+
+    from agent_harness.orchestrator import run_wave
+
+    try:
+        engine = make_engine()
+        printer = (
+            None
+            if output_json
+            else (lambda t, e: (line := _describe(e)) and console.print(f"{t}: {line}"))
+        )
+        results = asyncio.run(
+            run_wave(
+                path,
+                engine,
+                max_parallel=max_parallel,
+                on_event=printer,
+                max_resumes=max_resumes,
+            )
+        )
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    tasks = [
+        {
+            "task": r.task_id,
+            "run": r.outcome.status,
+            "status": r.status,
+            "cost_usd": r.outcome.cost_usd,
+            "note": r.note,
+        }
+        for r in results
+    ]
+    ok = all(r.status == "IN_REVIEW" for r in results)
+    emit({"ok": ok, "started": len(results), "tasks": tasks}, output_json)
+    if not ok:
+        raise typer.Exit(1)
+
+
 @app.command()
 def scope(
     role: Annotated[str, typer.Argument(help="Role name from .harness/config.yaml.")],

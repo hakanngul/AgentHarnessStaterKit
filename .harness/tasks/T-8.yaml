@@ -1,0 +1,78 @@
+schema_version: 1
+id: T-8
+title: 'Uygulama adım 3: orchestrator dalgası (harness wave)'
+owner: developer
+status: IN_REVIEW
+goal: Planlayıcının başlatılabilir dediği görevleri sınırlı paralellikte çalıştıran ve her
+  koşunun sonucunu defterde durum olarak kaydeden katman. Biten görev IN_REVIEW'a, hata verense
+  BLOCKED'a, limite takılan READY'ye gider. DONE, review, commit ve faz kapısı bu katmanın
+  dışında kalır.
+scope:
+- src/agent_harness/orchestrator.py
+- src/agent_harness/cli.py
+- tests/
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: Yalnız `plan().start` içindeki görevler başlar, en çok `max_parallel` tanesi; hepsi
+    aynı anda çalışır ve başlamadan önce IN_PROGRESS yazılır. Geçersiz defterde hiçbir şey
+    çalışmaz ve defter değişmez.
+  verified_by:
+  - E1
+- id: AC2
+  text: 'Koşu sonucu duruma çevrilir: kanıtı ve kabul kriteri olan tamamlanmış görev IN_REVIEW,
+    kanıtsız tamamlanmış ya da hatalı görev BLOCKED (gerekçeyle), limite takılan READY. Bir
+    görevin motor hatası kardeşlerini durdurmaz.'
+  verified_by:
+  - E1
+- id: AC3
+  text: Durum değişimleri görev kilidi altında, geçerli şemayla yazılır ve log'a satır ekler;
+    geçersiz durum yazılmaz.
+  verified_by:
+  - E1
+- id: AC4
+  text: '`harness wave [PATH] [--max-parallel] [--max-resumes] [--json]` her görevin sonucunu
+    gösterir; hepsi IN_REVIEW olduysa 0, değilse 1 ile çıkar. Testler yalnız unit testtir.'
+  verified_by:
+  - E1
+  - E2
+  - E3
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 01eac08967f2260c171195e5e1a2789c36916077
+  output: .harness/evidence/T-8/E1.txt
+  output_sha256: db6ce4eb6c2002206d98dcea0dfbc3dcfad0ea3f5b12acc5b1458dc4c726a7ab
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 01eac08967f2260c171195e5e1a2789c36916077
+  output: .harness/evidence/T-8/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 01eac08967f2260c171195e5e1a2789c36916077
+  output: .harness/evidence/T-8/E3.txt
+  output_sha256: 2e643e4c20a118b0f9a72f93a837b5279f02ec6ad2330e6ff24ecb0a0002e0bf
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+review:
+  status: pending
+log:
+- 2026-11-16 görev açıldı; plan https://claude.ai/artifact/DjRVH6D2TuYA74hREncM8X adım 3.
