@@ -115,6 +115,35 @@ Komut çalıştırmaz: kanıtların tutarlılığını denetler, doğruluğunu k
 Reviewer adı (`review.by`) beyandır; kimlik doğrulaması yapılmaz.
 CI'da çalıştırılması önerilir. Plan: [docs/plans/team-system.md](docs/plans/team-system.md).
 
+## Yaşam döngüsü fazları
+
+`.harness/config.yaml` içindeki opsiyonel `workflow`, işin hangi fazlardan geçeceğini
+tanımlar. `init` bunu yazmaz; elle eklenir. Yoksa hiçbir şey değişmez.
+
+```yaml
+workflow:
+  require_phase: true
+  phases:
+    - name: spec
+    - name: design
+      requires: [spec]
+    - name: implement
+      requires: [spec, design]
+    - name: fix
+```
+
+Görev `phase: implement` taşır. READY, IN_PROGRESS, IN_REVIEW ya da DONE durumundaki
+fazlı görev, fazının `requires` listesindeki her faz için `depends_on` zincirinde o
+fazda bir göreve ulaşmalıdır; yoksa `check` hata verir. İlerleyen görevin bağımlılıkları
+zaten DONE olmak zorunda olduğundan, gereken fazın görevi tamamlanmadan iş ilerleyemez.
+`requires` yalnız daha önce tanımlı fazlara bakabilir. `require_phase: true` fazsız
+görevi reddeder (CANCELLED hariç); küçük değişiklikler için gereksinimi olmayan bir faz
+(yukarıdaki `fix`) tanımlanır.
+
+Sınırlar: kapı, faz görevinin var ve tamamlanmış olduğunu denetler; içeriğinin iyi
+olduğunu ya da bağlanan görevin gerçekten o spec'i uyguladığını değil. Bu review'un
+işidir. Plan: [docs/plans/lifecycle.md](docs/plans/lifecycle.md).
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.

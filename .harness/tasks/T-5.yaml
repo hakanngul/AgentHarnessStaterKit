@@ -1,0 +1,40 @@
+schema_version: 1
+id: T-5
+title: 'Yaşam döngüsü 1: config''te workflow fazları ve check faz kapısı'
+owner: developer
+status: IN_PROGRESS
+goal: Projenin yaşam döngüsü fazları (ör. spec, design, implement) config'te tanımlanır;
+  bir görev, gerektirdiği fazların görevlerine bağlı değilse ilerleyemez. Kapıyı ajan
+  talimatı değil `harness check` uygular.
+scope:
+- src/agent_harness/models.py
+- src/agent_harness/check.py
+- src/agent_harness/templates/skill.md.j2
+- schemas/
+- tests/
+- README.md
+- docs/
+acceptance:
+- id: AC1
+  text: config.yaml opsiyonel `workflow` (phases, require_phase) kabul eder; faz adları
+    benzersizdir ve `requires` yalnız daha önce tanımlı fazlara bakar; workflow'suz eski
+    config'ler geçerli kalır.
+- id: AC2
+  text: Görev opsiyonel `phase` taşır; config'te tanımlı olmayan faz ve workflow yokken
+    verilen faz `check` hatasıdır.
+- id: AC3
+  text: READY/IN_PROGRESS/IN_REVIEW/DONE durumundaki fazlı görev, fazının gerektirdiği
+    her faz için depends_on zincirinde o fazda bir göreve ulaşamıyorsa `check` hata verir;
+    BACKLOG/BLOCKED görev engellenmez.
+- id: AC4
+  text: '`require_phase: true` iken fazsız görev (CANCELLED hariç) `check` hatasıdır.'
+- id: AC5
+  text: Yayımlanan JSON şemaları modellerle eşleşir; mevcut 0.1.0 kurulumları ve bu
+    reponun defteri `validate` ve `check`'ten geçmeye devam eder.
+- id: AC6
+  text: Kurulu wheel ile temiz bir projede faz kapısı uçtan uca çalışır (spec'siz
+    implement reddedilir, spec DONE olunca kabul edilir).
+log:
+- 2026-11-16 görev açıldı; plan docs/plans/lifecycle.md
+review:
+  status: pending

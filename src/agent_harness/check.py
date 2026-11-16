@@ -19,7 +19,7 @@ from agent_harness.filesystem import (
     read_text,
     sha256_file,
 )
-from agent_harness.models import Decision, LedgerReport, Task
+from agent_harness.models import Decision, HarnessConfig, LedgerReport, Task, WorkflowConfig
 
 TASKS_DIR = ".harness/tasks"
 DECISIONS_DIR = ".harness/decisions"
@@ -200,17 +200,88 @@ def _cycles(tasks: dict[str, Task]) -> list[str]:
     return found
 
 
-def _configured_roles(root: Path, report: LedgerReport) -> set[str]:
-    """Role names from the config; empty when the project defines none."""
+def _reachable_phases(tasks: dict[str, Task]) -> dict[str, frozenset[str]]:
+    """Phases of the tasks each task reaches through depends_on, excluding itself.
+
+    Iterative and memoized. Inside a dependency cycle the result may be incomplete;
+    cycles are reported as errors separately.
+    """
+    reach: dict[str, frozenset[str]] = {}
+    on_path: set[str] = set()
+    for start in sorted(tasks):
+        if start in reach:
+            continue
+        on_path.add(start)
+        stack = [(start, iter(tasks[start].depends_on), set())]
+        while stack:
+            current, refs, found = stack[-1]
+            ref = next(refs, None)
+            if ref is None:
+                stack.pop()
+                on_path.discard(current)
+                reach[current] = frozenset(found)
+                if stack:
+                    stack[-1][2].update(found)
+                continue
+            target = tasks.get(ref)
+            if target is None or ref in on_path:
+                continue
+            if target.phase:
+                found.add(target.phase)
+            if ref in reach:
+                found.update(reach[ref])
+            else:
+                on_path.add(ref)
+                stack.append((ref, iter(target.depends_on), set()))
+    return reach
+
+
+def _check_phases(
+    tasks: dict[str, Task], workflow: WorkflowConfig | None, errors: list[str]
+) -> None:
+    reach = _reachable_phases(tasks) if workflow else {}
+    for task_id in sorted(tasks):
+        task = tasks[task_id]
+        where = f"{TASKS_DIR}/{task_id}.yaml"
+        if workflow is None:
+            if task.phase:
+                errors.append(
+                    f"{where}: phase {task.phase!r} is set but {CONFIG_PATH} defines no workflow"
+                )
+            continue
+        if task.phase is None:
+            if workflow.require_phase and task.status != "CANCELLED":
+                errors.append(f"{where}: {CONFIG_PATH} requires every task to name a phase")
+            continue
+        required = workflow.requires(task.phase)
+        if required is None:
+            names = ", ".join(phase.name for phase in workflow.phases)
+            errors.append(
+                f"{where}: phase {task.phase!r} is not defined in {CONFIG_PATH} ({names})"
+            )
+            continue
+        if task.status not in ACTIVE:
+            continue
+        for phase in required:
+            if phase not in reach[task_id]:
+                errors.append(
+                    f"{where}: {task.status} in phase {task.phase!r} but no {phase!r} task "
+                    "is reachable through depends_on; add the dependency or use BLOCKED "
+                    "or BACKLOG until that phase is done"
+                )
+
+
+def _load_config(root: Path, report: LedgerReport) -> tuple[HarnessConfig | None, bool]:
+    """The project config, or None when there is none; False when it is unreadable."""
     from agent_harness.roles import load_config
 
     try:
         if not managed_path(root, CONFIG_PATH).exists():
-            return set()
-        return set(load_config(root).roles)
+            return None, True
+        return load_config(root), True
     except (HarnessError, OSError) as exc:
         report.errors.append(f"{CONFIG_PATH}: {exc}")
-        return set()
+        return None, False
 
 
 def check(path: Path) -> LedgerReport:
@@ -223,7 +294,8 @@ def check(path: Path) -> LedgerReport:
         report.errors.append(str(exc))
         return report
 
-    roles = _configured_roles(root, report)
+    config, config_readable = _load_config(root, report)
+    roles = set(config.roles) if config else set()
     for task_id in sorted(tasks):
         _check_task(tasks[task_id], tasks, decisions, root, report.errors)
         owner = tasks[task_id].owner.strip()
@@ -232,6 +304,8 @@ def check(path: Path) -> LedgerReport:
                 f"{TASKS_DIR}/{task_id}.yaml: owner {owner!r} is not a role in "
                 f"{CONFIG_PATH} ({', '.join(sorted(roles))})"
             )
+    if config_readable:  # an unreadable config is one error, not one per phased task
+        _check_phases(tasks, config.workflow if config else None, report.errors)
     for cycle in _cycles(tasks):
         report.errors.append(f"dependency cycle: {cycle}")
 

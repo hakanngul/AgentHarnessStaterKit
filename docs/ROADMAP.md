@@ -17,8 +17,15 @@
 - `harness evidence run`, config'te roller ve `harness scope`, PreToolUse hook'u ve
   `harness hook install`.
 
+## Yayımlanmamış — uygulanan (yaşam döngüsü L1)
+
+- Config'te `workflow` fazları, görevde `phase`, `harness check` faz kapısı.
+  Ayrıntı: [plans/lifecycle.md](plans/lifecycle.md).
+
 ## Sonraki aşamalar — uygulanmadı
 
+- Yaşam döngüsü L2–L4: `init` için varsayılan akış ve faz rolleri, sıradaki işi
+  hesaplayan orchestrator komutu, motor adapter'ı ve yönetim arayüzü.
 - Stack pack: teknolojiye göre komut, kural ve klasör düzeni (Faz 3).
 - upgrade --dry-run / sync: kullanıcı değişikliklerini koruyan üç yönlü karşılaştırma.
 - Gerçek proje ihtiyaçlarına göre uzman rolü/skill seçimi ve üretimi.

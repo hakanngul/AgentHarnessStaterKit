@@ -38,6 +38,10 @@ hash'leri değişiklik tespiti içindir; imza veya güvenlik onayı değildir. K
 `init` tarafından üretilmez ve manifestte yer almaz; böylece mevcut kurulumların
 `validate` sonucu değişmez. `check` komut çalıştırmaz; kanıt kayıtları beyandır.
 
+Config'te `workflow` varsa `check` faz kapısını da uygular: fazlı ve ilerleyen bir
+görev, fazının gerektirdiği her faz için `depends_on` grafiğinde o fazda bir göreve
+ulaşmalıdır. Ayrı bir gruplama kavramı yoktur; kapı mevcut bağımlılık grafiğini kullanır.
+
 Şu an sürüm 0.1.0 ve config şeması 1 desteklenir. Tanınmayan sürüm kabul edilmez;
 sürüm yükseltme migration'ları ayrı bir geliştirmedir. Metadata veri olarak tutulur;
 CLI proje metadata'sındaki komutları yürütmez; yalnız `harness evidence run`
