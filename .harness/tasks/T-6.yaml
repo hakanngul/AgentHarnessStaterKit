@@ -2,7 +2,7 @@ schema_version: 1
 id: T-6
 title: 'Yaşam döngüsü 3: harness next ile sıradaki işi hesaplama'
 owner: developer
-status: IN_PROGRESS
+status: DONE
 goal: Orchestrator'ın çekirdeği. Defterden hangi görevlerin şimdi başlayabileceğini, hangilerinin
   neyi beklediğini ve hangilerinin aynı anda çalışabileceğini hesaplar. Hiçbir şey çalıştırmaz
   ve defteri değiştirmez.
@@ -20,24 +20,42 @@ acceptance:
 - id: AC1
   text: '`harness next [PATH] [--json]` defteri değiştirmez ve komut çalıştırmaz; `check`
     hata veriyorsa aynı hataları gösterir, plan üretmez ve 1 ile çıkar.'
+  verified_by:
+  - E14
+  - E19
 - id: AC2
   text: READY görevler `start` listesinde, IN_PROGRESS/IN_REVIEW görevler `running` listesinde,
     bağımlılıkları ve faz gereksinimi karşılanmış BACKLOG görevler `unblocked` listesinde
     görünür.
+  verified_by:
+  - E14
+  - E19
 - id: AC3
   text: Bağımlılığı ya da faz gereksinimi karşılanmamış BACKLOG görevler ve BLOCKED görevler
     `waiting` listesinde nedenleriyle görünür; PENDING kararlar, bekleten görevlerle birlikte
     listelenir.
+  verified_by:
+  - E14
+  - E19
 - id: AC4
   text: Kapsamı (scope) çalışan ya da aynı turda başlatılan bir görevle kesişen READY görev
     `start` yerine `held` listesine, kesiştiği görevlerle birlikte girer; kapsamı boş görev
     yalnız tek başına başlatılır.
+  verified_by:
+  - E14
+  - E19
 - id: AC5
   text: Sıralama görev numarasına göredir (T-2, T-10'dan önce) ve çıktı aynı defter için hep
     aynıdır.
+  verified_by:
+  - E14
 - id: AC6
   text: Kurulu wheel ile temiz bir projede `harness next` uçtan uca çalışır; mevcut komutların
     davranışı değişmez.
+  verified_by:
+  - E19
+  - E14
+  - E18
 evidence:
 - id: E1
   kind: command
@@ -181,7 +199,86 @@ evidence:
   output_sha256: c434490bd5b25897df5d4c331d900e634456713c8e828e1030828bfe47b1a895
   recorded_at: '2026-11-16'
   recorded_by: harness
-review:
-  status: pending
+- id: E14
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 441 passed in 17.86s
+  commit: 438b3014b1d4226b667ff21c92d959c3c7341dec
+  output: .harness/evidence/T-6/E14.txt
+  output_sha256: f18c1d56bed3caf514351367a89cf5672c5b6ad740ee5a7b663e730a66d2f42a
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E15
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 438b3014b1d4226b667ff21c92d959c3c7341dec
+  output: .harness/evidence/T-6/E15.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E16
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 42 files already formatted
+  commit: 438b3014b1d4226b667ff21c92d959c3c7341dec
+  output: .harness/evidence/T-6/E16.txt
+  output_sha256: 505dc7c2a10562495c9430689d1fe5e6753b5f766a90efacc3676a7a42eea6e1
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E17
+  kind: command
+  command: uv run --frozen python -m build --no-isolation
+  cwd: .
+  exit_code: 0
+  summary: Successfully built agent_harness_starter-0.1.0.tar.gz and agent_harness_starter-0.1.0-py3-none-any.whl
+  commit: 438b3014b1d4226b667ff21c92d959c3c7341dec
+  output: .harness/evidence/T-6/E17.txt
+  output_sha256: 42883c93215da33ee60123b4c45fd78641211c297c58d50a8a9c6f20f70f1f64
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E18
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: '"Manifest schema and file list are valid"'
+  commit: 438b3014b1d4226b667ff21c92d959c3c7341dec
+  output: .harness/evidence/T-6/E18.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E19
+  kind: manual
+  result: pass
+  summary: 'Wheel built from 438b301 installed with uv into a fresh venv outside the checkout:
+    T-2 (src/api/) and T-3 (src/web/) start together; T-4 with an absolute path scope is held;
+    T-5 waits for DEC-1, which lists it; a READY implement task without a spec makes next
+    report the check error and exit 1.'
+  output: .harness/evidence/T-6/wheel-smoke-final.txt
+  recorded_at: '2026-11-16'
 log:
 - 2026-11-16 görev açıldı; plan docs/plans/lifecycle.md (L3)
+- '2026-11-16 review round 1 on dcaafa1: CHANGES REQUESTED (scope comparison false negatives);
+  fixed in 56d9972'
+- '2026-11-16 review round 2 on 56d9972: APPROVED with low findings; fixed in 438b301; final-tree
+  evidence and wheel smoke; DONE'
+review:
+  status: approved
+  by: reviewer
+  notes: 'Two independent read-only reviewer subagents in this session; they read code and
+    ran no commands. Round 1 on dcaafa1: CHANGES REQUESTED, 3 medium (scope comparison missed
+    Unicode NFC/NFD and absolute paths; shared files outside every scope) and 7 low findings.
+    Code findings fixed in 56d9972 with tests that fail on the previous code; shared files
+    and the branch-per-task conflict documented as limits and an open decision. Round 2 on
+    56d9972: APPROVED with low findings (URL, variable and UNC forms, zero-width characters,
+    misleading hold reason, doc wording, a proposal filed under user decisions); fixed in
+    438b301. 438b301 itself was not re-reviewed. PR bots at the time of writing: SonarCloud
+    gate passed; Codex still running; Sourcery over quota; CodeRabbit does not review this
+    repository.'

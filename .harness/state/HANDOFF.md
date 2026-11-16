@@ -24,12 +24,21 @@ where mistakes cannot be hidden. Faz 1 added the task/decision ledger and
   yet and must not emit `workflow: null`. Direction agreed with the user: the core stays
   Python; an orchestrator app drives the phases later, engine behind an adapter.
 
+- `harness next` (schedule.py) is the orchestrator core: stateless, derived from the
+  validated ledger. Parallel start depends on task `scope`; comparison errs toward
+  holding a task back. User decisions and open questions are in lifecycle.md.
+- The user asked agents to state their own opinion and flag wrong or risky requests
+  (AGENTS.md). The user prefers diagrams to long text.
+
 ## Remaining work
 
-Lifecycle L1 is in PR #3 (T-5). L2 and L4 need user decisions (TASK.md). Faz 3 (stack
-packs) and Faz 4 (upgrade) remain per the team-system plan. Do not claim a default
-workflow, orchestrator, UI, stack packs, upgrade or a sandbox exist. The hook does not
-see Bash. The phase gate is only as strong as the config: protect config.yaml.
+L3 is in PR #4 (T-6). Next: L2 (default workflow and phase roles in `init`), then L4
+(engine adapter, background agents, desktop app: Python backend, React UI, shell
+decided last). Open decision: branch layout for parallel work. Faz 3 (stack packs) and
+Faz 4 (upgrade) remain per the team-system plan. Do not claim a default workflow, an
+orchestrator process, a UI, stack packs, upgrade or a sandbox exist. The hook does not
+see Bash. Shared files (.harness/state/, lockfiles) are not protected from parallel
+tasks.
 
 ## Resume
 

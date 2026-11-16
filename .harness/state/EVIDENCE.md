@@ -47,11 +47,25 @@ upward propagation in `_reachable_phases` fails 1.
 Review: two read-only reviewer subagents, both APPROVED; details in T-5.yaml. The last
 commit of test and doc fixes was not re-reviewed.
 
+## Yaşam döngüsü L3 (T-6, PR #4)
+
+Final tree 438b301, recorded with `harness evidence run`: pytest 441 passed; ruff check
+and format clean; build ok; `harness validate . --json` ok. Manual E19: wheel from
+438b301 in a fresh venv outside the checkout; two tasks with separate scopes start
+together, a task with an absolute-path scope is held, a task waiting on a decision is
+listed with it, and a READY task that skips its spec makes `next` exit 1.
+Mutation check (not in the ledger, run on dcaafa1): six mutations of schedule.py each
+fail at least one test.
+Review: round 1 CHANGES REQUESTED (scope comparison false negatives), round 2 APPROVED;
+details in T-6.yaml. The last commit of low-severity fixes was not re-reviewed.
+
 ## Not tested / limits
 
 - Python 3.11 and 3.13 run only in CI. Windows is not tested; process-group kill is POSIX.
 - Real Claude Code sessions are not tested; whether subagent events carry agent_type is
   not confirmed by docs. The hook does not see Bash writes.
+- `next` trusts declared scopes and does not protect shared files (.harness/state/,
+  lockfiles) from parallel tasks; no orchestrator process exists yet.
 - The phase gate is only as strong as the config: loosening the workflow is not
   detected, and a workflow has not been tried on a real project yet.
 - Evidence is produced locally: the hash detects later edits, not fabrication.
