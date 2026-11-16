@@ -55,9 +55,18 @@ depends_on: [T-6]          # T-6 design fazında, o da bir spec görevine bağl�
 ## L1 sınırları
 
 - `check` durumsuzdur: geçiş sırasını değil, defterin o anki tutarlılığını denetler.
-- Kapı, faz görevinin içeriğinin iyi olduğunu kanıtlamaz; yalnız var, tamamlanmış ve
-  review'dan geçmiş olduğunu ister. Kalite kanıt ve review kurallarına dayanır.
+- Kapı, faz görevinin içeriğinin iyi olduğunu kanıtlamaz; yalnız var ve DONE olduğunu
+  ister. DONE, onaylı review ya da gerekçeli `unavailable` demektir; yani review'u
+  yapılamamış bir spec de kapıyı geçirir. Kalite kanıt ve review kurallarına dayanır.
 - Bir spec görevine bağlanan implement görevinin gerçekten o spec'i uyguladığı
   denetlenmez; bu review'un işidir.
 - Hangi görevin hangi faza ait olduğu beyandır. `require_phase` kapalıysa fazsız görev
   kapıdan muaftır.
+- Kapı config'tedir. Config silinirse ya da workflow gevşetilirse (gereksinimsiz yeni
+  faz, her işe `fix`) `check` bunu fark etmez; config dosyası yoksa uyarı da vermez.
+  Koruma: rolün yazma kapsamında config'in reddi ve config değişikliklerinin review'u.
+- Mevcut deftere `require_phase: true` eklemek, fazsız bütün eski görevleri (DONE dahil)
+  hataya düşürür. Geçiş için eski görevlere gereksinimsiz bir faz verilir; otomatik
+  muafiyet yoktur.
+- `workflow` alanı sürüm numarası değişmeden eklendi. Yayımlanmış 0.1.0 paketi bu alanı
+  tanımaz ve config'i reddeder; sürüm yükseltme upgrade (Faz 4) ile birlikte yapılır.

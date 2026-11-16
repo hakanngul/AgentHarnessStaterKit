@@ -142,7 +142,10 @@ görevi reddeder (CANCELLED hariç); küçük değişiklikler için gereksinimi 
 
 Sınırlar: kapı, faz görevinin var ve tamamlanmış olduğunu denetler; içeriğinin iyi
 olduğunu ya da bağlanan görevin gerçekten o spec'i uyguladığını değil. Bu review'un
-işidir. Plan: [docs/plans/lifecycle.md](docs/plans/lifecycle.md).
+işidir. Kapı config'te durur: config'i silen ya da gevşeten bir değişikliği `check`
+yakalamaz; config'i rolün yazma kapsamı dışında tutun. Mevcut bir deftere
+`require_phase: true` eklemek fazsız eski görevleri de hataya düşürür; onlara
+gereksinimsiz bir faz verin. Plan: [docs/plans/lifecycle.md](docs/plans/lifecycle.md).
 
 ## Roller ve yazma kapsamı
 

@@ -200,11 +200,12 @@ def _cycles(tasks: dict[str, Task]) -> list[str]:
     return found
 
 
-def _reachable_phases(tasks: dict[str, Task]) -> dict[str, frozenset[str]]:
-    """Phases of the tasks each task reaches through depends_on, excluding itself.
+def _reachable_phases(tasks: dict[str, Task], defined: set[str]) -> dict[str, frozenset[str]]:
+    """Defined phases of the tasks each task reaches through depends_on, excluding itself.
 
     Iterative and memoized. Inside a dependency cycle the result may be incomplete;
-    cycles are reported as errors separately.
+    cycles are reported as errors separately. Undefined phase names are left out, so
+    each set is bounded by the workflow size rather than by the number of tasks.
     """
     reach: dict[str, frozenset[str]] = {}
     on_path: set[str] = set()
@@ -226,7 +227,7 @@ def _reachable_phases(tasks: dict[str, Task]) -> dict[str, frozenset[str]]:
             target = tasks.get(ref)
             if target is None or ref in on_path:
                 continue
-            if target.phase:
+            if target.phase in defined:
                 found.add(target.phase)
             if ref in reach:
                 found.update(reach[ref])
@@ -239,7 +240,8 @@ def _reachable_phases(tasks: dict[str, Task]) -> dict[str, frozenset[str]]:
 def _check_phases(
     tasks: dict[str, Task], workflow: WorkflowConfig | None, errors: list[str]
 ) -> None:
-    reach = _reachable_phases(tasks) if workflow else {}
+    defined = {phase.name for phase in workflow.phases} if workflow else set()
+    reach = _reachable_phases(tasks, defined) if workflow else {}
     for task_id in sorted(tasks):
         task = tasks[task_id]
         where = f"{TASKS_DIR}/{task_id}.yaml"

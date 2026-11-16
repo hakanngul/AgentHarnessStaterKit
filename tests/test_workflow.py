@@ -344,7 +344,9 @@ def test_long_dependency_chain_does_not_exhaust_the_stack(tmp_path):
 # --- require_phase ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize("status", ["BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE"])
+@pytest.mark.parametrize(
+    "status", ["BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE"]
+)
 def test_require_phase_rejects_tasks_without_phase(tmp_path, status):
     write_config(tmp_path, require_phase=True)
     found = errors(tmp_path, task("T-1", status=status))
@@ -361,3 +363,31 @@ def test_require_phase_exempts_cancelled_tasks(tmp_path):
 def test_require_phase_accepts_the_explicit_short_path(tmp_path):
     write_config(tmp_path, require_phase=True)
     assert errors(tmp_path, task("T-1", "fix")) == []
+
+
+# --- interaction with the rest of check --------------------------------------------
+
+
+def test_owner_check_and_phase_gate_both_report(tmp_path):
+    write_config(tmp_path)
+    config = tmp_path / ".harness/config.yaml"
+    data = yaml.safe_load(config.read_text())
+    data["roles"] = {"reviewer": {"write": [".harness/tasks/**"]}}
+    config.write_text(yaml.safe_dump(data))
+    found = errors(tmp_path, task("T-1", "design"))
+    assert any("no 'spec' task" in error for error in found)
+    assert any("owner 'developer' is not a role" in error for error in found)
+    assert len(found) == 2
+
+
+def test_a_dependency_with_an_undefined_phase_does_not_satisfy_the_gate(tmp_path):
+    write_config(tmp_path)
+    found = errors(tmp_path, task("T-1", "specs"), task("T-2", "design", depends_on=["T-1"]))
+    assert any("T-1.yaml: phase 'specs' is not defined" in error for error in found)
+    assert any("T-2.yaml" in error and "no 'spec' task" in error for error in found)
+
+
+def test_removing_the_config_removes_the_gate(tmp_path):
+    # Documented limit: the gate lives in the config; without the file nothing is enforced
+    # for tasks that name no phase. Protect the config with a role deny rule and in review.
+    assert errors(tmp_path, task("T-1")) == []
