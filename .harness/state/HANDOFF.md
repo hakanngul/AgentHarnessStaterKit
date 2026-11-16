@@ -19,10 +19,17 @@ where mistakes cannot be hidden. Faz 1 added the task/decision ledger and
 - Roles will be defined by authority and write scope, not by technology; stack
   specifics come from data-only stack packs (Faz 3).
 
+- Lifecycle (docs/plans/lifecycle.md): phases live in the config's optional `workflow`;
+  the gate reuses the depends_on graph, no separate grouping. `init` writes no workflow
+  yet and must not emit `workflow: null`. Direction agreed with the user: the core stays
+  Python; an orchestrator app drives the phases later, engine behind an adapter.
+
 ## Remaining work
 
-Faz 2 is DONE in PR #2 (awaiting merge). Then Faz 3 (stack packs) and Faz 4 (upgrade) per the
-plan. Do not claim stack packs, upgrade or a sandbox exist. The hook does not see Bash.
+Lifecycle L1 is in PR #3 (T-5). L2 and L4 need user decisions (TASK.md). Faz 3 (stack
+packs) and Faz 4 (upgrade) remain per the team-system plan. Do not claim a default
+workflow, orchestrator, UI, stack packs, upgrade or a sandbox exist. The hook does not
+see Bash. The phase gate is only as strong as the config: protect config.yaml.
 
 ## Resume
 
