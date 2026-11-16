@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 from pydantic import ValidationError
 from rich.console import Console
+from rich.markup import escape
 
 from agent_harness import __version__
 from agent_harness.analyze import analyze as inspect_project
@@ -206,7 +207,9 @@ def run_command(
     try:
         engine = make_engine()
         printer = (
-            None if output_json else (lambda e: (line := _describe(e)) and console.print(line))
+            None
+            if output_json
+            else (lambda e: (line := _describe(e)) and console.print(escape(line)))
         )
         outcome = asyncio.run(
             run_task(path, task, engine, role=role, max_resumes=max_resumes, on_event=printer)
@@ -253,7 +256,7 @@ def wave_command(
         printer = (
             None
             if output_json
-            else (lambda t, e: (line := _describe(e)) and console.print(f"{t}: {line}"))
+            else (lambda t, e: (line := _describe(e)) and console.print(escape(f"{t}: {line}")))
         )
         results = asyncio.run(
             run_wave(
