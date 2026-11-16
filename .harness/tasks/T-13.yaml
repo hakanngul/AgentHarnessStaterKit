@@ -1,0 +1,53 @@
+schema_version: 1
+id: T-13
+title: 'Proje çalışma kilidi: CLI ve sunucu aynı projede aynı anda wave, review ya da commit
+  çalıştırmasın'
+owner: developer
+status: IN_REVIEW
+goal: 'T-12 incelemesinde bulunan üç gerçek riski kapatmak: (1) run_wave kaybettiği claim''de
+  kazananın görevini READY''ye bırakıyor, (2) CLI ve sunucu aynı git index''ini paylaşabiliyor,
+  (3) git alt süreçlerinin zaman aşımı yok. Çözüm: bir proje başına tek çalışma kilidi (flock,
+  süreç ölünce kendiliğinden düşer), kilidin giriş noktalarında alınması, run_wave''in yalnız
+  kendi aldığı görevleri bırakması ve git çağrılarına zaman aşımı.'
+scope:
+- src/agent_harness/runlock.py
+- src/agent_harness/cli.py
+- src/agent_harness/jobs.py
+- src/agent_harness/orchestrator.py
+- src/agent_harness/commit.py
+- tests/test_runlock.py
+- tests/test_orchestrator.py
+- tests/test_jobs.py
+- tests/test_commit.py
+- tests/test_cli.py
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: 'Proje kilidi dışlayıcı ve beklemesizdir: ikinci alma (aynı süreçte başka dosya tanıtıcısıyla
+    ve başka süreçte) HarnessError verir ve tutanı (tür, pid, başlangıç) söyler; bırakma,
+    istisna ve süreç ölümü (SIGKILL) kilidi düşürür; bırakma tekrar çağrılabilir; sembolik
+    bağlantı reddedilir; kilit dosyası commit denetiminde stray sayılmaz.'
+- id: AC2
+  text: CLI run, wave (--review dahil, tek kilit altında), review ve commit komutları kilidi
+    tüm işlem boyunca tutar; tutulmuşsa 1 ile çıkar ve tutanı söyler; evidence run ve salt
+    okunur komutlar kilit almaz (ajan bir wave içinden evidence run çağırır).
+- id: AC3
+  text: 'Sunucu işi kilidi başlangıçtan son duruma kadar tutar: bitiş, hata, iptal, ilk adımdan
+    önce iptal ve kapanışta bırakır; başka bir aktör tutuyorsa POST /api/jobs 409 verir ve
+    mesajda tutan görünür; iş yokken kilit tutulmaz.'
+- id: AC4
+  text: 'run_wave yalnız kendi başarıyla aldığı görevleri bırakır: claim''i reddedilen (başkasının)
+    görev READY''ye düşürülmez; claim sırasında kesilen görev ve daha önce alınanlar yine
+    bırakılır.'
+- id: AC5
+  text: Git alt süreçleri zaman aşımına uğrarsa HarnessError verir ve komutu söyler. Testler
+    unit testtir (gerçek dosyalar ve gerçek flock; çapraz süreç testi bir alt süreç açar);
+    pytest, ruff check ve ruff format --check geçer.
+evidence: []
+log:
+- '2026-11-16 developer: task opened; follows the T-12 review findings (wave claim race, shared
+  git index, git without timeout); flock chosen over an O_EXCL file because a crash must not
+  leave a lock behind'
+- '2026-11-16 developer: runlock.py, CLI and server integration, run_wave claim fix, git timeout;
+  24 new tests; every fix mutation-checked; waiting for independent review'

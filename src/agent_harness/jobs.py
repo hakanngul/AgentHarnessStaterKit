@@ -22,6 +22,7 @@ from agent_harness.engine.describe import describe_event
 from agent_harness.filesystem import HarnessError
 from agent_harness.orchestrator import run_wave
 from agent_harness.review import review_all
+from agent_harness.runlock import RunLock, acquire
 
 MAX_EVENTS = 2000  # events kept per job; older ones are dropped
 MAX_TEXT = 500  # characters kept per event
@@ -96,6 +97,7 @@ class Job:
     next_id: int = 1
     task: asyncio.Task | None = None
     waiters: list[asyncio.Future] = field(default_factory=list)
+    lock: RunLock | None = None  # the project run lock, held from start to the final status
 
     @property
     def cancellable(self) -> bool:
@@ -119,6 +121,10 @@ class Job:
         self.next_id += 1
         del self.events[:-MAX_EVENTS]
         self.wake()
+
+    def release_lock(self) -> None:
+        if self.lock is not None:
+            self.lock.release()
 
     def wake(self) -> None:
         for waiter in self.waiters:
@@ -158,17 +164,26 @@ class JobManager:
         active = self.active()
         if active is not None:
             raise Busy(f"job {active.id} is still running")
+        try:  # another actor (the CLI, another server) may hold the project
+            lock = acquire(self.root, f"server {params.kind}")
+        except HarnessError as exc:
+            raise Busy(str(exc)) from exc
         job = Job(
             uuid.uuid4().hex,
             params.kind,
             params.model_dump(exclude_unset=True),
             _now(),
+            lock=lock,
         )
         self.jobs[job.id] = job
         finished = [key for key, item in self.jobs.items() if item.status != "running"]
         for key in finished[: max(0, len(self.jobs) - MAX_JOBS)]:
             del self.jobs[key]
-        job.task = asyncio.create_task(self._run(job, params))
+        try:
+            job.task = asyncio.create_task(self._run(job, params))
+        except BaseException:
+            job.release_lock()
+            raise
         return job
 
     async def _run(self, job: Job, params: JobParams) -> None:
@@ -192,6 +207,7 @@ class JobManager:
     def _finish(job: Job, status: str, error: str | None) -> None:
         """Record the end of a job. Never awaits, so a stream that sees the status also sees
         the last event."""
+        job.release_lock()  # before the status flips, so a client that sees it can start again
         job.status, job.error, job.finished = status, error, _now()
         job.emit(None, f"{job.kind} {status}" + (f": {error}" if error else ""))
 
@@ -270,6 +286,7 @@ class JobManager:
     def _close_unfinished(self, job: Job) -> None:
         """A task cancelled before its first step never reaches `_run`'s own bookkeeping."""
         if job.status == "running":
+            job.release_lock()
             job.status, job.finished = "cancelled", _now()
             job.emit(None, f"{job.kind} cancelled")
 

@@ -14,8 +14,10 @@ from agent_harness.check import TASKS_DIR, inspect_ledger
 from agent_harness.evidence import EVIDENCE_DIR
 from agent_harness.filesystem import HarnessError, project_root
 from agent_harness.models import Task
+from agent_harness.runlock import LOCK_FILE as RUN_LOCK
 from agent_harness.schedule import _fold, _prefix
 
+GIT_TIMEOUT = 120  # seconds one git command may take before the commit gives up
 GENERATED_DIRS = ("__pycache__",)  # produced by allowed test commands, never a task's work
 FALLBACK_NAME = "Agent Harness"
 FALLBACK_EMAIL = "harness@localhost"
@@ -34,6 +36,7 @@ class CommitResult:
 
 def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
     """git with literal pathspecs: a file named `*.py` or `:(top)x` is just a file name."""
+    name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
     try:
         done = subprocess.run(
             ["git", "--literal-pathspecs", *args],
@@ -41,11 +44,13 @@ def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
             capture_output=True,
             text=True,
             check=False,
+            timeout=GIT_TIMEOUT,
         )
+    except subprocess.TimeoutExpired as exc:  # e.g. a hook that never returns
+        raise HarnessError(f"git {name} timed out after {GIT_TIMEOUT} s") from exc
     except OSError as exc:
         raise HarnessError(f"git is not available: {exc}") from exc
     if check and done.returncode != 0:
-        name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
         raise HarnessError(f"git {name} failed: {(done.stderr or done.stdout).strip()[:300]}")
     return done
 
@@ -71,7 +76,12 @@ def _is_generated(path: str) -> bool:
         and name.startswith(".")
         and name.endswith(".lock")
     )  # .harness/tasks/.T-1.yaml.lock
-    return path.endswith(".pyc") or ledger_lock or any(part in GENERATED_DIRS for part in parts)
+    return (
+        path.endswith(".pyc")
+        or ledger_lock
+        or path == RUN_LOCK  # the project run lock file, kept after a run
+        or any(part in GENERATED_DIRS for part in parts)
+    )
 
 
 def changed_files(root: Path) -> list[str]:

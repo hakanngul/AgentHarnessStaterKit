@@ -665,3 +665,20 @@ def test_a_failed_commit_still_names_git_commit_when_the_identity_options_are_ad
     (result,) = commit_done_tasks(root)
     assert result.status == "blocked" and "git commit failed" in result.note
     assert "git -c failed" not in result.note
+
+
+def test_a_git_command_that_times_out_is_a_clear_error(monkeypatch, tmp_path):
+    import subprocess
+
+    from agent_harness import commit
+
+    seen = {}
+
+    def hung(command, **kwargs):
+        seen["timeout"] = kwargs.get("timeout")
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(commit.subprocess, "run", hung)
+    with pytest.raises(HarnessError, match=r"git commit timed out after 120 s"):
+        commit._run(tmp_path, "-c", "user.name=x", "commit", "-m", "m")
+    assert seen["timeout"] == commit.GIT_TIMEOUT == 120

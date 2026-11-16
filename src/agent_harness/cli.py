@@ -20,6 +20,7 @@ from agent_harness.hooks import install as install_hook
 from agent_harness.hooks import run_pre_tool_use
 from agent_harness.models import PlanReport, Report
 from agent_harness.roles import decide, load_config
+from agent_harness.runlock import run_lock
 from agent_harness.schedule import plan as plan_next
 from agent_harness.validate import validate as check_project
 
@@ -190,9 +191,10 @@ def run_command(
         printer = (
             None if output_json else (lambda e: (line := _describe(e)) and console.print(line))
         )
-        outcome = asyncio.run(
-            run_task(path, task, engine, role=role, max_resumes=max_resumes, on_event=printer)
-        )
+        with run_lock(project_root(path), "run"):
+            outcome = asyncio.run(
+                run_task(path, task, engine, role=role, max_resumes=max_resumes, on_event=printer)
+            )
     except (HarnessError, OSError, UnicodeError) as exc:
         fail(exc, output_json)
     summary = {
@@ -242,28 +244,29 @@ def wave_command(
             if output_json
             else (lambda t, e: (line := _describe(e)) and console.print(f"{t}: {line}"))
         )
-        results = asyncio.run(
-            run_wave(
-                path,
-                engine,
-                max_parallel=max_parallel,
-                on_event=printer,
-                max_resumes=max_resumes,
-            )
-        )
-        reviews = []
-        if review:
-            reviews = asyncio.run(
-                review_all(
+        with run_lock(project_root(path), "wave"):  # one lock for the wave and its review
+            results = asyncio.run(
+                run_wave(
                     path,
                     engine,
-                    task_ids=[r.task_id for r in results if r.status == "IN_REVIEW"],
-                    role=reviewer,
                     max_parallel=max_parallel,
                     on_event=printer,
                     max_resumes=max_resumes,
                 )
             )
+            reviews = []
+            if review:
+                reviews = asyncio.run(
+                    review_all(
+                        path,
+                        engine,
+                        task_ids=[r.task_id for r in results if r.status == "IN_REVIEW"],
+                        role=reviewer,
+                        max_parallel=max_parallel,
+                        on_event=printer,
+                        max_resumes=max_resumes,
+                    )
+                )
     except (HarnessError, OSError, UnicodeError) as exc:
         fail(exc, output_json)
     tasks = [
@@ -321,7 +324,8 @@ def commit_command(
     from agent_harness.commit import commit_done_tasks
 
     try:
-        results = commit_done_tasks(path, task_ids=task, branch=branch)
+        with run_lock(project_root(path), "commit"):
+            results = commit_done_tasks(path, task_ids=task, branch=branch)
     except (HarnessError, OSError, UnicodeError) as exc:
         fail(exc, output_json)
     ok = all(r.status != "blocked" for r in results)
@@ -365,17 +369,18 @@ def review_command(
             if output_json
             else (lambda t, e: (line := _describe(e)) and console.print(f"{t}: {line}"))
         )
-        reviews = asyncio.run(
-            review_all(
-                path,
-                engine,
-                task_ids=task,
-                role=role,
-                max_parallel=max_parallel,
-                on_event=printer,
-                max_resumes=max_resumes,
+        with run_lock(project_root(path), "review"):
+            reviews = asyncio.run(
+                review_all(
+                    path,
+                    engine,
+                    task_ids=task,
+                    role=role,
+                    max_parallel=max_parallel,
+                    on_event=printer,
+                    max_resumes=max_resumes,
+                )
             )
-        )
     except (HarnessError, OSError, UnicodeError) as exc:
         fail(exc, output_json)
     ok = all(r.status == "DONE" and r.recorded for r in reviews)
