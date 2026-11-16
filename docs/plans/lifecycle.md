@@ -62,11 +62,12 @@ depends_on: [T-6]          # T-6 design fazında, o da bir spec görevine bağl�
   denetlenmez; bu review'un işidir.
 - Hangi görevin hangi faza ait olduğu beyandır. `require_phase` kapalıysa fazsız görev
   kapıdan muaftır.
-- Kapı config'tedir. Config silinirse ya da workflow gevşetilirse (gereksinimsiz yeni
-  faz, her işe `fix`) `check` bunu fark etmez; config dosyası yoksa uyarı da vermez.
+- Kapı config'tedir. Workflow gevşetilirse (gereksinimsiz yeni faz, her işe `fix`)
+  `check` bunu fark etmez. Config ya da `workflow` silinirse yalnız `phase` taşıyan
+  görevler hata verir; fazsız görevler için uyarı da çıkmaz.
   Koruma: rolün yazma kapsamında config'in reddi ve config değişikliklerinin review'u.
-- Mevcut deftere `require_phase: true` eklemek, fazsız bütün eski görevleri (DONE dahil)
-  hataya düşürür. Geçiş için eski görevlere gereksinimsiz bir faz verilir; otomatik
+- Mevcut deftere `require_phase: true` eklemek, CANCELLED dışındaki fazsız bütün eski
+  görevleri (DONE dahil) hataya düşürür. Geçiş için eski görevlere gereksinimsiz bir faz verilir; otomatik
   muafiyet yoktur.
 - `workflow` alanı sürüm numarası değişmeden eklendi. Yayımlanmış 0.1.0 paketi bu alanı
   tanımaz ve config'i reddeder; sürüm yükseltme upgrade (Faz 4) ile birlikte yapılır.

@@ -109,10 +109,11 @@ def test_invalid_workflow_in_config_is_one_check_error(tmp_path):
 
 def test_init_does_not_write_a_workflow_key(tmp_path):
     # `workflow: null` would collide with a workflow block the user appends.
-    assert runner.invoke(app, ["init", str(tmp_path), "--json"]).exit_code == 0
-    config = (tmp_path / ".harness/config.yaml").read_text()
-    assert "workflow" not in config
-    assert "null" not in config
+    result = runner.invoke(app, ["init", str(tmp_path), "--name", "Demo", "--json"])
+    assert result.exit_code == 0, result.output
+    text = (tmp_path / ".harness/config.yaml").read_text()
+    assert "workflow" not in yaml.safe_load(text)
+    assert "null" not in text
 
 
 def test_validate_rejects_invalid_workflow(tmp_path):
@@ -387,7 +388,17 @@ def test_a_dependency_with_an_undefined_phase_does_not_satisfy_the_gate(tmp_path
     assert any("T-2.yaml" in error and "no 'spec' task" in error for error in found)
 
 
-def test_removing_the_config_removes_the_gate(tmp_path):
-    # Documented limit: the gate lives in the config; without the file nothing is enforced
-    # for tasks that name no phase. Protect the config with a role deny rule and in review.
+def test_removing_the_config_removes_the_gate_for_tasks_without_phase(tmp_path):
+    # Documented limit: the gate lives in the config. Protect the config with a role deny
+    # rule and in review.
+    write_config(tmp_path, require_phase=True)
+    assert len(errors(tmp_path, task("T-1"))) == 1
+    (tmp_path / ".harness/config.yaml").unlink()
     assert errors(tmp_path, task("T-1")) == []
+
+
+def test_removing_the_config_is_reported_for_tasks_that_name_a_phase(tmp_path):
+    write_config(tmp_path)
+    assert errors(tmp_path, task("T-1", "spec")) == []
+    (tmp_path / ".harness/config.yaml").unlink()
+    assert "defines no workflow" in errors(tmp_path, task("T-1", "spec"))[0]
