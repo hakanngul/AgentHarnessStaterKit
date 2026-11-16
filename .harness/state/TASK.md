@@ -1,28 +1,22 @@
 # Current task
 
-Status: Yaşam döngüsü L3 (T-6, `harness next`) DONE, review approved; PR #4 awaits merge.
-L1 (T-5) is merged.
+Status: Uygulama adım 1, motor adapter (T-7) DONE, review approved. Sıradaki adım:
+orchestrator döngüsü (görev seç, paralel başlat, kanıt, review, kapı).
 
 ## Goal and scope
 
-L3 of docs/plans/lifecycle.md: `harness next` computes from the ledger which tasks can
-start, which wait and why, and which can run in parallel. Out of scope: default
-workflow and phase roles in `init` (L2), engine adapter, background agents and the
-desktop app (L4), stack packs (Faz 3), upgrade (Faz 4), version bump.
+T-7: Claude Agent SDK üstünde, rol politikasıyla kısıtlı, kullanım limitini bekleyen
+`harness run`. Kapsam dışı: orchestrator, FastAPI sunucu, React arayüz, masaüstü kabuğu.
 
 ## Acceptance criteria
 
-AC1–AC6 in `.harness/tasks/T-6.yaml`.
+AC1-AC6 in `.harness/tasks/T-7.yaml`.
 
 ## Required checks
 
-Run through `harness evidence run <task> -- <command>`: uv run --frozen pytest -q;
-ruff check .; ruff format --check .; python -m build --no-isolation; harness
-validate . --json; harness check . --json. Wheel smoke test in a fresh venv for
-template, generation or CLI changes.
+Unit tests only (owner decision): uv run --frozen pytest -q; ruff check .; ruff format
+--check .; harness validate; harness check. Run via `harness evidence run`.
 
 ## Product decisions and blockers
 
-User decisions are recorded in docs/plans/lifecycle.md. Open: branch layout for
-parallel work (one branch per parallel group, or a worktree per task). No hook is
-installed in this repository.
+User decisions: docs/plans/lifecycle.md (branch layout A decided). No blocker.

@@ -45,3 +45,14 @@ tasks.
 Use this checkout; no worktree unless asked. `uv sync --frozen --group dev`, then
 `uv run --frozen pytest` and `uv run --frozen harness check .`. Expected edits to
 generated files show as `validate` warnings; do not refresh hashes to hide them.
+
+## Engine adapter (T-7)
+
+- `harness run TASK` runs one READY/IN_PROGRESS task through the Claude Agent SDK
+  (optional extra `engine`). Role policy is default-deny, enforced as a PreToolUse hook
+  and `can_use_tool`; shell quoting/expansion, chaining, MCP and web tools are refused.
+- It is a guardrail, not a sandbox (README limits). Real-session behaviour is
+  unverified: hook precedence over allow rules, subagent hook coverage, cost after
+  resume, 429 as exception. Try it on a throwaway project first.
+- Next: orchestrator loop that uses `harness next` and `run_task`, records evidence,
+  requests review, enforces the phase gate, commits per task (layout A).

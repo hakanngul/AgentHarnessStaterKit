@@ -23,3 +23,8 @@ concurrency).
 L2: default workflow (discovery, spec, design, implement, qa, release, fix) and phase
 roles in `init`, with model and effort per role. Then L4: engine adapter and background
 agents. The user must first choose the branch layout for parallel work.
+
+## 2026-11-16 T-7 engine adapter
+
+DONE. 656 unit tests, ruff clean, 3 independent review rounds (all fixed). Never run
+against a real Claude session. Next: orchestrator loop.
