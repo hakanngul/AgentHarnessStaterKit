@@ -24,12 +24,12 @@ from agent_harness.schedule import plan
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 MIN_TOKEN = 16
 TASK_ID = re.compile(r"T-[0-9]+")
-HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE)
+HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE | re.ASCII)
 
 
 def is_loopback_host(header: str) -> bool:
     """True only for a well-formed loopback Host header (name, optional numeric port)."""
-    return HOST.fullmatch(header.strip()) is not None
+    return HOST.fullmatch(header.strip(" \t")) is not None
 
 
 def require_loopback(host: str) -> None:

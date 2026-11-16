@@ -420,3 +420,41 @@ def test_the_task_id_pattern_takes_ascii_digits_only():
     assert TASK_ID.fullmatch("T-12")
     for bad in ("T-\u0661", "T-", "t-1", "T-1\n", "T-1.yaml", "T-1/.."):
         assert TASK_ID.fullmatch(bad) is None, bad
+
+
+def test_serve_refuses_a_bad_host_or_port_without_touching_uvicorn(monkeypatch, tmp_path):
+    import sys
+
+    from agent_harness.server import serve
+
+    fake = FakeUvicorn()
+    monkeypatch.setitem(sys.modules, "uvicorn", fake)
+    root = project(tmp_path, task("T-1"))
+    for host, port in (("0.0.0.0", 9000), ("example.com", 9000), ("127.0.0.1", 0)):  # noqa: S104
+        with pytest.raises(HarnessError):
+            serve(root, host=host, port=port, token=TOKEN)
+    with pytest.raises(HarnessError, match="token"):
+        serve(root, host="127.0.0.1", port=9000, token="short")
+    assert fake.calls == []
+
+
+def test_serve_prints_nothing_for_a_missing_project(monkeypatch, tmp_path):
+    result, calls = run_serve(monkeypatch, tmp_path / "does-not-exist")
+    assert result.exit_code == 1 and calls == []
+    assert "token:" not in result.output and "listening" not in result.output
+
+
+def test_a_non_ascii_lookalike_or_unicode_space_is_not_loopback():
+    assert not is_loopback_host("localhoſt")  # long s folds to s without re.ASCII
+    assert not is_loopback_host("\u00a0localhost")
+    assert not is_loopback_host("localhost\u0085")
+
+
+def test_an_undecodable_config_does_not_crash_the_api(tmp_path):
+    root = project(tmp_path, task("T-1"))
+    (root / ".harness/config.yaml").write_bytes(b"\xff\xfe\x00 bad \x80")
+    api = client(root)
+    for url in ("/api/plan", "/api/check"):
+        response = api.get(url, headers=AUTH)
+        assert response.status_code in (200, 422), url
+        assert str(root) not in response.text or response.status_code == 200

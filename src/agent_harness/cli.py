@@ -423,6 +423,7 @@ def serve(
     given = os.environ.get("HARNESS_TOKEN")
     token = given or secrets.token_urlsafe(32)
     try:  # validate first, so nothing secret is printed for a start that cannot happen
+        project_root(path)
         require_loopback(host)
         check_port(port)
         check_token(token)
