@@ -1,0 +1,112 @@
+schema_version: 1
+id: T-7
+title: 'Uygulama adım 2: motor adapter ile bir görevi arka planda çalıştırma'
+owner: developer
+status: DONE
+goal: Bir görevi, görev sahibinin rolüyle ve role atanmış model ve effort ile Claude'a yaptıran
+  katman. Rolün yazma kapsamı dışındaki dosya yazımlarını ve izinli olmayan komutları reddeder,
+  kullanım limiti dolunca bekleyip aynı oturumu sürdürür. Orchestrator ve sunucu bunun üstüne
+  kurulur.
+scope:
+- src/agent_harness/engine/
+- src/agent_harness/models.py
+- src/agent_harness/cli.py
+- schemas/
+- tests/
+- pyproject.toml
+- uv.lock
+- README.md
+- docs/
+acceptance:
+- id: AC1
+  text: config'te rol başına opsiyonel `model`, `effort` ve `bash` (izinli komut önekleri)
+    tanımlanır, katı şemayla doğrulanır; mevcut config'ler geçerli kalır ve JSON şeması modelle
+    eşleşir.
+  verified_by:
+  - E1
+  - E4
+- id: AC2
+  text: 'İzin politikası varsayılan olarak reddeder: rolün yazma kapsamı dışındaki dosya yazımını,
+    `bash` listesinde olmayan ya da zincirleme komutları, MCP ve ağ araçlarını, tanımadığı
+    araçları ve proje dışı okumaları reddeder; `harness evidence run` yalnız `--` sonrası
+    komut listedeyse geçer. Politika PreToolUse hook''u olarak da bağlanır, böylece proje
+    ayarlarındaki izin kuralları onu atlayamaz.'
+  verified_by:
+  - E1
+- id: AC3
+  text: Görev istemi görevin başlığını, hedefini, kabul kriterlerini ve kapsamını içerir;
+    ajana commit atmamasını ve `.harness/state/` belgelerini güncellememesini söyler.
+  verified_by:
+  - E1
+- id: AC4
+  text: Çalıştırıcı geçersiz defterde, bilinmeyen görevde, bilinmeyen rolde ve READY ya da
+    IN_PROGRESS olmayan görevde motoru hiç çağırmadan reddeder.
+  verified_by:
+  - E1
+- id: AC5
+  text: Limit dolup koşu hatayla bitince bekleme olayını yayar, sıfırlanma zamanına kadar
+    bekler ve aynı oturumu sürdürür; deneme sayısı ya da bekleme sınırı aşılırsa beklemeden
+    `rate_limited` döner. Diğer hatalar ve motorun fırlattığı istisnalar oturum kimliği korunarak
+    `failed` döner.
+  verified_by:
+  - E1
+- id: AC6
+  text: Claude SDK mesajları motor olaylarına doğru çevrilir; SDK kurulu değilse `harness
+    run` kurulum talimatıyla 1 ile çıkar. Testler yalnız unit testtir, gerçek Claude çağrısı
+    yapmaz.
+  verified_by:
+  - E1
+  - E2
+  - E3
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 9e9c07440850da74c77507e936a88cba8d36dffa
+  output: .harness/evidence/T-7/E1.txt
+  output_sha256: 8766ce5da8b45a433231a1bec83666436b78b54625050df6766c910ac45b2f88
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 9e9c07440850da74c77507e936a88cba8d36dffa
+  output: .harness/evidence/T-7/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 9e9c07440850da74c77507e936a88cba8d36dffa
+  output: .harness/evidence/T-7/E3.txt
+  output_sha256: 58ac06b639c4ff25869145d1f74c2bd0e9e173ded75001e1427be87373615d6c
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen harness validate . --json
+  cwd: .
+  exit_code: 0
+  summary: ledger valid
+  commit: 9e9c07440850da74c77507e936a88cba8d36dffa
+  output: .harness/evidence/T-7/E4.txt
+  output_sha256: 7548181899dd7aebf9eb7b8d6709afccde9d26d6015a33f691df5ade6a5aa3c2
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+review:
+  status: approved
+  by: reviewer
+  notes: 'Three independent read-only reviewer subagents (they read code, ran no commands); 9e9c074 itself was not re-reviewed. Round 1-2 CHANGES REQUESTED (allow-rule shadowing, fail-open unknown tools, evidence `--` bypass, fail-open hook, Glob escapes, misclassified success); all fixed. Round 3 CHANGES REQUESTED (shell quoting bypass, brace globs, unclosed stream); fixed in 9e9c074 with tests. No fourth review: policy is a guardrail, not a sandbox (see README limits). Unverified: real Claude session behaviour (hook precedence, subagent hook coverage, cost after resume), Glob/Grep brace expansion, managed_path cwd escape. Unit tests only by owner decision.'
+log:
+- 2026-11-16 görev açıldı; plan https://claude.ai/artifact/DjRVH6D2TuYA74hREncM8X adım 2.
+  Kullanıcı kararı - yalnız unit test, başka test türü yok.

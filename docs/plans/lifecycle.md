@@ -23,7 +23,7 @@ Bu plan [team-system.md](team-system.md) planını değiştirmez; onun süreç �
   gereksinimsiz `fix` fazı.
 - Otonomi: kullanıcı onayı yalnız spec ve release bitince istenir; diğer fazlar
   otomatik ilerler.
-- Git: commit'i orchestrator atar, merge'i kullanıcı yapar. Dal düzeni açık (aşağıda).
+- Git: commit'i orchestrator atar, merge'i kullanıcı yapar. Dal düzeni A: paralel grup tek dalda, görev başına commit, grup başına PR.
 - Ajanlar arka planda, ayrı oturumlar olarak çalışır; orchestrator model değil koddur.
   Kapsamı kesişmeyen görevler paralel başlatılır (worktree yok); kanıt sayılan test
   koşusu faz kapısında yapılır.
@@ -37,9 +37,8 @@ Bu plan [team-system.md](team-system.md) planını değiştirmez; onun süreç �
   Rust ve Electron yok. İlk hedef işletim sistemi macOS (varsayım, teyit edilmedi).
 - Stack: karar gerektirmez. `analyze` stack'i tanır; test/lint/build komutları proje
   açılırken bir kez sorulur ve config'e yazılır.
-- Açık: dal düzeni. "Görev başına branch" ile "worktree'siz paralel" birlikte olamaz;
-  bir checkout'ta aynı anda tek branch açıktır. Seçenekler: paralel grup için tek dal
-  (görev başına commit, grup başına PR) ya da görev başına worktree.
+- Karar (kullanıcı): dal düzeni A. Paralel grup tek dalda çalışır, her görev ayrı commit,
+  grup başına bir PR. Görev başına worktree seçilmedi.
 
 Öneri (kullanıcı kararı değil): paralel görevler `.harness/state/` ve lock dosyalarına
 yazmasın; bunları orchestrator, başka iş çalışmıyorken güncellesin. Bugün AGENTS.md her

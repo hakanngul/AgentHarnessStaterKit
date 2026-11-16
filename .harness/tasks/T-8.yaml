@@ -1,0 +1,179 @@
+schema_version: 1
+id: T-8
+title: 'Uygulama adım 3: orchestrator dalgası (harness wave)'
+owner: developer
+status: DONE
+goal: Planlayıcının başlatılabilir dediği görevleri sınırlı paralellikte çalıştıran ve her
+  koşunun sonucunu defterde durum olarak kaydeden katman. Biten görev IN_REVIEW'a, hata verense
+  BLOCKED'a, limite takılan READY'ye gider. DONE, review, commit ve faz kapısı bu katmanın
+  dışında kalır.
+scope:
+- src/agent_harness/orchestrator.py
+- src/agent_harness/cli.py
+- tests/
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: Yalnız `plan().start` içindeki görevler başlar, en çok `max_parallel` tanesi; hepsi
+    aynı anda çalışır ve başlamadan önce IN_PROGRESS yazılır. Geçersiz defterde hiçbir şey
+    çalışmaz ve defter değişmez.
+  verified_by:
+  - E10
+- id: AC2
+  text: 'Koşu sonucu duruma çevrilir: kanıtı ve kabul kriteri olan tamamlanmış görev IN_REVIEW,
+    kanıtsız tamamlanmış ya da hatalı görev BLOCKED (gerekçeyle), limite takılan READY. Bir
+    görevin motor hatası kardeşlerini durdurmaz.'
+  verified_by:
+  - E10
+- id: AC3
+  text: Durum değişimleri görev kilidi altında, geçerli şemayla yazılır ve log'a satır ekler;
+    geçersiz durum yazılmaz.
+  verified_by:
+  - E10
+- id: AC4
+  text: '`harness wave [PATH] [--max-parallel] [--max-resumes] [--json]` her görevin sonucunu
+    gösterir; hepsi IN_REVIEW olduysa 0, değilse 1 ile çıkar. Testler yalnız unit testtir.'
+  verified_by:
+  - E10
+  - E11
+  - E12
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 01eac08967f2260c171195e5e1a2789c36916077
+  output: .harness/evidence/T-8/E1.txt
+  output_sha256: db6ce4eb6c2002206d98dcea0dfbc3dcfad0ea3f5b12acc5b1458dc4c726a7ab
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 01eac08967f2260c171195e5e1a2789c36916077
+  output: .harness/evidence/T-8/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 01eac08967f2260c171195e5e1a2789c36916077
+  output: .harness/evidence/T-8/E3.txt
+  output_sha256: 2e643e4c20a118b0f9a72f93a837b5279f02ec6ad2330e6ff24ecb0a0002e0bf
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 2299fa2d76f748b43391d94ac2a8ad12d0293e6e
+  output: .harness/evidence/T-8/E4.txt
+  output_sha256: 88bc46ed2d0172aac6b9307affec8fed354ee24427cc4cff556a4045471caac8
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 2299fa2d76f748b43391d94ac2a8ad12d0293e6e
+  output: .harness/evidence/T-8/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 2299fa2d76f748b43391d94ac2a8ad12d0293e6e
+  output: .harness/evidence/T-8/E6.txt
+  output_sha256: 2e643e4c20a118b0f9a72f93a837b5279f02ec6ad2330e6ff24ecb0a0002e0bf
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: a11aa138b696739a35633519ee47ab78ce33bfc0
+  output: .harness/evidence/T-8/E7.txt
+  output_sha256: b4bd1fe22006c718833b1c5ba8dcf8b1269add835e622718c7983d43c4e60db1
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: a11aa138b696739a35633519ee47ab78ce33bfc0
+  output: .harness/evidence/T-8/E8.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: a11aa138b696739a35633519ee47ab78ce33bfc0
+  output: .harness/evidence/T-8/E9.txt
+  output_sha256: 2e643e4c20a118b0f9a72f93a837b5279f02ec6ad2330e6ff24ecb0a0002e0bf
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 0ee88f86ef7bf4bc5a45ba3990583fc7670ea7b6
+  output: .harness/evidence/T-8/E10.txt
+  output_sha256: c2efc7ce50806cb7ef3834aedd5b0c185ffc386cd32d7b3791c2e092aaea5f43
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 0ee88f86ef7bf4bc5a45ba3990583fc7670ea7b6
+  output: .harness/evidence/T-8/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 0ee88f86ef7bf4bc5a45ba3990583fc7670ea7b6
+  output: .harness/evidence/T-8/E12.txt
+  output_sha256: 2e643e4c20a118b0f9a72f93a837b5279f02ec6ad2330e6ff24ecb0a0002e0bf
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+review:
+  status: approved
+  by: reviewer
+  notes: 'Three read-only reviewer subagents, none ran commands. Round 1 CHANGES REQUESTED (stranded IN_PROGRESS tasks, no compare-and-set, stale evidence accepted, unbounded log, blocking lock wait); round 2 CHANGES REQUESTED (cancellation during settle, unrecorded result hidden, markup escape, snapshot timing); all fixed with tests. Round 3 APPROVED with two LOW notes: a narrow cancel window before a child task first runs (fixed by releasing all claimed tasks when gather is interrupted) and a cancel test that did not prove the cancel landed during the run (fixed with an event). Those two fixes are not re-reviewed. Open LOW: the recorded flag in ok is defensive and not isolated by a test; release can block the loop up to the lock wait on a stale lock. Not verified: behaviour with a real Claude session (a trial was blocked by the permission classifier and not run).'
+log:
+- 2026-11-16 görev açıldı; plan https://claude.ai/artifact/DjRVH6D2TuYA74hREncM8X adım 3.

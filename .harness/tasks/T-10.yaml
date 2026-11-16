@@ -1,0 +1,222 @@
+schema_version: 1
+id: T-10
+title: 'Uygulama adım 5: görev başına commit ve kapsamın kodla denetimi (harness commit)'
+owner: developer
+status: DONE
+goal: DONE görevleri tek dalda görev başına bir commit olarak işleyen ve hiçbir görevin açıklamadığı
+  değişikliği kodla yakalayıp commit'leri durduran katman. Reviewer'ın git ile doğrulayamadığı
+  kapsam denetimi böylece modelin okumasına bırakılmaz.
+scope:
+- src/agent_harness/commit.py
+- src/agent_harness/cli.py
+- tests/
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: Her DONE görev, commit'i yoksa, yalnız sahip olduğu dosyalarla (kapsamı ve kendi defter
+    dosyaları) ayrı bir commit olur; açık yol verilerek stage edilir ve hiçbir şey push edilmez.
+  verified_by:
+  - E13
+- id: AC2
+  text: Bir dosya tek göreve gider, en spesifik kapsam kazanır, eşitlikte küçük görev numarası;
+    geniş kapsam başka görevin adıyla andığı dosyayı yutmaz; çalışan görevin dosyası commit'lenmez.
+  verified_by:
+  - E13
+- id: AC3
+  text: Hiçbir görevin açıklamadığı değişiklik varsa hiçbir commit atılmaz ve dosya adları
+    söylenir; üretilen dosyalar (pycache, pyc, lock) sayılmaz.
+  verified_by:
+  - E13
+- id: AC4
+  text: Aynı komutun ikinci çalıştırması commit atmaz; depo kökü değilse, index'te stage edilmiş
+    değişiklik, bozuk defter ya da bilinmeyen görev varsa hata verir; --branch dalı oluşturur
+    ya da kullanır.
+  verified_by:
+  - E13
+- id: AC5
+  text: '`harness commit [PATH] [--task] [--branch] [--json]` sonucu gösterir; engellenen
+    görev yoksa 0, varsa 1 ile çıkar. Testler yalnız unit testtir, gerçek git deposunda çalışır.'
+  verified_by:
+  - E13
+  - E14
+  - E15
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 6bbb008fd5812f4f4ca90bba6863c8777cbffb57
+  output: .harness/evidence/T-10/E1.txt
+  output_sha256: 782e08c576042717f6d8bcfbda7491a1c0cfd6837fe605d20ef095c87af0ee2b
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 6bbb008fd5812f4f4ca90bba6863c8777cbffb57
+  output: .harness/evidence/T-10/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 6bbb008fd5812f4f4ca90bba6863c8777cbffb57
+  output: .harness/evidence/T-10/E3.txt
+  output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: e3ca8644ee94fba0ee6055da72f0ae465511de29
+  output: .harness/evidence/T-10/E4.txt
+  output_sha256: 3d377124e071d1df729fb864448677e9b501349f1452cbf71015962cd0d2e048
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: e3ca8644ee94fba0ee6055da72f0ae465511de29
+  output: .harness/evidence/T-10/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: e3ca8644ee94fba0ee6055da72f0ae465511de29
+  output: .harness/evidence/T-10/E6.txt
+  output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 5593e6017fc586cf4b0507db15292172f794a2f2
+  output: .harness/evidence/T-10/E7.txt
+  output_sha256: 40aa6d231bf72658f659682f0f980f8e9f90ab0f3b57731429fcb7d4ea98674f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 5593e6017fc586cf4b0507db15292172f794a2f2
+  output: .harness/evidence/T-10/E8.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 5593e6017fc586cf4b0507db15292172f794a2f2
+  output: .harness/evidence/T-10/E9.txt
+  output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: e3d89690d42d23e2b8041bbde5960e653fddd655
+  output: .harness/evidence/T-10/E10.txt
+  output_sha256: 1c4b1e1526410568a6765f5d1326acc8c847d7c1dc9abc27151b1d49586e06b8
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: e3d89690d42d23e2b8041bbde5960e653fddd655
+  output: .harness/evidence/T-10/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: e3d89690d42d23e2b8041bbde5960e653fddd655
+  output: .harness/evidence/T-10/E12.txt
+  output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E13
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 795 passed in 27.37s
+  commit: 26f0790a8094f0051103419c3e1f2bdd528a6b6e
+  output: .harness/evidence/T-10/E13.txt
+  output_sha256: 2436a6d7fec693827a9e761e2a96aaeef29d5d6898b350a7a74b3de6fbfd8a8e
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E14
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 26f0790a8094f0051103419c3e1f2bdd528a6b6e
+  output: .harness/evidence/T-10/E14.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E15
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 57 files already formatted
+  commit: 26f0790a8094f0051103419c3e1f2bdd528a6b6e
+  output: .harness/evidence/T-10/E15.txt
+  output_sha256: 1de52ff6b48b590807e3e78f12653c68ec7d319853a56c0ddca035921be538fe
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+review:
+  status: approved
+  by: reviewer
+  notes: 'Round 4 (read-only reviewer): APPROVED. _committed separates unborn branch from
+    git errors; CANCELLED tasks keep ledger files owned; rev-parse outside try; error names
+    the git command; new tests cover each. Low findings (rev-parse treats every failure as
+    unborn; git switch -c on unborn repo untested; README CANCELLED sentence added) accepted
+    as known limits. Reviewer could not execute; checks E13-E15 recorded by harness.'
+log:
+- 2026-11-16 görev açıldı. Gerçek oturum denemesi (geçici proje) bir hata buldu - geniş kapsamlı
+  T-1 diğer görevlerin dosyalarını yutuyordu; en spesifik sahip kuralı ile düzeltildi ve gerçek
+  projede dört görev doğru ayrı commit'lendi.
+- '2026-11-16 orchestrator: review by reviewer: approved'

@@ -13,6 +13,8 @@ flowchart TD
   CLI --> Check[check.py: görev ve karar defteri]
   CLI --> Evidence[evidence.py: komutu çalıştırıp kanıt kaydı]
   CLI --> Schedule[schedule.py: sıradaki işi hesaplar]
+  CLI --> Engine[engine/: görevi Claude'a yaptırır]
+  Engine --> RoleScope
   Check --> Schedule
   CLI --> RoleScope[roles.py: rol yazma kapsamı]
   RoleScope --> Hooks[hooks.py: PreToolUse hook ve kurulum]
@@ -47,6 +49,13 @@ ulaşmalıdır. Ayrı bir gruplama kavramı yoktur; kapı mevcut bağımlılık 
 `next`, `check`'in doğruladığı defterden bir plan türetir: çalışanlar, şimdi
 başlatılabilecekler, bekleyenler ve nedenleri. Durum tutmaz ve yazmaz; orchestrator
 her adımda yeniden çağırır. Paralel başlatma kararı görevlerin `scope` kesişimine dayanır.
+
+`engine/` bir görevi bir motorla çalıştırır. `runner.py` görevin çalışabilir olduğunu
+doğrular, istemi kurar ve kullanım limitinde bekleyip oturumu sürdürür; motoru bir
+`Engine` arayüzü arkasında tutar. `claude.py` bu arayüzü Claude Agent SDK ile uygular
+(SDK isteğe bağlı bağımlılıktır, çalıştırılırken yüklenir). `policy.py` ajanın her izin
+sorusunu rolün yazma kapsamı ve `bash` listesiyle yanıtlar. Çalıştırıcı defteri
+değiştirmez.
 
 Şu an sürüm 0.1.0 ve config şeması 1 desteklenir. Tanınmayan sürüm kabul edilmez;
 sürüm yükseltme migration'ları ayrı bir geliştirmedir. Metadata veri olarak tutulur;

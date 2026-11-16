@@ -1,28 +1,20 @@
 # Current task
 
-Status: Yaşam döngüsü L3 (T-6, `harness next`) DONE, review approved; PR #4 awaits merge.
-L1 (T-5) is merged.
+Status: T-7..T-11 DONE (motor, dalga, reviewer, görev başına commit, salt okunur sunucu). Sıradaki: sunucuya eylemler ve canlı olaylar.
 
 ## Goal and scope
 
-L3 of docs/plans/lifecycle.md: `harness next` computes from the ledger which tasks can
-start, which wait and why, and which can run in parallel. Out of scope: default
-workflow and phase roles in `init` (L2), engine adapter, background agents and the
-desktop app (L4), stack packs (Faz 3), upgrade (Faz 4), version bump.
+T-9: `harness review` ve `wave --review`; review koşusu salt okunur, karar kodla işlenir.
+Kapsam dışı: görev başına commit, kapsam denetimi, faz kapısını döngüde işletme, sunucu, arayüz.
 
 ## Acceptance criteria
 
-AC1–AC6 in `.harness/tasks/T-6.yaml`.
+AC1-AC5 in `.harness/tasks/T-9.yaml`.
 
 ## Required checks
 
-Run through `harness evidence run <task> -- <command>`: uv run --frozen pytest -q;
-ruff check .; ruff format --check .; python -m build --no-isolation; harness
-validate . --json; harness check . --json. Wheel smoke test in a fresh venv for
-template, generation or CLI changes.
+Unit tests only (owner decision): pytest, ruff check, ruff format --check, harness check.
 
 ## Product decisions and blockers
 
-User decisions are recorded in docs/plans/lifecycle.md. Open: branch layout for
-parallel work (one branch per parallel group, or a worktree per task). No hook is
-installed in this repository.
+Yok. Dal düzeni A (docs/plans/lifecycle.md). PR #5 merge'i kullanıcıda.

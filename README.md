@@ -179,6 +179,187 @@ belgeleri yalnız başka iş çalışmıyorken güncellemek kullanıcının uyma
 kuraldır; bunu yapan bir orchestrator henüz yok. `next` öncelik, tahmin ya da rol
 kapasitesi bilmez.
 
+## Bir görevi ajana yaptırma
+
+```bash
+pip install 'agent-harness-starter[engine]'   # Claude Agent SDK, isteğe bağlı
+harness run T-3 /path/to/project --json
+```
+
+Defterdeki bir görevi, görev sahibinin rolüyle Claude'a yaptırır. Yalnız READY ya da
+IN_PROGRESS görevler çalışır; geçersiz defter, bilinmeyen görev ve rol motor çağrılmadan
+reddedilir. Komut defteri değiştirmez, commit atmaz: durum güncelleme ve commit
+orchestrator'ın işidir. Çıkış kodu 0 yalnız görev tamamlandıysa; hata ya da limit
+nedeniyle bitmişse 1.
+
+Rol başına motor ayarları `.harness/config.yaml` içinde durur:
+
+```yaml
+roles:
+  developer:
+    write: ["src/**", "tests/**"]
+    model: claude-sonnet-5-5   # boşsa motorun varsayılanı
+    effort: medium             # low, medium, high, xhigh, max
+    bash: ["uv run pytest", "ruff check"]   # ajanın sormadan çalıştırabildiği komutlar
+```
+
+Ajan insansız çalıştığı için her araç çağrısını rol politikası karara bağlar. Varsayılan red; izin
+verilenler şunlardır.
+
+- Dosya yazan araçlar (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) rolün yazma
+  kapsamı içinde; `harness scope` ile aynı kural.
+- Bilinen okuma araçları (`Read`, `Glob`, `Grep`, `LS`, `TodoWrite`, `Task`, `Skill`...),
+  yalnız proje klasörünün içindeki yollar ve desenler için (`/`, `~` ya da `..` ile başlayan
+  `Glob` deseni reddedilir).
+- `Bash` yalnız `bash` listesindeki önekle başlayan tek komut. `;`, `&`, `|`, `<`, `>`,
+  `` ` ``, `$(` ve satır sonu içeren komutlar reddedilir. `harness evidence run T-1 -- KOMUT`
+  yalnız şu biçimde ve KOMUT listedeyse geçer: görev kimliği, bilinen seçenekler (`--cwd`,
+  `--id`, `--timeout`, `--summary`, `--json`; `--cwd` proje içinde), sonra hemen `--`. Komut
+  satırı ayrıştırıcısı `--` öncesindeki sözcükleri de komuta kattığı için (`T-1 rm build --
+  uv run pytest` gerçekte `rm build uv run pytest` çalıştırır), başka hiçbir sözcüğe ve
+  `--path` seçeneğine izin verilmez.
+- Reddedilenler: MCP araçları (proje ayarları dosya yazan sunucu ekleyebilir), ağ araçları
+  (`WebFetch`, `WebSearch`) ve politikanın tanımadığı her araç.
+
+Politika iki yerden bağlanır: `PreToolUse` hook'u ve izin geri çağrımı. Hook, projenin kendi
+`.claude/settings.json` dosyasındaki bir izin kuralının (ör. `Bash(*)`) geri çağrımı
+atlamasını engeller. Hook hata verirse ya da girdisi bozuksa çağrı reddedilir (açık
+bırakılmaz). Hook'un reddini proje ayarlarının geri aldığı SDK dokümanında yazan davranışa
+dayanır; gerçek CLI ile denenmedi.
+
+Kullanım limiti dolunca koşu hatayla biter; çalıştırıcı "bekleniyor" olayını yazdırır,
+motorun bildirdiği sıfırlanma zamanına (yoksa 5 dakikaya) kadar bekler ve aynı oturumu
+sürdürür. `--max-resumes` (varsayılan 3) aşılırsa ya da bekleme 6 saati geçecekse
+beklemeden `rate_limited` döner. Motor ya da SDK hata fırlatırsa koşu `failed` döner;
+oturum kimliği ve olaylar korunur.
+
+Sınırlar:
+
+- Bu bir sandbox değildir. İzinli bir komut dosya yazabilir ve bayraklar kapsam dışını
+  değiştirebilir (`ruff check --fix`, `pytest --junitxml=/yol`). `bash` listesine yalnız
+  zararsız komutlar yazın, bayraklı biçimleri de düşünün.
+- Kabuk özel karakterleri (tırnak, `\`, `$`, `*`, `?`, `{}`, `~`, `#`) içeren komutlar reddedilir:
+  politika komutu boşluktan böler, kabuk ise başka okur. Bu yüzden `-k "a or b"` gibi
+  tırnaklı argümanlar da yazılamaz.
+- Okuma kuralı yalnız yola bakar; proje içindeki bir symlink dışarıyı gösterebilir.
+- Ajan proje ayarlarını (`.claude/settings.json`, CLAUDE.md, hook'lar, yetenekler) yükler.
+  `.mcp.json`'daki MCP sunucuları başlatılır (yalnız araçları reddedilir), projenin kendi
+  hook'ları ve `statusLine` komutları araç hattının dışında kabuk komutu çalıştırabilir.
+  Yalnız güvendiğiniz projelerde çalıştırın.
+- Kullanım limiti SDK'dan `ResultMessage` yerine istisna olarak gelirse beklenmez, koşu
+  `failed` olur.
+- Devam eden oturumda `cost_usd` ve `turns` toplamının tekrar saymayabileceği doğrulanmadı.
+- Bekleme sırasında Ctrl-C temiz bir `failed` sonucu vermez.
+- Gerçek Claude oturumu henüz denenmedi: motor yalnız sahte SDK ve sahte motorla birim
+  testlerden geçti.
+
+## Paralel dalga ve bağımsız review
+
+`harness wave [PATH] [--max-parallel N] [--review]`: `harness next`in "başlayabilir" dediği
+görevleri (en çok `--max-parallel`, varsayılan 3) aynı anda çalıştırır ve her koşunun
+sonucunu deftere yazar. Durumu yalnız bu komut değiştirir; ajanlar değiştirmez.
+
+- Başlamadan önce görev READY'den IN_PROGRESS'e alınır (başkası araya girdiyse alınmaz).
+- Biten görev, koşu sırasında kaydedilmiş en az bir yeni ve geçen kanıtı varsa
+  IN_REVIEW'a gider. Kanıtsızsa ya da hata verdiyse BLOCKED olur ve gerekçe yazılır.
+  Kullanım limitine takılan görev READY'ye döner. Yarıda kesilen dalga görevleri
+  READY'ye bırakır.
+- Çıkış kodu 0: hepsi IN_REVIEW'a ulaştı ve defter yazıldı.
+
+`harness review [PATH] [--task T-n] [--role reviewer]` (ya da `wave --review`): IN_REVIEW
+görevleri reviewer rolüyle inceletir. Review koşusu **salt okunurdur**: politika, rolün yazma
+kapsamı ne olursa olsun her dosya yazımını reddeder (hook düzeyinde). Reviewer kararını
+kendi yazmaz; cevabını `VERDICT: APPROVED|CHANGES_REQUESTED` satırıyla ve her kabul kriteri
+için kanıt satırıyla (`AC1: E1`) bitirir. Karar kodla işlenir:
+
+- Onay yalnız şunlar sağlanırsa kabul edilir: her kriter, `harness evidence run` ile kaydedilmiş
+  ve geçen bir kanıta bağlanmış; bir komutun en son koşusu başarısız değil. Görev DONE olur,
+  `verified_by` doldurulur (geliştiricinin bağladıkları korunur). Aksi hâlde onay "değişiklik
+  istendi" sayılır ve nedeni nota yazılır.
+- Belirsizlik reddedilir: iki farklı `VERDICT` satırı karar sayılmaz, bir kritere iki farklı
+  kanıt kimliği yazılırsa o kriter bağlanmamış sayılır.
+- Değişiklik istenirse görev READY'ye döner, reviewer'ın notları bir sonraki geliştirici
+  istemine veri olarak eklenir. Geliştirici metni istemde tek satıra indirilir ve alıntılanır,
+  böylece sahte `VERDICT` satırı üretemez.
+- Görev sahibi kendi görevini inceleyemez. İnceleme sırasında görevde herhangi bir değişiklik
+  olursa (salt okunur zorlama bir ikinci savunmadır) görev BLOCKED olur. Karar satırı yoksa ya
+  da koşu başarısızsa görev IN_REVIEW'da kalır ve log'a yazılır.
+- `--task` ile istenen görev IN_REVIEW değilse komut hata verir (sessiz başarı yok).
+- Çıkış kodu 0: incelenen her görev DONE oldu. `wave --review` yalnız o dalgada IN_REVIEW'a
+  ulaşan görevleri inceletir; çıkış kodu 0 için hem dalga hem review başarılı olmalıdır.
+  JSON'da son durum `reviews` listesindedir.
+
+Sınırlar: review koşusunda `harness evidence run` da reddedilir (başka görevin deftere kanıt yazmasın diye); ama reviewer'ın `bash` listesindeki diğer komutlar dosya yazabilir (`ruff --fix` gibi), bu listeyi yalnız `git status`, `git diff` gibi okuyan komutlarla sınırlayın. Tutarsız tespit edilen değişiklik geri alınmaz, yalnız görev BLOCKED olur. Reviewer'a `bash` vermezseniz "kapsam dışı dosya değişti mi" sorusunu `git` ile
+doğrulayamaz; onay bu noktada modelin okumasına dayanır. Kodla kapsam denetimi görev başına
+commit adımıyla gelecek. Onay, kanıtın ilgili kriteri gerçekten gösterip göstermediğini
+denetlemez, yalnız kanıtın var, geçen ve harness kaydı olduğunu denetler; ilgiyi model yargılar.
+IN_REVIEW'daki görev DONE olana kadar kapsamını meşgul tutar ve çakışan görevleri bekletir.
+
+## Görev başına commit ve kapsam denetimi
+
+`harness commit [PATH] [--task T-n] [--branch ad]`: DONE olmuş ve henüz commit'i olmayan her
+görevi ayrı bir commit olarak işler (dal düzeni A: paralel grup tek dalda, görev başına commit).
+`--branch` dalı oluşturur ya da ona geçer (geçersiz ad, `-` ile başlayan ad ve joker karakter
+reddedilir). Hiçbir şey push edilmez, merge sende.
+
+- Yalnız görevin sahip olduğu dosyalar stage edilir: kapsamındaki dosyalar ve kendi defter
+  dosyaları (`.harness/tasks/T-n.yaml`, `.harness/evidence/T-n/`). `git add -A` yok; git
+  `--literal-pathspecs` ile çalışır, yani `src/*.py` adlı bir dosya joker sayılmaz.
+- Bir dosya tek göreve gider: en spesifik kapsam kazanır (`src/` geniş kapsamı, başka görevin
+  adıyla andığı `src/api.py`'yi yutmaz), eşitlikte küçük görev numarası. Hâlâ çalışan bir
+  görevin spesifik kapsamındaki dosya commit'lenmez, o göreve bırakılır. Dosya yolları gerçek
+  ad olarak karşılaştırılır; `~x`, `a:b` gibi adlar kapsamı genişletmez.
+- **Kapsam denetimi kodla yapılır:** hiçbir görevin kapsamının ya da defter dosyalarının
+  açıklamadığı bir değişiklik varsa hiçbir commit atılmaz ve dosya adları söylenir. Paralel
+  görevlerde bunun kimin olduğu bilinemeyeceği için grubun tamamı durur. Yalnız testlerin
+  ürettiği `__pycache__`, `*.pyc` (izlenen olsalar bile) ve `.harness/tasks/` altındaki defter
+  kilit dosyaları (`.T-n.yaml.lock`) sayılmaz; başka yerdeki `.x.lock` ve `uv.lock` sayılır;
+  iptal edilmiş görevin kapsamı hiçbir dosyayı sahiplenmez (o kapsamdaki değişiklik stray sayılır ve
+  commit'leri durdurur); iptal edilmiş görevin kendi defter dosyaları ise sahipli kalır, commit'lenmez
+  ve engellemez;
+  `uv.lock` gibi proje dosyaları sayılır.
+- Bir görevin commit'i başarısız olursa (örneğin pre-commit hook) stage edilenler geri alınır,
+  o görev `blocked`, sonrakiler `skipped` raporlanır; önceki commit'ler raporda kalır.
+- Aynı komutu tekrar çalıştırmak ikinci commit atmaz: HEAD'den erişilen bir commit'in konusu
+  `T-n: ` ile başlıyorsa görev tamamlanmış sayılır. Sonradan değişen dosyalar commit'lenmez ve
+  notta sayısı yazılır. Hedef dal `--branch` ile verilmişse bu bakış o dalda yapılır.
+- Dizin git deposunun kökü olmalı. Index'te stage edilmiş değişiklik, bozuk defter, bilinmeyen
+  görev, çözülmemiş birleştirme, iç içe depo ve (`--branch` yoksa) detached HEAD hata verir.
+  Hiç commit'i olmayan depoda ilk commit atılabilir.
+- Çıkış kodu 0: engellenen görev yok.
+
+Sınırlar:
+- Kapsam eşleşmesi önek temellidir; `src/*.py` gibi joker karakterli kapsam, joker öncesi
+  öneki sahiplenir (aşırı geniş). `.`, `**`, `*.md` (ilk segmenti joker), mutlak ya da `..` içeren bir kapsam tüm projeyi
+  sahiplenir; bu görev en düşük öncelikli sahiptir ama kapsam denetimini fiilen kapatır, böyle
+  kapsamdan kaçının.
+- Commit'lemeden önce çalışma ağacında kendi değişikliğiniz varsa ve bir görevin kapsamına
+  düşüyorsa o görevle birlikte commit'lenir; ajan ekibini temiz bir ağaçta çalıştırın.
+- Git, deponun kendi `.git/config` ve hook'larıyla çalışır; kabuk erişimi olan bir ajan hook
+  yerleştirirse bu komut onu kendi yetkisiyle çalıştırır. Güvenmediğiniz projede çalıştırmayın.
+- Kimlik git ayarından gelir; eksik olan `user.name`/`user.email` için `Agent Harness
+  <harness@localhost>` kullanılır.
+
+## Yerel sunucu (salt okunur)
+
+`harness serve [PATH] [--port 8765]`: defteri JSON olarak sunan FastAPI sunucusu. Ek bağımlılık
+ister: `pip install 'agent-harness-starter[server]'`. Bu ilk dilim yalnız okur; wave, review ve
+commit başlatmaz, canlı olay akışı yoktur (sonraki görev).
+
+- Yalnız loopback'e bağlanır (`127.0.0.1`, `localhost`, `::1`); başka adres reddedilir.
+- `/api/health` dışında her istek `Authorization: Bearer <token>` ister. Token her başlangıçta
+  üretilir ve doğrulamalar geçtikten sonra bir kez yazdırılır; `HARNESS_TOKEN` ortam
+  değişkeni verilirse o kullanılır (en az 16 karakter) ve geri yazdırılmaz.
+- `Host` başlığı katı biçimde `localhost`, `127.0.0.1` ya da `[::1]` (isteğe bağlı sayısal port)
+  değilse istek token bakılmadan 403 alır (DNS rebinding savunması). `127.0.0.1` tercih edilir:
+  `localhost` ad çözümlemesine bağlıdır.
+- Uçlar: `GET /api/plan`, `/api/check`, `/api/tasks`, `/api/tasks/{T-n}`. `/docs` kapalı.
+
+Sınırlar: token düz HTTP ile loopback'te gider, TLS yok; Host ve token denetimi aynı
+makinedeki başka bir sürece karşı koruma değildir, token'ı bilen her süreç erişir. Hata
+mesajları yetkili istemciye dosya yolu içerebilir (okunamayan dosyalar için yol gizlenir). Token'ı komut satırı geçmişine ya da log'a koyma. Tarayıcıya token'ı verme
+yolu (arayüz) henüz tasarlanmadı.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.

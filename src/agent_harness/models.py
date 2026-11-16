@@ -21,6 +21,11 @@ RoleName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9-]{0,39}$")]
 Glob = Annotated[str, Field(min_length=1, max_length=300)]
 
 
+BashPrefix = Annotated[
+    str, Field(min_length=1, max_length=200, pattern=r"^[^\s;&|<>`$()]+( [^\s;&|<>`$()]+)*$")
+]
+
+
 class RoleConfig(BaseModel):
     """Write scope for one role. Globs are project-relative; deny wins over write."""
 
@@ -29,6 +34,11 @@ class RoleConfig(BaseModel):
     description: Annotated[str, Field(max_length=500)] = ""
     write: list[Glob] = Field(default_factory=list, max_length=200)
     deny: list[Glob] = Field(default_factory=list, max_length=200)
+    # Engine settings used by `harness run`; unset means the engine's own default.
+    model: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,99}$")] | None = None
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
+    # Shell commands the role may run unattended, as command prefixes ("uv run pytest").
+    bash: list[BashPrefix] = Field(default_factory=list, max_length=100)
 
     @field_validator("write", "deny")
     @classmethod

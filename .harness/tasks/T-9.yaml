@@ -1,0 +1,153 @@
+schema_version: 1
+id: T-9
+title: 'Uygulama adım 4: bağımsız reviewer (harness review, wave --review)'
+owner: developer
+status: DONE
+goal: IN_REVIEW görevleri reviewer rolüyle inceleten ve kararı kodla deftere işleyen katman.
+  Reviewer yalnız okur ve karar satırı üretir; DONE, verified_by ve geri gönderme orchestrator
+  tarafından yazılır. Eksik ya da sahte onay DONE yapmaz.
+scope:
+- src/agent_harness/review.py
+- src/agent_harness/orchestrator.py
+- src/agent_harness/engine/
+- src/agent_harness/cli.py
+- tests/
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: Reviewer çıktısından son `VERDICT:` satırı ve her kriter için kanıt kimliği ayrıştırılır;
+    onay yalnız her kriter kaydedilmiş ve geçen bir kanıta bağlıysa DONE yapar (verified_by
+    doldurulur, review approved, defter geçerli kalır); aksi hâlde değişiklik istendi sayılır.
+  verified_by:
+  - E7
+- id: AC2
+  text: Değişiklik istendiğinde görev READY'ye döner ve reviewer notları sonraki geliştirici
+    istemine veri olarak eklenir; ikinci dalga görevi yeniden IN_REVIEW'a getirir.
+  verified_by:
+  - E7
+- id: AC3
+  text: Karar satırı yoksa ya da review koşusu başarısızsa görev IN_REVIEW'da kalır ve log'a
+    yazılır; reviewer kanıtı ya da kabul kriterlerini değiştirirse görev BLOCKED olur.
+  verified_by:
+  - E7
+- id: AC4
+  text: Yalnız IN_REVIEW görev incelenir; görev sahibi reviewer olamaz; tanımsız rol defteri
+    değiştirmez. Bir görevin reddi diğerlerini durdurmaz.
+  verified_by:
+  - E7
+- id: AC5
+  text: '`harness review [PATH] [--task] [--role] [--max-parallel] [--json]` ve `harness wave
+    --review` sonucu gösterir; hepsi DONE olduysa 0, değilse 1 ile çıkar. Testler yalnız unit
+    testtir.'
+  verified_by:
+  - E7
+  - E8
+  - E9
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 2db3554e1d59834eee1561ef9fdb6ae35b4106ec
+  output: .harness/evidence/T-9/E1.txt
+  output_sha256: 376163e326ce8da64f59299c5d2fc9feb18266b14d0aabbe4277f44118dc0c1e
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 2db3554e1d59834eee1561ef9fdb6ae35b4106ec
+  output: .harness/evidence/T-9/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 2db3554e1d59834eee1561ef9fdb6ae35b4106ec
+  output: .harness/evidence/T-9/E3.txt
+  output_sha256: 5143a71867e2bd7dfcd6d76f8603e2f8ef6377cb2f6eac07d725e30b317980cc
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: edfd109fbd65a437ae02465d68eb79882c6becce
+  output: .harness/evidence/T-9/E4.txt
+  output_sha256: 217fcb9854866930b02fb9594af4ab5c8da5c1d34181a7fe411bf7f6885f6c6e
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: edfd109fbd65a437ae02465d68eb79882c6becce
+  output: .harness/evidence/T-9/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: edfd109fbd65a437ae02465d68eb79882c6becce
+  output: .harness/evidence/T-9/E6.txt
+  output_sha256: 5143a71867e2bd7dfcd6d76f8603e2f8ef6377cb2f6eac07d725e30b317980cc
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: unit tests
+  commit: 50c8bb5cca43da78a99ef2f228b806a30bd7b92b
+  output: .harness/evidence/T-9/E7.txt
+  output_sha256: bbb91a547428cd45d6638ee3ee84363f2aac4afe74645f3c3a215a5e6c6b9c94
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: ruff check
+  commit: 50c8bb5cca43da78a99ef2f228b806a30bd7b92b
+  output: .harness/evidence/T-9/E8.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: ruff format
+  commit: 50c8bb5cca43da78a99ef2f228b806a30bd7b92b
+  output: .harness/evidence/T-9/E9.txt
+  output_sha256: 5143a71867e2bd7dfcd6d76f8603e2f8ef6377cb2f6eac07d725e30b317980cc
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+review:
+  status: approved
+  by: reviewer
+  notes: 'Two read-only reviewer subagents, neither ran commands. Round 1 CHANGES REQUESTED (HIGH: the reviewer role could write every task file and only part of one task was frozen; MEDIUM: weak evidence rules, verdict injection, silent --task, lost sibling results); all fixed. Round 2 APPROVED with non-blocking findings: read-only runs still allowed `harness evidence run` for a reviewer with a bash list (fixed: denied in read-only runs), an unflattened task title in the review prompt (fixed), missing wiring test for read_only in claude.py and NotebookEdit (added). Those last fixes are not re-reviewed. Open and documented: tampering is detected but not reverted; a bash list on the reviewer can still write files; harness-recorded evidence is a YAML field, so a developer can forge it (pre-existing limit of the evidence model); SDK hook coverage of subagent tool calls unverified. A real-session trial (throwaway project) ran wave then review and both tasks reached DONE before the read-only fix; the read-only path itself was not re-run against a real session.'
+log:
+- 2026-11-16 görev açıldı. Gerçek oturum denemesi (geçici proje, scratchpad) - wave sonrası
+  harness review iki görevi DONE yaptı; reviewer git ile kapsam doğrulayamadı (README sınırı).

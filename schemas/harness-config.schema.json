@@ -60,6 +60,49 @@
           "maxItems": 200,
           "title": "Deny",
           "type": "array"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:\\[\\]-]{0,99}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effort"
+        },
+        "bash": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[^\\s;&|<>`$()]+( [^\\s;&|<>`$()]+)*$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Bash",
+          "type": "array"
         }
       },
       "title": "RoleConfig",

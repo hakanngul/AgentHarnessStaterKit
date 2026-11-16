@@ -160,6 +160,281 @@ def next_tasks(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> 
     report_result(plan_next(path), output_json)
 
 
+def make_engine():
+    """The engine `harness run` uses; tests replace it."""
+    from agent_harness.engine.claude import ClaudeEngine, load_sdk
+
+    return ClaudeEngine(load_sdk())
+
+
+def _describe(event) -> str | None:
+    from agent_harness.engine import events
+
+    if isinstance(event, events.Started):
+        return f"session {event.session_id}"
+    if isinstance(event, events.Text):
+        return event.text.strip()
+    if isinstance(event, events.ToolUse):
+        detail = event.input.get("command") or event.input.get("file_path") or ""
+        return f"[{event.name}] {detail}".rstrip()
+    if isinstance(event, events.ToolDenied):
+        return f"[denied {event.name}] {event.reason}"
+    if isinstance(event, events.Waiting):
+        return f"[usage limit] waiting {int(event.seconds)}s, then resuming the session"
+    if isinstance(event, events.RateLimit) and event.status != "allowed":
+        return f"[usage limit {event.status}] resets at {event.resets_at}"
+    return None
+
+
+@app.command("run")
+def run_command(
+    task: Annotated[str, typer.Argument(help="Task id from .harness/tasks, e.g. T-3.")],
+    path: ProjectPath = Path("."),
+    role: Annotated[
+        str | None, typer.Option(help="Role to act as; defaults to the task owner.")
+    ] = None,
+    max_resumes: Annotated[
+        int, typer.Option(min=0, help="How often to resume after a usage limit.")
+    ] = 3,
+    output_json: JsonFlag = False,
+) -> None:
+    """Run one READY or IN_PROGRESS task through the agent engine; the ledger is not changed."""
+    import asyncio
+
+    from agent_harness.engine.runner import run_task
+
+    try:
+        engine = make_engine()
+        printer = (
+            None if output_json else (lambda e: (line := _describe(e)) and console.print(line))
+        )
+        outcome = asyncio.run(
+            run_task(path, task, engine, role=role, max_resumes=max_resumes, on_event=printer)
+        )
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    summary = {
+        "ok": outcome.status == "completed",
+        "status": outcome.status,
+        "task": outcome.task_id,
+        "role": outcome.role,
+        "session_id": outcome.session_id,
+        "sessions": outcome.sessions,
+        "turns": outcome.turns,
+        "cost_usd": outcome.cost_usd,
+        "waited_seconds": outcome.waited_seconds,
+        "result": outcome.result,
+        "errors": [outcome.error] if outcome.error else [],
+    }
+    emit(summary, output_json)
+    if outcome.status != "completed":
+        raise typer.Exit(1)
+
+
+@app.command("wave")
+def wave_command(
+    path: ProjectPath = Path("."),
+    max_parallel: Annotated[int, typer.Option(min=1, help="Most tasks to run at once.")] = 3,
+    max_resumes: Annotated[
+        int, typer.Option(min=0, help="How often to resume after a usage limit.")
+    ] = 3,
+    review: Annotated[
+        bool, typer.Option("--review", help="Run the reviewer on tasks that reach IN_REVIEW.")
+    ] = False,
+    reviewer: Annotated[str, typer.Option(help="Role that reviews with --review.")] = "reviewer",
+    output_json: JsonFlag = False,
+) -> None:
+    """Run every task `harness next` would start, in parallel, and record how each ended.
+
+    Finished tasks go to IN_REVIEW, failed ones to BLOCKED, rate-limited ones back to READY.
+    """
+    import asyncio
+
+    from agent_harness.orchestrator import run_wave
+    from agent_harness.review import review_all
+
+    try:
+        engine = make_engine()
+        printer = (
+            None
+            if output_json
+            else (lambda t, e: (line := _describe(e)) and console.print(f"{t}: {line}"))
+        )
+        results = asyncio.run(
+            run_wave(
+                path,
+                engine,
+                max_parallel=max_parallel,
+                on_event=printer,
+                max_resumes=max_resumes,
+            )
+        )
+        reviews = []
+        if review:
+            reviews = asyncio.run(
+                review_all(
+                    path,
+                    engine,
+                    task_ids=[r.task_id for r in results if r.status == "IN_REVIEW"],
+                    role=reviewer,
+                    max_parallel=max_parallel,
+                    on_event=printer,
+                    max_resumes=max_resumes,
+                )
+            )
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    tasks = [
+        {
+            "task": r.task_id,
+            "run": r.outcome.status,
+            "status": r.status,
+            "cost_usd": r.outcome.cost_usd,
+            "note": r.note,
+            "recorded": r.recorded,
+        }
+        for r in results
+    ]
+    ok = all(r.status == "IN_REVIEW" and r.recorded for r in results)
+    payload = {"ok": ok, "started": len(results), "tasks": tasks}
+    if review:
+        payload["reviews"] = _review_rows(reviews)
+        ok = ok and all(r.status == "DONE" and r.recorded for r in reviews)
+        payload["ok"] = ok
+    emit(payload, output_json)
+    if not ok:
+        raise typer.Exit(1)
+
+
+def _review_rows(reviews) -> list[dict]:
+    return [
+        {
+            "task": r.task_id,
+            "verdict": r.verdict,
+            "status": r.status,
+            "cost_usd": r.outcome.cost_usd,
+            "note": r.note,
+            "recorded": r.recorded,
+        }
+        for r in reviews
+    ]
+
+
+@app.command("commit")
+def commit_command(
+    path: ProjectPath = Path("."),
+    task: Annotated[
+        list[str] | None, typer.Option("--task", help="Commit only this task; repeatable.")
+    ] = None,
+    branch: Annotated[
+        str | None, typer.Option(help="Switch to (or create) this branch first.")
+    ] = None,
+    output_json: JsonFlag = False,
+) -> None:
+    """Commit every DONE task that has no commit yet, one commit per task; nothing is pushed.
+
+    Only the files a task owns (its scope and its ledger files) are staged. A change that
+    no task accounts for blocks all commits.
+    """
+    from agent_harness.commit import commit_done_tasks
+
+    try:
+        results = commit_done_tasks(path, task_ids=task, branch=branch)
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    ok = all(r.status != "blocked" for r in results)
+    rows = [
+        {"task": r.task_id, "status": r.status, "sha": r.sha, "files": r.files, "note": r.note}
+        for r in results
+    ]
+    emit({"ok": ok, "tasks": rows}, output_json)
+    if not ok:
+        raise typer.Exit(1)
+
+
+@app.command("review")
+def review_command(
+    path: ProjectPath = Path("."),
+    task: Annotated[
+        list[str] | None, typer.Option("--task", help="Review only this task; repeatable.")
+    ] = None,
+    role: Annotated[
+        str, typer.Option(help="Role that reviews; never the task owner.")
+    ] = "reviewer",
+    max_parallel: Annotated[int, typer.Option(min=1, help="Most reviews at once.")] = 3,
+    max_resumes: Annotated[
+        int, typer.Option(min=0, help="How often to resume after a usage limit.")
+    ] = 3,
+    output_json: JsonFlag = False,
+) -> None:
+    """Have the reviewer role judge IN_REVIEW tasks: approved ones become DONE.
+
+    Changes requested send the task back to READY with the reviewer's notes. An approval
+    counts only if every acceptance criterion is backed by passing evidence.
+    """
+    import asyncio
+
+    from agent_harness.review import review_all
+
+    try:
+        engine = make_engine()
+        printer = (
+            None
+            if output_json
+            else (lambda t, e: (line := _describe(e)) and console.print(f"{t}: {line}"))
+        )
+        reviews = asyncio.run(
+            review_all(
+                path,
+                engine,
+                task_ids=task,
+                role=role,
+                max_parallel=max_parallel,
+                on_event=printer,
+                max_resumes=max_resumes,
+            )
+        )
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    ok = all(r.status == "DONE" and r.recorded for r in reviews)
+    emit({"ok": ok, "reviewed": len(reviews), "tasks": _review_rows(reviews)}, output_json)
+    if not ok:
+        raise typer.Exit(1)
+
+
+SERVER_HINT = "the server needs its extra: pip install 'agent-harness-starter[server]'"
+
+
+@app.command()
+def serve(
+    path: ProjectPath = Path("."),
+    host: Annotated[str, typer.Option(help="Loopback address to bind.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to listen on.")] = 8765,
+) -> None:
+    """Serve the ledger as a read-only JSON API on loopback; every request needs the token."""
+    import os
+    import secrets
+
+    try:
+        from agent_harness.server import check_port, check_token, require_loopback
+        from agent_harness.server import serve as run_server
+    except ImportError:
+        return fail(HarnessError(SERVER_HINT), False)
+    given = os.environ.get("HARNESS_TOKEN")
+    token = given or secrets.token_urlsafe(32)
+    try:  # validate first, so nothing secret is printed for a start that cannot happen
+        project_root(path)
+        require_loopback(host)
+        check_port(port)
+        check_token(token)
+        typer.echo(f"listening on {host}:{port}")
+        if not given:  # a token the user supplied is never echoed back
+            typer.echo(f"token: {token}")
+        run_server(path, host=host, port=port, token=token)
+    except HarnessError as exc:
+        fail(exc, False)
+
+
 @app.command()
 def scope(
     role: Annotated[str, typer.Argument(help="Role name from .harness/config.yaml.")],

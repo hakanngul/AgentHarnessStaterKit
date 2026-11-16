@@ -45,3 +45,49 @@ tasks.
 Use this checkout; no worktree unless asked. `uv sync --frozen --group dev`, then
 `uv run --frozen pytest` and `uv run --frozen harness check .`. Expected edits to
 generated files show as `validate` warnings; do not refresh hashes to hide them.
+
+## Engine adapter (T-7)
+
+- `harness run TASK` runs one READY/IN_PROGRESS task through the Claude Agent SDK
+  (optional extra `engine`). Role policy is default-deny, enforced as a PreToolUse hook
+  and `can_use_tool`; shell quoting/expansion, chaining, MCP and web tools are refused.
+- It is a guardrail, not a sandbox (README limits). Real-session behaviour is
+  unverified: hook precedence over allow rules, subagent hook coverage, cost after
+  resume, 429 as exception. Try it on a throwaway project first.
+- Next: orchestrator loop that uses `harness next` and `run_task`, records evidence,
+  requests review, enforces the phase gate, commits per task (layout A).
+
+## Orchestrator wave (T-8)
+
+- `harness wave` = plan().start -> claim (READY->IN_PROGRESS, compare-and-set) -> parallel
+  run_task -> settle: IN_REVIEW only with acceptance and NEW passing evidence, BLOCKED on
+  failure, READY on usage limit. Interrupts release claimed tasks to READY.
+- Not done: reviewer agent run, commit per task (layout A), phase gate in the loop.
+- Trial project for a real-session run: scratchpad `trial/` (throwaway, not in the repo).
+
+## Independent reviewer (T-9)
+
+- `harness review` / `wave --review`: reviewer runs read-only (hook denies every write and
+  `harness evidence run`), ends with `VERDICT:` plus `AC<n>: E<n>` lines; code writes review,
+  verified_by and status. Approval needs harness-recorded passing evidence and no failing
+  latest run per command. Any change to the task during review blocks it.
+- Not done: scope check by code (reviewer cannot run git), commit per task, phase gate in
+  the loop. Known: tampering detected not reverted; forged `recorded_by: harness` evidence.
+
+## Commit per task (T-10)
+
+- `harness commit`: one commit per DONE task on a group branch (layout A); scope checked by
+  code, any unowned change blocks all commits; most specific scope owns a file; CANCELLED
+  scopes own nothing but keep their ledger files. Nothing is pushed.
+- Known limits: rev-parse failure treated as unborn branch; `git switch -c` on an unborn
+  repo untested; wildcard scopes over-own; run the team on a clean working tree.
+- Next: FastAPI server, React UI, desktop shell; phase gate in the loop.
+
+## Local server (T-11)
+
+- `harness serve [PATH] [--port]` needs the `server` extra. Read-only: plan, check, tasks.
+  Loopback bind only, Bearer token on everything but /api/health, strict Host regex.
+- Known limits: no TLS; any local process holding the token has access; plan/check error
+  texts may contain file paths; no way yet to hand the token to a browser UI.
+- Next: T-12 actions as background jobs (wave, review, commit) with SSE events; the UI
+  token hand-off must be designed before the React UI.
