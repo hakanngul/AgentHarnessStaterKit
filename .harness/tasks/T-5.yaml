@@ -188,5 +188,5 @@ review:
     filter is a memory bound, not a behaviour fix, so no test fails on the previous code for
     it. Round 2 on 1ca1628 + d8e9e7e: APPROVED, 4 low findings and a nit; fixed in 6614863.
     6614863 itself (tests and docs only, no source change) was not re-reviewed. PR bots: Codex
-    found nothing on 1ca1628; SonarCloud gate passed; Sourcery was over its quota and CodeRabbit
+    found nothing on 1ca1628; SonarCloud gate passed; Sourcery approved without findings after first reporting it was over its quota and CodeRabbit
     does not review this repository.'

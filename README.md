@@ -148,6 +148,37 @@ kapsamı dışında tutun. Mevcut bir deftere
 `require_phase: true` eklemek fazsız eski görevleri de hataya düşürür; onlara
 gereksinimsiz bir faz verin. Plan: [docs/plans/lifecycle.md](docs/plans/lifecycle.md).
 
+## Sıradaki iş
+
+```bash
+harness next /path/to/project --json
+```
+
+Defterden hangi görevlerin şimdi başlayabileceğini hesaplar; hiçbir şey çalıştırmaz ve
+defteri değiştirmez. `check` hata veriyorsa aynı hataları gösterir, plan üretmez ve 1
+ile çıkar. Listeler: `running` (IN_PROGRESS, IN_REVIEW), `start` (şimdi başlatılabilecek
+READY görevler), `held` (kapsamı çalışan ya da aynı turda başlayan bir görevle kesişen
+READY görevler), `unblocked` (bağımlılıkları tamam, READY yapılabilecek BACKLOG görevler),
+`waiting` (nedenleriyle bekleyenler), `decisions` (PENDING kararlar ve beklettikleri).
+
+İki görev ancak `scope` alanları kesişmiyorsa birlikte başlatılır. `scope` girdileri
+proje köküne göre yol ya da glob'dur (`*`, `?`, `**`; köşeli parantez ve süslü parantez
+desteklenmez). Kesişim yol öneklerine bakar ve temkinlidir: `src/api/*.py` ile
+`src/api/v1/` kesişir sayılır. Büyük/küçük harf ve Unicode normalleştirme farkı yok
+sayılır; mutlak yollar, `~`, sürücü harfi, `$VAR`, URL ve `..` her şeyle kesişir. `scope` yazılmamış görev her şeye
+dokunuyor kabul edilir ve yalnız tek başına başlar; başka işler sürdükçe bekleyebilir.
+Sıra önce önek, sonra numaradır (`API-3`, `T-1`, `T-2`, `T-10`); kesişmede önce gelen
+başlar.
+
+Sınırlar: `scope` beyandır; görevin gerçekten yalnız o yollara yazdığını rolün yazma
+kapsamı ve review denetler. Serbest metin (`API katmanı`) yol gibi okunur ve gerçek
+yollarla kesişmez; yol yazın. Herkesin yazdığı dosyalar (`.harness/state/`, lock
+dosyaları) hiçbir görevin kapsamında değildir ve `next` bunları korumaz. AGENTS.md her
+göreve durum belgelerini güncellemesini söylediği için, paralel çalıştırırken bu
+belgeleri yalnız başka iş çalışmıyorken güncellemek kullanıcının uyması gereken bir
+kuraldır; bunu yapan bir orchestrator henüz yok. `next` öncelik, tahmin ya da rol
+kapasitesi bilmez.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.

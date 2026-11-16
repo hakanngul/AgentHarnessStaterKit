@@ -12,6 +12,8 @@ flowchart TD
   CLI --> Validate[validate.py: şema, dosyalar, değişiklikler]
   CLI --> Check[check.py: görev ve karar defteri]
   CLI --> Evidence[evidence.py: komutu çalıştırıp kanıt kaydı]
+  CLI --> Schedule[schedule.py: sıradaki işi hesaplar]
+  Check --> Schedule
   CLI --> RoleScope[roles.py: rol yazma kapsamı]
   RoleScope --> Hooks[hooks.py: PreToolUse hook ve kurulum]
   CLI --> Doctor[doctor.py: yerel gereksinimler]
@@ -41,6 +43,10 @@ hash'leri değişiklik tespiti içindir; imza veya güvenlik onayı değildir. K
 Config'te `workflow` varsa `check` faz kapısını da uygular: fazlı ve ilerleyen bir
 görev, fazının gerektirdiği her faz için `depends_on` grafiğinde o fazda bir göreve
 ulaşmalıdır. Ayrı bir gruplama kavramı yoktur; kapı mevcut bağımlılık grafiğini kullanır.
+
+`next`, `check`'in doğruladığı defterden bir plan türetir: çalışanlar, şimdi
+başlatılabilecekler, bekleyenler ve nedenleri. Durum tutmaz ve yazmaz; orchestrator
+her adımda yeniden çağırır. Paralel başlatma kararı görevlerin `scope` kesişimine dayanır.
 
 Şu an sürüm 0.1.0 ve config şeması 1 desteklenir. Tanınmayan sürüm kabul edilmez;
 sürüm yükseltme migration'ları ayrı bir geliştirmedir. Metadata veri olarak tutulur;

@@ -200,7 +200,7 @@ def _cycles(tasks: dict[str, Task]) -> list[str]:
     return found
 
 
-def _reachable_phases(tasks: dict[str, Task], defined: set[str]) -> dict[str, frozenset[str]]:
+def reachable_phases(tasks: dict[str, Task], defined: set[str]) -> dict[str, frozenset[str]]:
     """Defined phases of the tasks each task reaches through depends_on, excluding itself.
 
     Iterative and memoized. Inside a dependency cycle the result may be incomplete;
@@ -241,7 +241,7 @@ def _check_phases(
     tasks: dict[str, Task], workflow: WorkflowConfig | None, errors: list[str]
 ) -> None:
     defined = {phase.name for phase in workflow.phases} if workflow else set()
-    reach = _reachable_phases(tasks, defined) if workflow else {}
+    reach = reachable_phases(tasks, defined) if workflow else {}
     for task_id in sorted(tasks):
         task = tasks[task_id]
         where = f"{TASKS_DIR}/{task_id}.yaml"
@@ -286,7 +286,13 @@ def _load_config(root: Path, report: LedgerReport) -> tuple[HarnessConfig | None
         return None, False
 
 
-def check(path: Path) -> LedgerReport:
+def inspect_ledger(
+    path: Path,
+) -> tuple[LedgerReport, dict[str, Task], dict[str, Decision], HarnessConfig | None]:
+    """Validate the ledger and return the report with the loaded entries and config.
+
+    When the report has errors, the returned entries may be incomplete.
+    """
     report = LedgerReport()
     try:
         root = project_root(path)
@@ -294,7 +300,7 @@ def check(path: Path) -> LedgerReport:
         decisions = _load(root, DECISIONS_DIR, Decision, report)
     except (HarnessError, OSError) as exc:
         report.errors.append(str(exc))
-        return report
+        return report, {}, {}, None
 
     config, config_readable = _load_config(root, report)
     roles = set(config.roles) if config else set()
@@ -321,4 +327,8 @@ def check(path: Path) -> LedgerReport:
         report.warnings.append(f"No ledger entries found under {TASKS_DIR} or {DECISIONS_DIR}")
     report.checks.append(f"{len(tasks)} task(s) and {len(decisions)} decision(s) checked")
     report.checks.append("Evidence is checked for consistency only; commands were not rerun")
-    return report
+    return report, tasks, decisions, config
+
+
+def check(path: Path) -> LedgerReport:
+    return inspect_ledger(path)[0]

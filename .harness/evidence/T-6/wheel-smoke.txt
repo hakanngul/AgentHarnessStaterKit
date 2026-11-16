@@ -1,0 +1,25 @@
+# T-6 wheel smoke: wheel built from dcaafa117c251c2cc4bb72be3fdfc1a94ba373fe, fresh venv outside the checkout
+$ harness init proj -> exit=0
+$ harness next proj   # empty ledger
+  ok: True
+  exit=0
+$ harness next proj   # spec done; three implement tasks, two share src/api; payments waits for DEC-1
+  ok: True
+  start: ['T-2', 'T-3']
+  held: ['T-4']
+  waiting: ['T-5']
+  decisions: ['DEC-1']
+  exit=0
+$ harness next proj   # T-2 now IN_PROGRESS
+  ok: True
+  running: ['T-2']
+  start: ['T-3']
+  held: ['T-4']
+  waiting: ['T-5']
+  decisions: ['DEC-1']
+$ harness next proj   # T-6 READY without a spec task
+  ok: False
+  error: .harness/tasks/T-6.yaml: READY in phase 'implement' but no 'spec' task is reachable through depends_on; add the dependency or use BLOCKED or BACKLOG until that phase is done
+  exit=1
+$ harness check proj (same ledger)
+  exit=1

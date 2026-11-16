@@ -291,3 +291,45 @@ class Report(BaseModel):
 
 class LedgerReport(Report):
     summary: dict[str, int] = Field(default_factory=dict)
+
+
+class PlanTask(BaseModel):
+    id: str
+    title: str
+    owner: str
+    status: str
+    phase: str | None = None
+    scope: list[str] = Field(default_factory=list)
+
+
+class HeldTask(PlanTask):
+    conflicts_with: list[str] = Field(default_factory=list)
+    reason: str = ""
+
+
+class WaitingTask(PlanTask):
+    reasons: list[str] = Field(default_factory=list)
+
+
+class PendingDecision(BaseModel):
+    id: str
+    question: str
+    blocks: list[str] = Field(default_factory=list)
+
+
+class PlanReport(BaseModel):
+    """What can start next. Derived from the ledger; nothing is executed or written."""
+
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    running: list[PlanTask] = Field(default_factory=list)
+    start: list[PlanTask] = Field(default_factory=list)
+    held: list[HeldTask] = Field(default_factory=list)
+    unblocked: list[PlanTask] = Field(default_factory=list)
+    waiting: list[WaitingTask] = Field(default_factory=list)
+    decisions: list[PendingDecision] = Field(default_factory=list)
+    finished: bool = False
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors

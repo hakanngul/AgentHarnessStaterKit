@@ -9,13 +9,17 @@
   PreToolUse hook + `harness hook install`.
 - Yaşam döngüsü L1 (unreleased, PR #3): `workflow` phases in the config, `phase` on
   tasks, phase gate in `harness check` (T-5, DONE, review approved). 380 tests.
+- Yaşam döngüsü L3 (unreleased, PR #4): `harness next` (T-6, DONE, review approved).
+  441 tests.
 
 ## Current work
 
-T-5 is DONE in PR #3, awaiting merge. Three open threads from PR #2 remain for the maintainer (subprocess audit
-finding, credential redaction scope, settings.json concurrency).
+T-6 is DONE in PR #4, awaiting merge. Three open threads from PR #2 remain for the
+maintainer (subprocess audit finding, credential redaction scope, settings.json
+concurrency).
 
 ## Next step
 
-User decisions for L2/L4 (see TASK.md), then L2: default workflow and phase roles in
-`init`. Faz 3 (stack packs) per docs/plans/team-system.md is still planned.
+L2: default workflow (discovery, spec, design, implement, qa, release, fix) and phase
+roles in `init`, with model and effort per role. Then L4: engine adapter and background
+agents. The user must first choose the branch layout for parallel work.

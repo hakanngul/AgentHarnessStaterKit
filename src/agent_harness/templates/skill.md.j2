@@ -7,7 +7,9 @@ description: Plan, implement, verify, and hand off a project task with persisten
 2. Record each task as `.harness/tasks/<ID>.yaml` (ID like `T-1`): goal, owner, status,
    acceptance criteria, and dependencies. Identify real project checks.
    If the config defines `workflow`, set `phase` and depend on the tasks of the phases
-   it requires; `harness check` rejects work that skips a required phase.
+   it requires; `harness check` rejects work that skips a required phase. List the paths
+   a task will touch in `scope`; `harness next` shows which tasks can start and only
+   starts tasks together when their scopes do not overlap.
 3. Analyze only context needed for the task. Load architecture and decisions on demand.
 4. Implement in small changes. Use specialist roles only when needed and authorized.
 5. Run relevant tests/builds through `harness evidence run <ID> -- <command>`; it runs

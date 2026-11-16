@@ -12,13 +12,42 @@ Bu plan [team-system.md](team-system.md) planını değiştirmez; onun süreç �
 
 | Dilim | İçerik | Durum |
 | --- | --- | --- |
-| L1 | config'te `workflow` fazları, görevde `phase`, `check` faz kapısı | T-5 |
-| L2 | `init` için varsayılan akış ve faz başına rol şablonları (analyst, product, architect, qa) | planlandı, karar gerekir |
-| L3 | Orchestrator: sıradaki işi defterden hesaplayan komut (`harness next`) | planlandı |
-| L4 | Motor adapter'ı ve yönetim arayüzü | planlandı, karar gerekir |
+| L1 | config'te `workflow` fazları, görevde `phase`, `check` faz kapısı | uygulandı (T-5) |
+| L2 | `init` için varsayılan akış ve faz başına rol şablonları | planlandı; ilk hedef stack kararı bekliyor |
+| L3 | Sıradaki işi defterden hesaplayan komut (`harness next`) | T-6 |
+| L4 | Motor adapter'ı, arka plan ajanları, masaüstü uygulaması | planlandı |
 
-L2 ve L4 ürün kararı ister: varsayılan faz listesi, hangi rollerin kurulacağı, motorun
-nasıl çalıştırılacağı (abonelik/API key) ve arayüzün biçimi. Bunlar uygulanmadı.
+## Kullanıcı kararları (2026-11-16)
+
+- Fazlar: discovery → spec → design → implement → qa → release; küçük işler için
+  gereksinimsiz `fix` fazı.
+- Otonomi: kullanıcı onayı yalnız spec ve release bitince istenir; diğer fazlar
+  otomatik ilerler.
+- Git: commit'i orchestrator atar, merge'i kullanıcı yapar. Dal düzeni açık (aşağıda).
+- Ajanlar arka planda, ayrı oturumlar olarak çalışır; orchestrator model değil koddur.
+  Kapsamı kesişmeyen görevler paralel başlatılır (worktree yok); kanıt sayılan test
+  koşusu faz kapısında yapılır.
+- Modeller: lead ve architect Opus 5.5; developer, reviewer, product (spec) ve qa
+  Sonnet 5.5; analyst ve devops Haiku 5.5. Effort varsayılanı medium. Rol başına
+  config'te tutulacak.
+- Motor: kullanıcının Claude üyeliğiyle, kendi makinesinde (Python Agent SDK ya da
+  `claude -p`). Kullanım limiti dolunca orchestrator bekleyip sürdürmelidir. Kimlik
+  yöntemi değiştirilebilir kalır; dağıtım için API key gerekir.
+- Uygulama: masaüstü; Python arka uç (FastAPI), React arayüz, pywebview penceresi.
+  Rust ve Electron yok. İlk hedef işletim sistemi macOS (varsayım, teyit edilmedi).
+- Stack: karar gerektirmez. `analyze` stack'i tanır; test/lint/build komutları proje
+  açılırken bir kez sorulur ve config'e yazılır.
+- Açık: dal düzeni. "Görev başına branch" ile "worktree'siz paralel" birlikte olamaz;
+  bir checkout'ta aynı anda tek branch açıktır. Seçenekler: paralel grup için tek dal
+  (görev başına commit, grup başına PR) ya da görev başına worktree.
+
+Öneri (kullanıcı kararı değil): paralel görevler `.harness/state/` ve lock dosyalarına
+yazmasın; bunları orchestrator, başka iş çalışmıyorken güncellesin. Bugün AGENTS.md her
+göreve bu belgeleri güncellemesini söyler ve bu kuralı uygulayan kod yoktur.
+
+Bilinen riskler: üyelikle otomasyon dokümanlarda açıkça izinli değil (kişisel kullanım
+gri alan); paralel ajanlar limiti hızlı doldurur; pywebview paketlemesi denenmedi;
+insansız çalışmada izin modeli (hook Bash yazmalarını görmez) çözülmedi.
 
 ## L1 tasarımı
 
