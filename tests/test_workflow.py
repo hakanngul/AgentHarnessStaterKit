@@ -107,6 +107,14 @@ def test_invalid_workflow_in_config_is_one_check_error(tmp_path):
     assert "not defined before it" in found[0]
 
 
+def test_init_does_not_write_a_workflow_key(tmp_path):
+    # `workflow: null` would collide with a workflow block the user appends.
+    assert runner.invoke(app, ["init", str(tmp_path), "--json"]).exit_code == 0
+    config = (tmp_path / ".harness/config.yaml").read_text()
+    assert "workflow" not in config
+    assert "null" not in config
+
+
 def test_validate_rejects_invalid_workflow(tmp_path):
     assert runner.invoke(app, ["init", str(tmp_path), "--json"]).exit_code == 0
     config = tmp_path / ".harness/config.yaml"
