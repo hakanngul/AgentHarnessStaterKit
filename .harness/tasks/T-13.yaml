@@ -84,3 +84,9 @@ log:
   leave a lock behind'
 - '2026-11-16 developer: runlock.py, CLI and server integration, run_wave claim fix, git timeout;
   24 new tests; every fix mutation-checked; waiting for independent review'
+- '2026-11-16 reviewer: CHANGES_REQUESTED. #1 (one-lock test could not fail; the review never ran)
+  FIXED: test now asserts the review phase ran locked, mutation (review dedented out of the lock)
+  caught. #2 (cancel releases lock while a to_thread write may finish) ACCEPTED, documented in
+  README. #3 (git timeout vs grandchild holding the pipe) REFUTED: measured 1.0 s for a 1 s timeout
+  with a sleeping grandchild on POSIX. #4 (claim ownership keyed on exception type) ACCEPTED, very
+  unlikely behind the entry-point lock. #5 (holder note window) ACCEPTED, cosmetic, documented.'

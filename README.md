@@ -362,6 +362,10 @@ ve 1 ile çıkar (sunucuda 409).
   tutmasın).
 - Sınırlar: `flock` ağ dosya sistemlerinde (NFS) güvenilir olmayabilir. Windows'ta
   `msvcrt.locking` kullanılır; orada denenmedi.
+- Sınırlar (review bulgusu): sunucuda bir wave iptal edilirse kilit hemen bırakılır, ama o an
+  defteri yazan bir `to_thread` işi bitene kadar sürebilir; yazımlar görev başına `O_EXCL`
+  kilidiyle sıralı kalır, pencere küçüktür. Tutucu notu (kim, pid) kilit alındıktan hemen
+  sonra yazılır; o anda okuyan biri "holder unknown" görebilir, hata yine doğrudur.
 
 ## Yerel sunucu
 

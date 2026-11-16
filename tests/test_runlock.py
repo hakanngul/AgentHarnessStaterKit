@@ -194,18 +194,28 @@ def test_a_cli_wave_holds_the_lock_while_agents_run_and_frees_it_after(monkeypat
 
 
 def test_a_wave_with_review_uses_one_lock_for_both_phases(monkeypatch, tmp_path):
-    entered = []
+    entered, review_held = [], []
     real = cli.run_lock
 
     def counting(root, what):
         entered.append(what)
         return real(root, what)
 
+    async def fake_review(root, engine, **kwargs):
+        review_held.append((not is_free(root), kwargs["task_ids"]))
+        return []
+
     monkeypatch.setattr(cli, "run_lock", counting)
+    monkeypatch.setattr("agent_harness.review.review_all", fake_review)
     root = project(tmp_path, task("T-1"))
-    with_engine(monkeypatch, Probe({"T-1": ok("T-1")}, root))
-    runner.invoke(cli.app, ["wave", str(root), "--review", "--json"])
+    engine = Probe({"T-1": ok("T-1")}, root)
+    with_engine(monkeypatch, engine)
+    result = runner.invoke(cli.app, ["wave", str(root), "--review", "--json"])
+    assert result.exit_code == 0, result.output
     assert entered == ["wave"]  # not one lock for the wave and another for the review
+    assert engine.held == [True]
+    assert review_held == [(True, ["T-1"])]  # the review phase really ran, still locked
+    assert is_free(root)
 
 
 def test_evidence_and_read_only_commands_ignore_the_lock(tmp_path):
