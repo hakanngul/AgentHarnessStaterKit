@@ -396,3 +396,25 @@ def test_a_failing_event_listener_is_not_reported_as_an_engine_error(tmp_path):
     engine = FakeEngine([Started("s1"), ok()])
     with pytest.raises(ValueError, match="printer broke"):
         run(project(tmp_path, task()), engine, on_event=listener)
+
+
+def test_the_stream_is_closed_when_the_listener_raises(tmp_path):
+    closed = []
+
+    class Engine:
+        def run(self, request, root):
+            async def stream():
+                try:
+                    yield Started("s1")
+                    yield ok()
+                finally:
+                    closed.append(True)
+
+            return stream()
+
+    def listener(event) -> None:
+        raise ValueError("printer broke")
+
+    with pytest.raises(ValueError):
+        run(project(tmp_path, task()), Engine(), on_event=listener)
+    assert closed == [True]

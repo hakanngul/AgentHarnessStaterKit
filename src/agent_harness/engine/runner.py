@@ -102,21 +102,26 @@ async def run_task(
         finished: Finished | None = None
         crashed: Exception | None = None
         stream = engine.run(request, root).__aiter__()
-        while True:
-            try:
-                event = await stream.__anext__()
-            except StopAsyncIteration:
-                break
-            except Exception as exc:  # engine and process errors are not HarnessError
-                crashed = exc
-                break
-            _record(outcome, event, on_event)  # a failing listener is not an engine error
-            if isinstance(event, Started):
-                outcome.session_id = event.session_id
-            elif isinstance(event, RateLimit):
-                limit = event
-            elif isinstance(event, Finished):
-                finished = event
+        try:
+            while True:
+                try:
+                    event = await stream.__anext__()
+                except StopAsyncIteration:
+                    break
+                except Exception as exc:  # engine and process errors are not HarnessError
+                    crashed = exc
+                    break
+                _record(outcome, event, on_event)  # a failing listener is not an engine error
+                if isinstance(event, Started):
+                    outcome.session_id = event.session_id
+                elif isinstance(event, RateLimit):
+                    limit = event
+                elif isinstance(event, Finished):
+                    finished = event
+        finally:
+            aclose = getattr(stream, "aclose", None)
+            if aclose is not None:
+                await aclose()
         if finished is None:
             if crashed is not None:
                 outcome.error = f"{type(crashed).__name__}: {crashed}"

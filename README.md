@@ -238,6 +238,9 @@ Sınırlar:
 - Bu bir sandbox değildir. İzinli bir komut dosya yazabilir ve bayraklar kapsam dışını
   değiştirebilir (`ruff check --fix`, `pytest --junitxml=/yol`). `bash` listesine yalnız
   zararsız komutlar yazın, bayraklı biçimleri de düşünün.
+- Kabuk özel karakterleri (tırnak, `\`, `$`, `*`, `?`, `{}`, `~`, `#`) içeren komutlar reddedilir:
+  politika komutu boşluktan böler, kabuk ise başka okur. Bu yüzden `-k "a or b"` gibi
+  tırnaklı argümanlar da yazılamaz.
 - Okuma kuralı yalnız yola bakar; proje içindeki bir symlink dışarıyı gösterebilir.
 - Ajan proje ayarlarını (`.claude/settings.json`, CLAUDE.md, hook'lar, yetenekler) yükler.
   `.mcp.json`'daki MCP sunucuları başlatılır (yalnız araçları reddedilir), projenin kendi

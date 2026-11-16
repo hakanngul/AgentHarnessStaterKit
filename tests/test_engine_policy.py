@@ -353,3 +353,24 @@ def test_glob_patterns_that_leave_the_project_are_denied(tool, tool_input):
 )
 def test_glob_patterns_inside_the_project_are_allowed(tool, tool_input):
     assert verdict(tool, tool_input).allowed
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'harness evidence run T-1 --summary "x -- uv run pytest" rm build -- uv run pytest',
+        "harness evidence run T-1 --summary 'x -- uv run pytest' rm -- uv run pytest",
+        "uv run pytest $HOME",
+        'uv run pytest "a b"',
+        "uv run pytest tests/*.py",
+        r"uv run pytest \; rm",
+        "git status ~",
+    ],
+)
+def test_shell_quoting_and_expansion_are_denied(command):
+    assert not verdict("Bash", {"command": command}).allowed
+
+
+@pytest.mark.parametrize("pattern", ["{/etc/passwd,a}", "{..,x}/*", "src/{a,/etc}/*"])
+def test_glob_brace_alternatives_that_leave_the_project_are_denied(pattern):
+    assert not verdict("Glob", {"pattern": pattern}).allowed

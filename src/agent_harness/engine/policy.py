@@ -48,7 +48,29 @@ EVIDENCE_FLAGS = {"--json"}
 TASK_ID = re.compile(r"^[A-Z][A-Z0-9]*-[1-9][0-9]*$")
 EVIDENCE_COMMANDS = (("harness", "evidence", "run"), ("uv", "run", "harness", "evidence", "run"))
 # Characters that would let one command line run, feed or redirect another command.
-SHELL_META = (";", "&", "|", "<", ">", "`", "$(", "\n", "\r")
+# The Bash tool runs the command through a shell, but the policy splits it on whitespace.
+# Anything a shell would treat specially (quotes, escapes, expansion, globs) makes the two
+# views differ, so it is refused.
+SHELL_META = (
+    ";",
+    "&",
+    "|",
+    "<",
+    ">",
+    "`",
+    "$",
+    "\n",
+    "\r",
+    '"',
+    "'",
+    "\\",
+    "*",
+    "?",
+    "{",
+    "}",
+    "~",
+    "#",
+)
 
 
 @dataclass(frozen=True)
@@ -120,7 +142,11 @@ def _inside(root: Path, target: str) -> bool:
 
 
 def _escapes(pattern: str) -> bool:
-    return pattern.startswith(("/", "~")) or ".." in pattern.replace("\\", "/").split("/")
+    # Brace alternatives ({/etc,a}) are checked one by one, as a backend may expand them.
+    for part in re.split(r"[{},]", pattern):
+        if part.startswith(("/", "~")) or ".." in part.replace("\\", "/").split("/"):
+            return True
+    return False
 
 
 def check_tool(
