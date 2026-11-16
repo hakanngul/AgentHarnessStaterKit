@@ -3,7 +3,7 @@ id: T-11
 title: 'Uygulama adım 6a: yerel HTTP sunucusu, salt okunur API ve kimlik doğrulama (harness
   serve)'
 owner: developer
-status: IN_REVIEW
+status: DONE
 goal: Defteri (plan, görevler, check) JSON olarak sunan, yalnız loopback adresinde dinleyen
   ve her isteği token ile doğrulayan FastAPI sunucusu. Eylemler (wave, review, commit) ve
   canlı olaylar sonraki görev; bu görev yalnız okur, hiçbir şey yazmaz ve ajan çalıştırmaz.
@@ -23,21 +23,33 @@ acceptance:
     gövdesinde errors olarak raporlanır; hiçbiri 500 vermez ve dosya yazmaz; görev uçları
     ve liste satırları dosya yolu sızdırmaz, plan ve check gövdesindeki hata metinleri ise
     yetkili istemciye yol içerebilir (README'de yazılı).
+  verified_by:
+  - E10
 - id: AC2
   text: /api/health dışındaki her istek geçerli Bearer token ister (sabit zamanlı karşılaştırma);
     eksik ya da yanlış token 401 verir.
+  verified_by:
+  - E10
 - id: AC3
   text: Host başlığı katı biçimde loopback adı (isteğe bağlı sayısal port) değilse istek token
     bakılmadan 403 ile reddedilir (DNS rebinding); sunucu loopback dışı bir adrese ya da geçersiz
     porta bağlanmayı reddeder ve uvicorn'a yalnız doğrulanmış host/port verilir.
+  verified_by:
+  - E10
 - id: AC4
   text: '`harness serve [PATH] [--port]` proje yolunu, host''u, portu ve token''ı doğruladıktan
     sonra yalnız kendi ürettiği token''ı bir kez yazar (HARNESS_TOKEN verilmişse onu yazmaz
     ve kullanır), fastapi/uvicorn yoksa kurulum yolunu söyleyen bir hata verir; bağımlılıklar
     `server` extra olarak tanımlıdır.'
+  verified_by:
+  - E10
 - id: AC5
   text: Testler yalnız unit testtir (TestClient, gerçek ledger dosyaları); pytest, ruff check
     ve ruff format --check geçer.
+  verified_by:
+  - E10
+  - E11
+  - E12
 evidence:
 - id: E1
   kind: command
@@ -138,17 +150,46 @@ evidence:
   output_sha256: 98c3e013fccf39091730bb21f579ed3160ed39a17ff3e680b97a11a5a7e45c69
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 859 passed in 27.90s
+  commit: 9179dc7b08af82a827190a284b1001e269c86a80
+  output: .harness/evidence/T-11/E10.txt
+  output_sha256: 3bc8b8c689414be564eac47adaafbfee1ffec4c48a55f07b565082a3f6192217
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 9179dc7b08af82a827190a284b1001e269c86a80
+  output: .harness/evidence/T-11/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 59 files already formatted
+  commit: 9179dc7b08af82a827190a284b1001e269c86a80
+  output: .harness/evidence/T-11/E12.txt
+  output_sha256: 98c3e013fccf39091730bb21f579ed3160ed39a17ff3e680b97a11a5a7e45c69
+  recorded_at: '2026-11-16'
+  recorded_by: harness
 review:
-  status: changes_requested
+  status: approved
   by: reviewer
-  notes: 'Round 1: no auth bypass or write path found. Requested: (1) OSError/UnicodeError
-    not handled, (2) AC1 only partly tested, (3) weak never-writes snapshot, (4) uvicorn host
-    never asserted, (5) token printed before validation and echoed from env. All five fixed,
-    plus strict Host regex, ASCII-only task ids, port range. Each fix proven by a mutation
-    check (revert the fix, a test fails). Sonar S5332 on the http:// banner removed by printing
-    host:port only. Round 2 asked: serve refuses bad host/port without touching uvicorn (test),
-    project path validated before banner, AC1 path-leak claim softened, re.ASCII and ASCII-only
-    strip on Host. Done.'
+  notes: 'Round 3 (fresh read-only reviewer): APPROVED, no blocking issue. Accepted low items:
+    some tests accept 200 or 422 for plan/check; broken-YAML HarnessError messages not asserted
+    path-free; banner prints "::1:8765" for IPv6; README sentence is a run-on; the server
+    extra itself is untested. Rounds 1-2 fixes proven by mutation checks.'
 log:
 - '2026-11-16 developer: task opened after the owner said "Başla"; first slice is read-only
   on purpose'
@@ -156,3 +197,4 @@ log:
   waiting for independent review'
 - '2026-11-16 developer: round-1 findings fixed; waiting for a narrow second review'
 - '2026-11-16 developer: round-2 findings fixed; evidence E7-E9'
+- '2026-11-16 orchestrator: review by reviewer: approved'

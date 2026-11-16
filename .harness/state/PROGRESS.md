@@ -44,3 +44,9 @@ commit per task, then FastAPI.
 
 DONE. 795 unit tests, ruff clean, four review rounds (last APPROVED, low findings accepted).
 Real trial: four tasks committed one per task on a group branch. Next: FastAPI server.
+
+## 2026-11-16 T-11 read-only local server
+
+DONE. 859 unit tests, ruff clean, three review rounds (last APPROVED). `harness serve`:
+loopback only, bearer token, strict Host check, read-only JSON (plan, check, tasks).
+Verified against a real uvicorn process. Next: actions (wave, review, commit) and live events.

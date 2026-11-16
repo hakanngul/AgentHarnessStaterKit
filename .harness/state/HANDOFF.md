@@ -82,3 +82,12 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
 - Known limits: rev-parse failure treated as unborn branch; `git switch -c` on an unborn
   repo untested; wildcard scopes over-own; run the team on a clean working tree.
 - Next: FastAPI server, React UI, desktop shell; phase gate in the loop.
+
+## Local server (T-11)
+
+- `harness serve [PATH] [--port]` needs the `server` extra. Read-only: plan, check, tasks.
+  Loopback bind only, Bearer token on everything but /api/health, strict Host regex.
+- Known limits: no TLS; any local process holding the token has access; plan/check error
+  texts may contain file paths; no way yet to hand the token to a browser UI.
+- Next: T-12 actions as background jobs (wave, review, commit) with SSE events; the UI
+  token hand-off must be designed before the React UI.

@@ -1,6 +1,6 @@
 # Current task
 
-Status: T-7..T-10 DONE (motor, dalga, reviewer, görev başına commit), review approved. Sıradaki: FastAPI sunucusu.
+Status: T-7..T-11 DONE (motor, dalga, reviewer, görev başına commit, salt okunur sunucu). Sıradaki: sunucuya eylemler ve canlı olaylar.
 
 ## Goal and scope
 
