@@ -46,10 +46,26 @@ def events_of(api, job_id, **params):
     with api.stream("GET", f"/api/jobs/{job_id}/events", headers=AUTH, **params) as response:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
+        announced = None
         for line in response.iter_lines():
-            if line.startswith("data: "):
+            if line.startswith("id: "):
+                announced = int(line[4:])
+            elif line.startswith("data: "):
                 frames.append(json.loads(line[6:]))
+                # the protocol id (what a client sends back to resume) must be the event id
+                assert announced == frames[-1]["id"], (announced, frames[-1]["id"])
+                announced = None
     return frames
+
+
+def wait_for_status(root, task_id, wanted, seconds=10):
+    """Poll until the task has the status; proves the orchestrator really claimed it."""
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if status_of(root, task_id) == wanted:
+            return
+        time.sleep(0.02)
+    assert status_of(root, task_id) == wanted, f"{task_id} never became {wanted}"
 
 
 def view(api, job_id):
@@ -89,6 +105,15 @@ def test_a_wave_job_runs_the_orchestrator_and_streams_ordered_events(tmp_path):
         assert job["status"] == "done" and job["error"] is None and job["finished"]
         assert job["result"]["ok"] is True
         assert [(t["task"], t["status"]) for t in job["result"]["tasks"]] == [("T-1", "IN_REVIEW")]
+        # the same row keys `harness wave --json` prints
+        assert set(job["result"]["tasks"][0]) == {
+            "task",
+            "run",
+            "status",
+            "cost_usd",
+            "note",
+            "recorded",
+        }
         assert job["params"] == {"kind": "wave"} and job["last_event"] == len(frames)
     assert status_of(root, "T-1") == "IN_REVIEW"
 
@@ -129,6 +154,14 @@ def test_a_review_job_passes_its_options_to_review_all(monkeypatch, tmp_path):
     assert job["status"] == "done" and job["result"]["ok"] is True
     # the same shape `harness review --json` prints
     assert job["result"]["reviewed"] == 1 and job["result"]["tasks"][0]["task"] == "T-1"
+    assert set(job["result"]["tasks"][0]) == {
+        "task",
+        "verdict",
+        "status",
+        "cost_usd",
+        "note",
+        "recorded",
+    }
     assert "reviews" not in job["result"]
 
 
@@ -209,6 +242,7 @@ def test_a_second_job_is_refused_while_one_runs_and_cancel_releases_the_task(tmp
     root = project(tmp_path, task("T-1"))
     with make_client(root, Blocking) as api:
         first = start(api, WAVE).json()["id"]
+        wait_for_status(root, "T-1", "IN_PROGRESS")  # the wave really holds the task
         second = start(api, WAVE)
         assert second.status_code == 409 and first in second.json()["detail"]
         assert view(api, first)["status"] == "running"
@@ -246,6 +280,7 @@ def test_shutdown_cancels_a_running_wave_and_releases_its_task(tmp_path):
     api = make_client(root, Blocking)
     with api:
         job_id = start(api, WAVE).json()["id"]
+        wait_for_status(root, "T-1", "IN_PROGRESS")
         assert view(api, job_id)["status"] == "running"
         manager = api.app.state.jobs
     assert manager.jobs[job_id].status == "cancelled"
@@ -261,12 +296,10 @@ def test_events_resume_after_an_id_or_last_event_id(tmp_path):
         assert events_of(api, job_id, params={"after": 2}) == everything[2:]
         header = {**AUTH, "Last-Event-ID": "2"}
         with api.stream("GET", f"/api/jobs/{job_id}/events", headers=header) as response:
-            ids = [
-                json.loads(line[6:])["id"]
-                for line in response.iter_lines()
-                if line.startswith("data: ")
-            ]
-        assert ids == [e["id"] for e in everything[2:]]
+            lines = list(response.iter_lines())
+        ids = [json.loads(line[6:])["id"] for line in lines if line.startswith("data: ")]
+        sse_ids = [int(line[4:]) for line in lines if line.startswith("id: ")]
+        assert ids == [e["id"] for e in everything[2:]] and sse_ids == ids
         assert events_of(api, job_id, params={"after": 10**6}) == []
         junk = {**AUTH, "Last-Event-ID": "x1"}
         with api.stream("GET", f"/api/jobs/{job_id}/events", headers=junk) as response:
@@ -585,6 +618,7 @@ def test_stopping_the_real_server_with_an_open_event_stream_does_not_hang(tmp_pa
     reader = threading.Thread(target=read_stream, daemon=True)
     reader.start()
     assert got_first_event.wait(10)
+    wait_for_status(root, "T-1", "IN_PROGRESS")  # so READY below can only come from the cancel
     server.should_exit = True
     thread.join(20)
     assert not thread.is_alive(), "the server hung on shutdown with an open stream"
@@ -680,3 +714,85 @@ def test_the_content_type_must_be_exactly_json_and_a_declared_size_is_checked(tm
         )
         big = {**AUTH, "Content-Type": "application/json", "Content-Length": "999999"}
         assert api.post("/api/jobs", headers=big, content=b"{}").status_code in (413, 400)
+
+
+def test_a_huge_last_event_id_is_ignored_not_a_500(tmp_path):
+    root = project(tmp_path, task("T-1"))
+    with make_client(root) as api:
+        job_id = start(api, WAVE).json()["id"]
+        everything = events_of(api, job_id)
+        for value in ("9" * 5000, "9" * 19, "0" * 5000):
+            header = {**AUTH, "Last-Event-ID": value}
+            with api.stream("GET", f"/api/jobs/{job_id}/events", headers=header) as response:
+                assert response.status_code == 200, len(value)
+                got = [ln for ln in response.iter_lines() if ln.startswith("id: ")]
+            assert len(got) == len(everything), len(value)  # the unusable header was ignored
+        header = {**AUTH, "Last-Event-ID": "9" * 18}
+        with api.stream("GET", f"/api/jobs/{job_id}/events", headers=header) as response:
+            assert [ln for ln in response.iter_lines() if ln.startswith("id: ")] == []
+
+
+def test_the_body_cap_is_enforced_while_reading_not_after_the_upload(tmp_path):
+    """Drive the app at the ASGI level with a body that never ends: it must answer 413 after
+    reading about the cap, not buffer the upload."""
+    from agent_harness.server import MAX_BODY
+
+    root = project(tmp_path, task("T-1"))
+    app = create_app(root, TOKEN)
+    state = {"reads": 0, "sent": 0}
+    chunk = b"x" * 1000
+
+    async def receive():
+        state["reads"] += 1
+        if state["reads"] > 500:  # a runaway reader would get here
+            return {"type": "http.disconnect"}
+        state["sent"] += len(chunk)
+        return {"type": "http.request", "body": chunk, "more_body": True}
+
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "path": "/api/jobs",
+        "raw_path": b"/api/jobs",
+        "query_string": b"",
+        "root_path": "",
+        "scheme": "http",
+        "server": ("localhost", 80),
+        "client": ("127.0.0.1", 1),
+        "headers": [
+            (b"host", b"localhost"),
+            (b"authorization", f"Bearer {TOKEN}".encode()),
+            (b"content-type", b"application/json"),
+        ],
+    }
+    asyncio.run(app(scope, receive, send))
+    status = next(m["status"] for m in sent if m["type"] == "http.response.start")
+    assert status == 413
+    assert state["sent"] <= MAX_BODY + 2 * len(chunk), state  # read to the cap, then stopped
+
+
+def test_cancelling_a_review_job_leaves_its_task_in_review(tmp_path):
+    from test_review import in_review
+    from test_review import project as reviewed_project
+
+    root = reviewed_project(tmp_path, in_review("T-1"))
+    with make_client(root, Blocking) as api:
+        job_id = start(api, {"kind": "review"}).json()["id"]
+        deadline = time.time() + 10
+        while time.time() < deadline:  # the reviewer session has started
+            if any("s-blocked" in e["text"] for e in api.app.state.jobs.jobs[job_id].events):
+                break
+            time.sleep(0.02)
+        else:
+            raise AssertionError("the review never started")
+        cancelled = api.post(f"/api/jobs/{job_id}/cancel", headers=AUTH)
+        assert cancelled.status_code == 200 and cancelled.json()["status"] == "cancelled"
+        assert events_of(api, job_id)[-1]["text"] == "review cancelled"
+    assert status_of(root, "T-1") == "IN_REVIEW"  # a review does not claim the task

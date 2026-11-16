@@ -30,6 +30,7 @@ from agent_harness.schedule import plan
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 MIN_TOKEN = 16
 MAX_BODY = 10_000
+MAX_ID_DIGITS = 18
 GRACEFUL_SHUTDOWN = 3  # seconds uvicorn waits for open connections before it cancels them
 TASK_ID = re.compile(r"T-[0-9]+")
 HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE | re.ASCII)
@@ -173,9 +174,13 @@ def create_app(
         declared = request.headers.get("content-length", "")
         if declared.isascii() and declared.isdigit() and int(declared) > MAX_BODY:
             raise HTTPException(413, "the request body is too large")
-        body = await request.body()
-        if len(body) > MAX_BODY:
-            raise HTTPException(413, "the request body is too large")
+        chunks, total = [], 0
+        async for chunk in request.stream():  # stop reading at the cap, not after the upload
+            total += len(chunk)
+            if total > MAX_BODY:
+                raise HTTPException(413, "the request body is too large")
+            chunks.append(chunk)
+        body = b"".join(chunks)
         try:
             params = JobParams.model_validate_json(body)
         except ValidationError as exc:
@@ -212,7 +217,12 @@ def create_app(
         last_event_id: Annotated[str | None, Header()] = None,
     ) -> StreamingResponse:
         job = find_job(job_id)
-        if last_event_id and last_event_id.isascii() and last_event_id.isdigit():
+        if (
+            last_event_id
+            and last_event_id.isascii()
+            and last_event_id.isdigit()
+            and len(last_event_id) <= MAX_ID_DIGITS  # a longer one is not a real event id
+        ):
             after = max(after, int(last_event_id))
 
         async def frames():

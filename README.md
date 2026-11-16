@@ -370,8 +370,9 @@ bir karar mantığı eklemez.
   kaldığı yerden devam eder, iş bitince kapanır. İş başına en çok 2000 olay ve olay başına 500
   karakter tutulur; `after` eski kalırsa akış en eski tutulan olaydan sürer. Tarayıcıda
   `EventSource` Authorization başlığı gönderemez; `fetch` ile akış okunur.
-- `POST /api/jobs/{id}/cancel`: wave ya da review'ı iptal eder, yarım kalan görevler READY'ye
-  döner. Commit işi kısa bir iş parçacığında koşar, iptal edilemez (409). Sunucu kapanırken
+- `POST /api/jobs/{id}/cancel`: wave ya da review'ı iptal eder. Wave'in yarım kalan görevleri
+  READY'ye döner; review görevleri sahiplenmediği için iptal edilen review'ın görevleri
+  IN_REVIEW'da kalır. Commit işi kısa bir iş parçacığında koşar, iptal edilemez (409). Sunucu kapanırken
   açık akışlar en çok 3 saniye beklenir (uvicorn açık bağlantıları bu süre sonunda keser), sonra
   çalışan wave ya da review iptal edilir ve commit bitirilir. Uzun süren bir git komutu kapanışı
   geciktirir.
@@ -385,6 +386,12 @@ Sınırlar:
   sürece karşı koruma değildir; token'ı bilen her süreç erişir.
 - Hata mesajları yetkili istemciye dosya yolu ya da git çıktısı içerebilir (okunamayan görev
   dosyalarında yol gizlenir).
+- Kilit yok: CLI ve sunucu aynı projede aynı anda wave ya da commit çalıştırırsa birbirinin
+  görevini ya da git index'ini bozabilir. Aynı anda yalnız tek aktör (CLI ya da sunucu) kullan.
+- Bir iptal, defter yazımı sürerken gelirse o yazım tamamlanabilir; iş `cancelled` görünür ama
+  görev gerçekten bitmiş durumda kalır (defter tutarlı kalır).
+- Takılan bir engine işi çalışıyor gösterir ve yeni işi 409 ile engeller; iptal uç noktası yuvayı
+  boşaltır. İş süresi sınırı yok.
 - Tarayıcı arayüzü için token'ı güvenle verme yolu henüz tasarlanmadı.
 
 ## Roller ve yazma kapsamı
