@@ -179,6 +179,49 @@ belgeleri yalnız başka iş çalışmıyorken güncellemek kullanıcının uyma
 kuraldır; bunu yapan bir orchestrator henüz yok. `next` öncelik, tahmin ya da rol
 kapasitesi bilmez.
 
+## Bir görevi ajana yaptırma
+
+```bash
+pip install 'agent-harness-starter[engine]'   # Claude Agent SDK, isteğe bağlı
+harness run T-3 /path/to/project --json
+```
+
+Defterdeki bir görevi, görev sahibinin rolüyle Claude'a yaptırır. Yalnız READY ya da
+IN_PROGRESS görevler çalışır; geçersiz defter, bilinmeyen görev ve rol motor çağrılmadan
+reddedilir. Komut defteri değiştirmez, commit atmaz: durum güncelleme ve commit
+orchestrator'ın işidir. Çıkış kodu 0 yalnız görev tamamlandıysa; hata ya da limit
+nedeniyle bitmişse 1.
+
+Rol başına motor ayarları `.harness/config.yaml` içinde durur:
+
+```yaml
+roles:
+  developer:
+    write: ["src/**", "tests/**"]
+    model: claude-sonnet-5-5   # boşsa motorun varsayılanı
+    effort: medium             # low, medium, high, xhigh, max
+    bash: ["uv run pytest", "ruff check"]   # ajanın sormadan çalıştırabildiği komutlar
+```
+
+Ajan insansız çalıştığı için her izin sorusunu rol politikası yanıtlar:
+
+- Dosya yazan araçlar (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) rolün yazma
+  kapsamıyla sınırlıdır; `harness scope` ile aynı kural.
+- `Bash` yalnız `bash` listesindeki önekle başlayan tek komutu çalıştırır. `;`, `&`, `|`,
+  `<`, `>`, `` ` ``, `$(` ve satır sonu içeren komutlar reddedilir.
+- MCP araçları reddedilir: proje ayarları dosya yazan sunucular ekleyebilir.
+- Diğer yerleşik araçlar (okuma, arama) serbesttir.
+
+Kullanım limiti dolunca koşu hatayla biter; çalıştırıcı, motorun bildirdiği sıfırlanma
+zamanına (yoksa 5 dakikaya) kadar bekler ve aynı oturumu sürdürür. `--max-resumes`
+(varsayılan 3) aşılırsa ya da bekleme 6 saati geçecekse beklemeden `rate_limited` döner.
+
+Sınırlar: Bu bir sandbox değildir. İzinli bir komut (ör. test çalıştırıcı) dosya yazabilir
+ve `ruff check --fix` gibi bayraklar kapsam dışını değiştirebilir; `bash` listesine yalnız
+zararsız komutlar yazın. Ajan proje ayarlarını (`.claude/settings.json`, hook'lar,
+yetenekler) yükler. Gerçek Claude oturumu henüz denenmedi: motor yalnız sahte SDK ve
+sahte motorla birim testlerden geçti.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.

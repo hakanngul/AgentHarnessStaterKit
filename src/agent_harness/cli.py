@@ -160,6 +160,75 @@ def next_tasks(path: ProjectPath = Path("."), output_json: JsonFlag = False) -> 
     report_result(plan_next(path), output_json)
 
 
+def make_engine():
+    """The engine `harness run` uses; tests replace it."""
+    from agent_harness.engine.claude import ClaudeEngine, load_sdk
+
+    return ClaudeEngine(load_sdk())
+
+
+def _describe(event) -> str | None:
+    from agent_harness.engine import events
+
+    if isinstance(event, events.Started):
+        return f"session {event.session_id}"
+    if isinstance(event, events.Text):
+        return event.text.strip()
+    if isinstance(event, events.ToolUse):
+        detail = event.input.get("command") or event.input.get("file_path") or ""
+        return f"[{event.name}] {detail}".rstrip()
+    if isinstance(event, events.ToolDenied):
+        return f"[denied {event.name}] {event.reason}"
+    if isinstance(event, events.RateLimit) and event.status != "allowed":
+        return f"[usage limit {event.status}] resets at {event.resets_at}"
+    return None
+
+
+@app.command("run")
+def run_command(
+    task: Annotated[str, typer.Argument(help="Task id from .harness/tasks, e.g. T-3.")],
+    path: ProjectPath = Path("."),
+    role: Annotated[
+        str | None, typer.Option(help="Role to act as; defaults to the task owner.")
+    ] = None,
+    max_resumes: Annotated[
+        int, typer.Option(min=0, help="How often to resume after a usage limit.")
+    ] = 3,
+    output_json: JsonFlag = False,
+) -> None:
+    """Run one READY or IN_PROGRESS task through the agent engine; the ledger is not changed."""
+    import asyncio
+
+    from agent_harness.engine.runner import run_task
+
+    try:
+        engine = make_engine()
+        printer = (
+            None if output_json else (lambda e: (line := _describe(e)) and console.print(line))
+        )
+        outcome = asyncio.run(
+            run_task(path, task, engine, role=role, max_resumes=max_resumes, on_event=printer)
+        )
+    except (HarnessError, OSError, UnicodeError) as exc:
+        fail(exc, output_json)
+    summary = {
+        "ok": outcome.status == "completed",
+        "status": outcome.status,
+        "task": outcome.task_id,
+        "role": outcome.role,
+        "session_id": outcome.session_id,
+        "sessions": outcome.sessions,
+        "turns": outcome.turns,
+        "cost_usd": outcome.cost_usd,
+        "waited_seconds": outcome.waited_seconds,
+        "result": outcome.result,
+        "errors": [outcome.error] if outcome.error else [],
+    }
+    emit(summary, output_json)
+    if outcome.status != "completed":
+        raise typer.Exit(1)
+
+
 @app.command()
 def scope(
     role: Annotated[str, typer.Argument(help="Role name from .harness/config.yaml.")],

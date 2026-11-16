@@ -27,10 +27,16 @@
 - `harness next`: defterden sıradaki işleri, bekleyenleri ve paralel başlatılabilecek
   görevleri hesaplar.
 
+## Yayımlanmamış — uygulanan (uygulama adım 2)
+
+- `harness run`: bir görevi rolün modeli ve izin politikasıyla Claude'a yaptırır, kullanım
+  limitinde bekleyip aynı oturumu sürdürür. Yalnız birim testlerle sınandı; gerçek Claude
+  oturumu denenmedi.
+
 ## Sonraki aşamalar — uygulanmadı
 
-- Yaşam döngüsü L2 ve L4: `init` için varsayılan akış ve faz rolleri; motor adapter'ı,
-  arka plan ajanları ve masaüstü yönetim uygulaması.
+- Yaşam döngüsü L2 ve L4: `init` için varsayılan akış ve faz rolleri; orchestrator döngüsü,
+  sunucu, arayüz ve masaüstü uygulaması.
 - Stack pack: teknolojiye göre komut, kural ve klasör düzeni (Faz 3).
 - upgrade --dry-run / sync: kullanıcı değişikliklerini koruyan üç yönlü karşılaştırma.
 - Gerçek proje ihtiyaçlarına göre uzman rolü/skill seçimi ve üretimi.

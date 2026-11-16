@@ -19,8 +19,19 @@ dependencies = [
 [project.scripts]
 harness = "agent_harness.cli:app"
 
+[project.optional-dependencies]
+engine = [
+    "claude-agent-sdk>=0.2.172,<0.3",
+]
+
 [dependency-groups]
-dev = ["pytest>=8,<10", "ruff>=0.11,<1", "build>=1,<2", "hatchling>=1.26,<2"]
+dev = [
+    "pytest>=8,<10",
+    "ruff>=0.11,<1",
+    "build>=1,<2",
+    "hatchling>=1.26,<2",
+    "claude-agent-sdk>=0.2.172,<0.3",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_harness"]

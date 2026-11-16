@@ -1,0 +1,47 @@
+schema_version: 1
+id: T-7
+title: 'Uygulama adım 2: motor adapter ile bir görevi arka planda çalıştırma'
+owner: developer
+status: IN_PROGRESS
+goal: Bir görevi, görev sahibinin rolüyle ve role atanmış model ve effort ile Claude'a
+  yaptıran katman. Rolün yazma kapsamı dışındaki dosya yazımlarını ve izinli olmayan
+  komutları reddeder, kullanım limiti dolunca bekleyip aynı oturumu sürdürür. Orchestrator
+  ve sunucu bunun üstüne kurulur.
+scope:
+- src/agent_harness/engine/
+- src/agent_harness/models.py
+- src/agent_harness/cli.py
+- schemas/
+- tests/
+- pyproject.toml
+- uv.lock
+- README.md
+- docs/
+acceptance:
+- id: AC1
+  text: config'te rol başına opsiyonel `model`, `effort` ve `bash` (izinli komut önekleri)
+    tanımlanır, katı şemayla doğrulanır; mevcut config'ler geçerli kalır ve JSON şeması
+    modelle eşleşir.
+- id: AC2
+  text: İzin politikası, rolün yazma kapsamı dışındaki dosya yazımını ve `bash` listesinde
+    olmayan ya da zincirleme (;, &&, |, yönlendirme, alt kabuk) komutları reddeder;
+    okuma araçlarına izin verir.
+- id: AC3
+  text: Görev istemi görevin başlığını, hedefini, kabul kriterlerini ve kapsamını içerir;
+    ajana commit atmamasını ve `.harness/state/` belgelerini güncellememesini söyler.
+- id: AC4
+  text: Çalıştırıcı geçersiz defterde, bilinmeyen görevde, bilinmeyen rolde ve READY ya
+    da IN_PROGRESS olmayan görevde motoru hiç çağırmadan reddeder.
+- id: AC5
+  text: Limit dolup koşu hatayla bitince sıfırlanma zamanına kadar bekler ve aynı oturumu
+    sürdürür; deneme sayısı ya da bekleme sınırı aşılırsa beklemeden `rate_limited`
+    döner. Diğer hatalar `failed` döner.
+- id: AC6
+  text: Claude SDK mesajları motor olaylarına doğru çevrilir; SDK kurulu değilse `harness
+    run` kurulum talimatıyla 1 ile çıkar. Testler yalnız unit testtir, gerçek Claude
+    çağrısı yapmaz.
+log:
+- 2026-11-16 görev açıldı; plan https://claude.ai/artifact/DjRVH6D2TuYA74hREncM8X adım 2.
+  Kullanıcı kararı - yalnız unit test, başka test türü yok.
+review:
+  status: pending
