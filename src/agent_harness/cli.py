@@ -12,6 +12,7 @@ from agent_harness import __version__
 from agent_harness.analyze import analyze as inspect_project
 from agent_harness.check import check as check_ledger
 from agent_harness.doctor import doctor as diagnose
+from agent_harness.engine.describe import describe_event as _describe
 from agent_harness.evidence import run_evidence
 from agent_harness.filesystem import HarnessError, project_root
 from agent_harness.generate import initialize
@@ -165,25 +166,6 @@ def make_engine():
     from agent_harness.engine.claude import ClaudeEngine, load_sdk
 
     return ClaudeEngine(load_sdk())
-
-
-def _describe(event) -> str | None:
-    from agent_harness.engine import events
-
-    if isinstance(event, events.Started):
-        return f"session {event.session_id}"
-    if isinstance(event, events.Text):
-        return event.text.strip()
-    if isinstance(event, events.ToolUse):
-        detail = event.input.get("command") or event.input.get("file_path") or ""
-        return f"[{event.name}] {detail}".rstrip()
-    if isinstance(event, events.ToolDenied):
-        return f"[denied {event.name}] {event.reason}"
-    if isinstance(event, events.Waiting):
-        return f"[usage limit] waiting {int(event.seconds)}s, then resuming the session"
-    if isinstance(event, events.RateLimit) and event.status != "allowed":
-        return f"[usage limit {event.status}] resets at {event.resets_at}"
-    return None
 
 
 @app.command("run")

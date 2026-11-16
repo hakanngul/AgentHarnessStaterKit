@@ -1,0 +1,79 @@
+schema_version: 1
+id: T-12
+title: 'Uygulama adım 6b: sunucuda eylemler (wave, review, commit) arka plan işi olarak ve
+  canlı olay akışı'
+owner: developer
+status: IN_REVIEW
+goal: 'Sunucudan wave, review ve commit başlatmak: tek aktif iş, JSON gövde, sınırlı parametre,
+  SSE ile sıralı canlı olaylar, iptal ve temiz kapanış. Aynı orkestratör fonksiyonları kullanılır;
+  sunucu yeni bir karar mantığı eklemez. Tarayıcı için token hand-off bu görevde yok (arayüz
+  görevinde).'
+scope:
+- src/agent_harness/jobs.py
+- src/agent_harness/server.py
+- src/agent_harness/engine/describe.py
+- src/agent_harness/cli.py
+- tests/test_jobs.py
+- tests/test_server.py
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: POST /api/jobs token ister, yalnız application/json kabul eder (aksi 415), bilinmeyen
+    alan ya da sınır dışı değer ve türe uymayan parametre 422 verir, geçerli istek 202 ile
+    iş kimliği döner; aktif iş varken ikinci istek 409 alır.
+- id: AC2
+  text: İş, CLI ile aynı fonksiyonları (run_wave, review_all, commit_done_tasks) enjekte edilen
+    engine ile çalıştırır; HarnessError, OSError ve engine kurulum hatası işi failed yapar
+    ve mesajı taşır, 500 vermez; sonuç CLI çıktısıyla aynı satırları içerir.
+- id: AC3
+  text: GET /api/jobs/{id}/events SSE akışı sıralı id ile olayları verir, after ya da Last-Event-ID
+    ile kaldığı yerden sürer, iş bitince kapanır; olay tamponu ve olay metni sınırlıdır; bilinmeyen
+    iş 404.
+- id: AC4
+  text: POST /api/jobs/{id}/cancel çalışan işi iptal eder ve wave görevleri READY'ye döner;
+    biten işte 409; sunucu kapanırken çalışan iş iptal edilir ve kapanış takılmaz.
+- id: AC5
+  text: GET /api/jobs ve /api/jobs/{id} durum, parametre ve sonucu verir; tutulan iş sayısı
+    sınırlıdır. Testler yalnız unit testtir (sahte engine, gerçek ledger dosyaları); pytest,
+    ruff check ve ruff format --check geçer.
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 910 passed in 28.36s
+  commit: 93fb9d4e16925adada66f48e4f97c61b3c013809
+  output: .harness/evidence/T-12/E1.txt
+  output_sha256: e43455f3bd29d1775d4910373bfb39f2a542e6b910a92d16bac6a70cd6a35d01
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 93fb9d4e16925adada66f48e4f97c61b3c013809
+  output: .harness/evidence/T-12/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 62 files already formatted
+  commit: 93fb9d4e16925adada66f48e4f97c61b3c013809
+  output: .harness/evidence/T-12/E3.txt
+  output_sha256: 26a51376cc4243c378ac84b9c475a7900ec6b6acfdf1191f09d0c4af5e6aca36
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+log:
+- '2026-11-16 developer: task opened after the owner said "başla"; token hand-off for browsers
+  deferred to the UI task on purpose'
+- '2026-11-16 developer: implemented jobs.py, job endpoints, SSE; 51 unit tests; stream race
+  found and fixed (slow test exposed it); real uvicorn SSE smoke ok; evidence E1-E3; waiting
+  for independent review'

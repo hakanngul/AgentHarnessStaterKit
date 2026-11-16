@@ -5,24 +5,30 @@ only and every request needs the bearer token, because a page in any browser tab
 `localhost`. This slice never writes and never starts an agent.
 """
 
+import json
 import re
 import secrets
+from collections.abc import Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import ValidationError
 
 from agent_harness.check import TASKS_DIR
 from agent_harness.check import check as check_ledger
 from agent_harness.evidence import _load_task
 from agent_harness.filesystem import HarnessError, managed_path, project_root
+from agent_harness.jobs import Busy, JobManager, JobParams, NotRunning
 from agent_harness.models import Task
 from agent_harness.schedule import plan
 
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 MIN_TOKEN = 16
+MAX_BODY = 10_000
 TASK_ID = re.compile(r"T-[0-9]+")
 HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE | re.ASCII)
 
@@ -65,11 +71,34 @@ def check_port(port: int) -> None:
         raise HarnessError("the port must be between 1 and 65535")
 
 
-def create_app(project: Path, token: str) -> FastAPI:
+def default_engine() -> object:
+    """The engine the CLI uses; resolved late so tests and the CLI can replace it."""
+    from agent_harness import cli
+
+    return cli.make_engine()
+
+
+def create_app(
+    project: Path, token: str, *, engine_factory: Callable[[], object] | None = None
+) -> FastAPI:
     """The app for one project; `token` is the shared secret every request must carry."""
     check_token(token)
     root = project_root(project)
-    app = FastAPI(title="Agent harness", docs_url=None, redoc_url=None, openapi_url=None)
+    jobs = JobManager(root, engine_factory or default_engine)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        yield
+        await jobs.shutdown()
+
+    app = FastAPI(
+        title="Agent harness",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
+    app.state.jobs = jobs
     bearer = HTTPBearer(auto_error=False)
 
     def authorize(
@@ -131,6 +160,71 @@ def create_app(project: Path, token: str) -> FastAPI:
         if not path.is_file():
             raise HTTPException(404, "no such task")
         return _load_task(path).model_dump(mode="json")
+
+    @app.post("/api/jobs", status_code=202, dependencies=[Depends(authorize)])
+    async def start_job(request: Request) -> dict:
+        if not request.headers.get("content-type", "").lower().startswith("application/json"):
+            raise HTTPException(415, "send application/json")
+        body = await request.body()
+        if len(body) > MAX_BODY:
+            raise HTTPException(413, "the request body is too large")
+        try:
+            params = JobParams.model_validate_json(body)
+        except ValidationError as exc:
+            problems = [
+                {"field": ".".join(str(part) for part in e["loc"]), "problem": e["msg"]}
+                for e in exc.errors(include_input=False)
+            ]
+            raise HTTPException(422, problems) from exc
+        try:
+            job = jobs.start(params)
+        except Busy as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return {"id": job.id, "status": job.status}
+
+    @app.get("/api/jobs", dependencies=[Depends(authorize)])
+    def list_jobs() -> list[dict]:
+        return [job.view() for job in reversed(jobs.jobs.values())]
+
+    def find_job(job_id: str):
+        job = jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404, "no such job")
+        return job
+
+    @app.get("/api/jobs/{job_id}", dependencies=[Depends(authorize)])
+    def get_job(job_id: str) -> dict:
+        return find_job(job_id).view()
+
+    @app.get("/api/jobs/{job_id}/events", dependencies=[Depends(authorize)])
+    async def job_events(
+        job_id: str,
+        after: Annotated[int, Query(ge=0)] = 0,
+        last_event_id: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        job = find_job(job_id)
+        if last_event_id and last_event_id.isascii() and last_event_id.isdigit():
+            after = max(after, int(last_event_id))
+
+        async def frames():
+            async for event in jobs.stream(job, after):
+                if event is None:
+                    yield ": keepalive\n\n"
+                else:
+                    yield f"id: {event['id']}\ndata: {json.dumps(event)}\n\n"
+
+        return StreamingResponse(
+            frames(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+        )
+
+    @app.post("/api/jobs/{job_id}/cancel", dependencies=[Depends(authorize)])
+    async def cancel_job(job_id: str) -> dict:
+        job = find_job(job_id)
+        try:
+            await jobs.cancel(job)
+        except NotRunning as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return job.view()
 
     return app
 
