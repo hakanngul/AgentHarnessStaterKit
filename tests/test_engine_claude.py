@@ -359,7 +359,7 @@ def test_run_without_the_sdk_prints_the_install_hint(tmp_path, monkeypatch):
     assert out.exit_code == 1 and "agent-harness-starter[engine]" in out.output
 
 
-def hook_for(tmp_path: Path):
+def hook_for(tmp_path: Path, read_only: bool = False):
     """The PreToolUse hook the engine registers, without opening a session."""
     write_project(tmp_path)
     captured = {}
@@ -373,7 +373,7 @@ def hook_for(tmp_path: Path):
     class CaptureSdk(FakeSdk):
         ClaudeSDKClient = Capture
 
-    request = RunRequest(cwd=tmp_path, role="developer", prompt="x")
+    request = RunRequest(cwd=tmp_path, role="developer", prompt="x", read_only=read_only)
     collect(claude_engine.ClaudeEngine(CaptureSdk()), request, tmp_path)
     return captured
 
@@ -431,3 +431,29 @@ def test_hook_denies_when_the_policy_itself_raises(tmp_path, monkeypatch):
     assert (
         "RuntimeError: policy crashed" in output["hookSpecificOutput"]["permissionDecisionReason"]
     )
+
+
+def test_a_read_only_request_makes_the_hook_deny_writes_that_the_role_allows(tmp_path):
+    write = {"tool_name": "Write", "tool_input": {"file_path": "src/a.py"}}
+    (tmp_path / "rw").mkdir()
+    (tmp_path / "ro").mkdir()
+    assert asyncio.run(hook_for(tmp_path / "rw")["hook"](write, "t1", None)) == {}
+    output = asyncio.run(hook_for(tmp_path / "ro", read_only=True)["hook"](write, "t2", None))
+    decision = output["hookSpecificOutput"]
+    assert (
+        decision["permissionDecision"] == "deny"
+        and "read-only" in decision["permissionDecisionReason"]
+    )
+
+
+def test_a_read_only_request_also_denies_notebook_edits_and_evidence_runs(tmp_path):
+    hook = hook_for(tmp_path, read_only=True)["hook"]
+    for data in (
+        {"tool_name": "NotebookEdit", "tool_input": {"notebook_path": "src/a.ipynb"}},
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "harness evidence run T-1 -- uv run pytest"},
+        },
+    ):
+        output = asyncio.run(hook(data, "t", None))
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"

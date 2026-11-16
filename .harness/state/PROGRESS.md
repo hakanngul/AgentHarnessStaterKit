@@ -33,3 +33,9 @@ against a real Claude session. Next: orchestrator loop.
 
 DONE. 684 unit tests, ruff clean, three review rounds (last APPROVED). Not run against a
 real Claude session. Next: real-session trial (needs permission), then FastAPI server.
+
+## 2026-11-16 T-9 independent reviewer
+
+DONE. 734 unit tests, ruff clean, two review rounds (last APPROVED). Real session trial:
+wave then review took two tasks to DONE (before the read-only fix). Next: scope check and
+commit per task, then FastAPI.

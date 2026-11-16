@@ -120,7 +120,7 @@ def _evidence(words: list[str], prefixes: list[str], root: Path) -> Verdict:
     return Verdict(True)
 
 
-def _shell(command: str, prefixes: list[str], root: Path) -> Verdict:
+def _shell(command: str, prefixes: list[str], root: Path, *, read_only: bool = False) -> Verdict:
     command = command.strip()
     if not command:
         return Verdict(False, "empty command")
@@ -132,6 +132,8 @@ def _shell(command: str, prefixes: list[str], root: Path) -> Verdict:
         )
     words = command.split()
     if any(tuple(words[: len(head)]) == head for head in EVIDENCE_COMMANDS):
+        if read_only:
+            return Verdict(False, "this run is read-only; it may not record evidence")
         return _evidence(words, prefixes, root)
     return Verdict(True) if _matches(words, prefixes) else _not_listed(prefixes)
 
@@ -172,7 +174,7 @@ def check_tool(
         command = tool_input.get("command")
         if not isinstance(command, str):
             return Verdict(False, "Bash call without a command")
-        return _shell(command, role_config.bash, root)
+        return _shell(command, role_config.bash, root, read_only=read_only)
     if tool in READ_TOOLS:
         for key in READ_TOOLS[tool]:
             target = tool_input.get(key)

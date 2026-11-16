@@ -289,7 +289,7 @@ için kanıt satırıyla (`AC1: E1`) bitirir. Karar kodla işlenir:
   ulaşan görevleri inceletir; çıkış kodu 0 için hem dalga hem review başarılı olmalıdır.
   JSON'da son durum `reviews` listesindedir.
 
-Sınırlar: reviewer'a `bash` vermezseniz "kapsam dışı dosya değişti mi" sorusunu `git` ile
+Sınırlar: review koşusunda `harness evidence run` da reddedilir (başka görevin deftere kanıt yazmasın diye); ama reviewer'ın `bash` listesindeki diğer komutlar dosya yazabilir (`ruff --fix` gibi), bu listeyi yalnız `git status`, `git diff` gibi okuyan komutlarla sınırlayın. Tutarsız tespit edilen değişiklik geri alınmaz, yalnız görev BLOCKED olur. Reviewer'a `bash` vermezseniz "kapsam dışı dosya değişti mi" sorusunu `git` ile
 doğrulayamaz; onay bu noktada modelin okumasına dayanır. Kodla kapsam denetimi görev başına
 commit adımıyla gelecek. Onay, kanıtın ilgili kriteri gerçekten gösterip göstermediğini
 denetlemez, yalnız kanıtın var, geçen ve harness kaydı olduğunu denetler; ilgiyi model yargılar.

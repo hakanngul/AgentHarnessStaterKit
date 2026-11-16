@@ -1,17 +1,16 @@
 # Current task
 
-Status: Uygulama adım 1 (motor, T-7) ve adım 2 (orchestrator dalgası, T-8) DONE, review
-approved. Sıradaki: gerçek Claude oturumunda deneme (izin bekliyor), sonra FastAPI.
+Status: Adım 1-4 DONE (motor T-7, dalga T-8, reviewer T-9), review approved. Sıradaki:
+kapsamı kodla denetleyen görev başına commit (layout A), sonra FastAPI.
 
 ## Goal and scope
 
-T-8: `harness wave` planlayıcının başlatılabilir dediği görevleri paralel çalıştırır ve
-sonucu deftere yazar (IN_REVIEW, BLOCKED, READY). Kapsam dışı: reviewer ajanını otomatik
-çalıştırma, görev başına commit, faz kapısını işletme, sunucu, arayüz.
+T-9: `harness review` ve `wave --review`; review koşusu salt okunur, karar kodla işlenir.
+Kapsam dışı: görev başına commit, kapsam denetimi, faz kapısını döngüde işletme, sunucu, arayüz.
 
 ## Acceptance criteria
 
-AC1-AC4 in `.harness/tasks/T-8.yaml`.
+AC1-AC5 in `.harness/tasks/T-9.yaml`.
 
 ## Required checks
 
@@ -19,5 +18,4 @@ Unit tests only (owner decision): pytest, ruff check, ruff format --check, harne
 
 ## Product decisions and blockers
 
-Gerçek Claude denemesi: izin sınıflandırıcısı `harness run` komutunu reddetti; kullanıcı
-karar verecek. Dal düzeni A karar verildi (docs/plans/lifecycle.md).
+Yok. Dal düzeni A (docs/plans/lifecycle.md). PR #5 merge'i kullanıcıda.

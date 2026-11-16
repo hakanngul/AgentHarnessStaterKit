@@ -56,7 +56,7 @@ def review_prompt(task: Task, role: str) -> str:
         "acceptance criterion. Do not edit any file and do not run the developer's checks again",
         "on faith: evidence below was recorded by `harness evidence run`; read its output file.",
         "",
-        f"Task {task.id}: {task.title}",
+        f"Task {task.id}: {_flat(task.title)}",
     ]
     if task.goal.strip():
         lines += ["", "Goal:", *[f"> {line}" for line in task.goal.strip().splitlines()]]

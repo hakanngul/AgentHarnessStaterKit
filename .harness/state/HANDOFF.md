@@ -64,3 +64,12 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
   failure, READY on usage limit. Interrupts release claimed tasks to READY.
 - Not done: reviewer agent run, commit per task (layout A), phase gate in the loop.
 - Trial project for a real-session run: scratchpad `trial/` (throwaway, not in the repo).
+
+## Independent reviewer (T-9)
+
+- `harness review` / `wave --review`: reviewer runs read-only (hook denies every write and
+  `harness evidence run`), ends with `VERDICT:` plus `AC<n>: E<n>` lines; code writes review,
+  verified_by and status. Approval needs harness-recorded passing evidence and no failing
+  latest run per command. Any change to the task during review blocks it.
+- Not done: scope check by code (reviewer cannot run git), commit per task, phase gate in
+  the loop. Known: tampering detected not reverted; forged `recorded_by: harness` evidence.
