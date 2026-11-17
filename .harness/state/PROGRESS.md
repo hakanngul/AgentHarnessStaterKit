@@ -19,8 +19,7 @@ kendi claim'lerini bırakır, git zaman aşımında süreç grubu öldürülür.
 
 ## Next step
 
-React arayüzü (kendi görevi: Vite + React, hash yönlendirme, fetch akışı) ve masaüstü kabuğu (pywebview denemesi, Electron yedek). Sonra: `init` varsayılan workflow ve faz
-rolleri, faz kapısını orkestra döngüsünde işletmek, gerçek Claude oturumuyla sunucudan deneme.
+Gerçek bir Claude oturumuyla sunucu/arayüz üzerinden uçtan uca deneme (changes_requested rework, kullanım limiti bekleme), masaüstü kabuğu (pywebview denemesi, Electron yedek). Sonra: `init` varsayılan workflow ve faz rolleri, faz kapısını orkestra döngüsünde işletmek.
 
 ## 2026-11-16 T-7 engine adapter
 
@@ -56,3 +55,10 @@ Wave, review and commit run as background jobs with SSE events, cancel and shutd
 uvicorn test covers shutdown with an open stream). Never run against a real Claude session
 through the server. Next: project run lock (CLI and server must not work on one project at
 once; fixes the wave-claim race and the shared git index), then the UI.
+
+## 2026-11-17 T-14 ve T-15
+
+T-14 DONE (tarayıcı için sunucu hazırlığı). T-15 DONE: `ui/` Vite + React + TypeScript ilk dilim (görev listesi,
+iş paneli, canlı olaylar, iptal). 989 pytest, 67 vitest, typecheck, build, CI'da ayrı `ui` işi; üç review turu
+(sonuncusu APPROVED) ve bot triage (Codex 2 P2 alındı, Sonar güvenlik derecesi düzeltildi). Gerçek Chromium ile
+elle denendi (otomatik değil, depoda yok). Gerçek Claude oturumuyla sunucu/arayüz üzerinden deneme yapılmadı.

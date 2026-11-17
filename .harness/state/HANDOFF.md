@@ -108,4 +108,12 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
 `evidence run` ve salt-okunur komutlar almaz (bir wave'in içindeki agent onu çağırır). Bilinen sınırlar README'de
 "Proje çalışma kilidi": `git clean -fd` kilit dosyasını silebilir, `kill -9` sonrası yetim git, iptalde çalışan
 to_thread yazımı, post-commit hook zaman aşımı "blocked" raporlar, flock NFS'te güvenilmez, Windows yolu denenmedi.
-Sıradaki iş: React arayüzü. Token devri T-14'te karara bağlandı: URL fragment + Authorization başlıklı fetch akışı (EventSource başlık gönderemez, çerez yok). Arayüz hash yönlendirme kullanmalı (sunucuda history fallback yok).
+Token devri T-14'te karara bağlandı (arayüz T-15'te yazıldı): URL fragment + Authorization başlıklı fetch akışı (EventSource başlık gönderemez, çerez yok). Arayüz hash yönlendirme kullanmalı (sunucuda history fallback yok).
+
+## T-15 (arayüz ilk dilimi)
+
+`ui/` altında; derleme `cd ui && npm ci && npm run build`, sunum `harness serve --ui ui/dist`, adres `<adres>/#token=<token>`
+(`&`, `%`, `+` içeren kendi token'ınızı yüzdeyle kodlayın). Bilinen sınırlar: `ui/dist` Python paketine girmiyor, masaüstü
+kabuğu yok, faz kapısı/karar kuyruğu/kanıt görünümleri yok, gerçek Claude oturumuyla denenmedi. Sıradaki iş: masaüstü kabuğu
+(pywebview denemesi, yedek Electron), `init` varsayılan workflow ve faz rolleri, orkestratör döngüsünde faz kapısı.
+Açık sahip kararı: Sourcery'nin `.harness` symlink bulgusu (T-13'te reddedildi), sertleştirme ayrı görev olur.

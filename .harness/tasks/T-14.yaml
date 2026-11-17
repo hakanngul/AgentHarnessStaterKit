@@ -41,7 +41,7 @@ acceptance:
   verified_by: *id001
 - id: AC5
   text: pytest, ruff check, ruff format --check ve harness check geçer; yeni davranışın her biri mutation
-    ile kanıtlanır (düzeltmeyi geri al, bir test kırılmalı).
+    ile kanıtlanır (düzeltmeyi geri al, bir test kırılmalı). Mutation kontrolleri log'dadır, harness evidence değildir.
   verified_by: *id001
 evidence:
 - id: E1

@@ -3,7 +3,7 @@ id: T-15
 title: 'React arayüzü, ilk dikey dilim: token, API istemcisi, SSE akışı, görev listesi ve
   iş paneli'
 owner: developer
-status: IN_REVIEW
+status: DONE
 goal: '`ui/` altında Vite + React + TypeScript arayüzünün ilk dilimi: token''ı URL fragment''inden
   alıp bellekte tutan ve adresten silen kod, Authorization başlıklı fetch istemcisi, EventSource''suz
   SSE ayrıştırıcı (kopmada ?after ile devam), görev listesi ve iş paneli (wave, review, commit
@@ -217,3 +217,26 @@ log:
   ve adres temizleme, görev tablosu (işaretli başlık metin olarak), commit işi canlı akış,
   yanlış token 401, 0 çerez, 0 storage, CSP ihlali yok, tüm API istekleri Bearer taşıdı. Bu
   deneme komut dosyası olarak depoda değil, otomatik testle kanıtlanmış sayılmaz.'
+- '2026-11-17 reviewer round 1: CHANGES_REQUESTED, bulgular doğrulanıp düzeltildi: bozuk SSE çerçevesi
+  artık atlanıyor (eskiden yeniden deneme fırtınası ya da sessiz bitiş), durum okumasında ağ kesintisi
+  yeniden deneniyor ve 404 (silinmiş iş) sessiz bitiyor, panel kapanınca akış açılmıyor/kesiliyor, iş
+  değişince eski işin geç olayı yeni log''a düşmüyor, token''da + boşluğa dönmüyor (README: & % + için
+  yüzde kodlama), README çelişkileri, role=log. Round 2: bağlantı kurulamayıp iş bitmişse akış sessiz
+  bitiyordu (streamRead bayrağı), Math.max, unmount/iş değişimi testleri; 5 mutation her biri tam bir
+  testi kırdı. Round 3: APPROVED. Bot triage: Codex P2 x2 alındı (token, result.ok=false gösterimi);
+  Sonar güvenlik derecesi C: npm ci --ignore-scripts, api yol allowlist''i, istek hedefi allowlist
+  eşleşmesinden kuruluyor (üçüncü denemede kapı geçti). Onaydan sonra gözden geçirilmeyen delta: api.ts''te
+  hedefin eşleşmeden kurulması + iki kozmetik not (testli, vitest 67/67).'
+review:
+  by: reviewer
+  status: approved
+  notes: 'Round 3 (fresh read-only reviewer): APPROVED. Rounds 1 and 2 were CHANGES_REQUESTED and all
+    findings were verified and fixed (see log). Accepted low findings: SSE parser is quadratic on one
+    huge frame and unbounded without a newline (server caps event text), no backoff on reconnect,
+    wait() ignores abort for up to 1 s, stale error message stays when following another job, table
+    caption/scope missing. Not separately re-reviewed after approval: api.ts builds the request target
+    from the allowlist match (added to satisfy Sonar taint rules S8476/S7044), a doc comment move and a
+    removed duplicate test. Reviewers could not run code; the test counts come from my own runs
+    (E8-E13). Not verified: any real Claude session through server and UI; the Chromium run was manual
+    and is not in the repo. Accepted limits: token holder can start agents, no TLS, no desktop shell,
+    ui/dist is not packaged into the Python package, no history-mode fallback.'
