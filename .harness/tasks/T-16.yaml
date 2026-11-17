@@ -24,6 +24,7 @@ acceptance:
   - E2
   - E3
   - E4
+  - E7
 - id: AC3
   text: CI'da macOS'ta pytest koşan ayrı bir iş vardır ve PR'da yeşildir.
   verified_by: []
