@@ -15,12 +15,11 @@
 ## Current work
 
 T-13 (proje çalışma kilidi, PR #7) birleştirildi: `flock` ile CLI ve sunucu işleri tek çalıştırma, `run_wave` yalnız
-kendi claim'lerini bırakır, git zaman aşımında süreç grubu öldürülür. 949 test. T-14 (tarayıcı için sunucu hazırlığı)
-başladı. PR #2'den üç konu bakımcıda açık: subprocess audit bulgusu, credential redaction kapsamı, settings.json eşzamanlılığı.
+kendi claim'lerini bırakır, git zaman aşımında süreç grubu öldürülür. 949 test. T-14 (güvenlik başlıkları, `--ui` ile statik arayüz, token devri tasarımı, PR #9) birleştirildi. 989 test. PR #2'den üç konu bakımcıda açık: subprocess audit bulgusu, credential redaction kapsamı, settings.json eşzamanlılığı.
 
 ## Next step
 
-T-14, sonra React arayüzü ve masaüstü kabuğu (pywebview denemesi, Electron yedek). Sonra: `init` varsayılan workflow ve faz
+React arayüzü (kendi görevi: Vite + React, hash yönlendirme, fetch akışı) ve masaüstü kabuğu (pywebview denemesi, Electron yedek). Sonra: `init` varsayılan workflow ve faz
 rolleri, faz kapısını orkestra döngüsünde işletmek, gerçek Claude oturumuyla sunucudan deneme.
 
 ## 2026-11-16 T-7 engine adapter

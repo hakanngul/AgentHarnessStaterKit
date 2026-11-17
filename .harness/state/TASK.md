@@ -1,6 +1,6 @@
 # Current task
 
-Status: T-7..T-13 DONE. Şimdi T-14: tarayıcı için sunucu hazırlığı.
+Status: T-7..T-14 DONE (T-14: tarayıcı için sunucu hazırlığı). Sıradaki: React arayüzü (ayrı görev), sonra masaüstü kabuğu.
 
 ## Goal and scope
 

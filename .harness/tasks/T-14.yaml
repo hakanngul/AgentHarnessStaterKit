@@ -1,16 +1,14 @@
 schema_version: 1
 id: T-14
-title: 'Tarayıcı için sunucu hazırlığı: güvenlik başlıkları, --ui ile statik arayüz, token
-  devri'
+title: 'Tarayıcı için sunucu hazırlığı: güvenlik başlıkları, --ui ile statik arayüz, token devri'
 owner: developer
-status: IN_REVIEW
-goal: 'React arayüzü yazılmadan önce sunucuyu tarayıcıya hazırlamak. Karar (kendi görüşüm,
-  önceki ''çerez + Origin'' önerimi değiştirdim): token URL fragment''inde taşınır (sunucuya
-  hiç gitmez), arayüz onu bellekte tutar ve REST ile SSE için Authorization başlıklı fetch
-  kullanır; EventSource kullanılmaz. Ortam kimlik bilgisi (çerez) olmadığı için CSRF yüzeyi
-  yoktur ve sunucudaki Bearer doğrulaması aynen kalır. Sunucu yalnız (1) her yanıta güvenlik
-  başlıkları ekler, (2) `--ui DIR` verilirse derlenmiş arayüzü salt okunur ve token''sız sunar.
-  Arayüzün kendisi bu görevin dışında.'
+status: DONE
+goal: 'React arayüzü yazılmadan önce sunucuyu tarayıcıya hazırlamak. Karar (kendi görüşüm, önceki ''çerez
+  + Origin'' önerimi değiştirdim): token URL fragment''inde taşınır (sunucuya hiç gitmez), arayüz onu
+  bellekte tutar ve REST ile SSE için Authorization başlıklı fetch kullanır; EventSource kullanılmaz.
+  Ortam kimlik bilgisi (çerez) olmadığı için CSRF yüzeyi yoktur ve sunucudaki Bearer doğrulaması aynen
+  kalır. Sunucu yalnız (1) her yanıta güvenlik başlıkları ekler, (2) `--ui DIR` verilirse derlenmiş arayüzü
+  salt okunur ve token''sız sunar. Arayüzün kendisi bu görevin dışında.'
 scope:
 - src/agent_harness/server.py
 - src/agent_harness/cli.py
@@ -20,23 +18,31 @@ scope:
 - .harness/
 acceptance:
 - id: AC1
-  text: 'Her yanıt (200, 401, 403 geçersiz Host, 404, 405, 413, SSE akışı) nosniff, DENY çerçeve,
-    no-referrer, CSP (default-src ''self'', connect-src ''self'', frame-ancestors ''none'',
-    base-uri ''none'', object-src ''none'') ve /api için Cache-Control: no-store taşır.'
+  text: 'Her yanıt (200, 401, 403 geçersiz Host, 404, 405, 413, SSE akışı) nosniff, DENY çerçeve, no-referrer,
+    CSP (default-src ''self'', connect-src ''self'', frame-ancestors ''none'', base-uri ''none'', object-src
+    ''none'') ve /api için Cache-Control: no-store taşır.'
+  verified_by: &id001
+  - E10
+  - E11
+  - E12
 - id: AC2
-  text: '`--ui DIR` ile index.html ve varlıklar token''sız sunulur, /api rotaları gölgelenmez
-    (health açık, diğerleri 401); POST ve diğer yöntemler statik yolda 405; `..` ile çıkış
-    ve dizin dışına işaret eden sembolik bağlantı 404; ui verilmezse `/` bugünkü gibi 404.'
+  text: '`--ui DIR` ile index.html ve varlıklar token''sız sunulur, /api rotaları gölgelenmez (health
+    açık, diğerleri 401); POST ve diğer yöntemler statik yolda 405; `..` ile çıkış ve dizin dışına işaret
+    eden sembolik bağlantı 404; ui verilmezse `/` bugünkü gibi 404.'
+  verified_by: *id001
 - id: AC3
-  text: Statik yol da Host denetiminden geçer (geçersiz Host 403); `serve` eksik dizin ya
-    da index.html'i dinlemeye başlamadan HarnessError ile reddeder.
+  text: Statik yol da Host denetiminden geçer (geçersiz Host 403); `serve` eksik dizin ya da index.html'i
+    dinlemeye başlamadan HarnessError ile reddeder.
+  verified_by: *id001
 - id: AC4
-  text: README token devrini anlatır (fragment, history.replaceState ile silme, fetch akışı
-    ve `after` ile devam, çerez bilinçli olarak yok) ve sınırları söyler (token'ı bilen herkes
-    iş başlatabilir, TLS yok).
+  text: README token devrini anlatır (fragment, history.replaceState ile silme, fetch akışı ve `after`
+    ile devam, çerez bilinçli olarak yok) ve sınırları söyler (token'ı bilen herkes iş başlatabilir, TLS
+    yok).
+  verified_by: *id001
 - id: AC5
-  text: pytest, ruff check, ruff format --check ve harness check geçer; yeni davranışın her
-    biri mutation ile kanıtlanır (düzeltmeyi geri al, bir test kırılmalı).
+  text: pytest, ruff check, ruff format --check ve harness check geçer; yeni davranışın her biri mutation
+    ile kanıtlanır (düzeltmeyi geri al, bir test kırılmalı).
+  verified_by: *id001
 evidence:
 - id: E1
   kind: command
@@ -171,28 +177,40 @@ evidence:
   recorded_at: '2026-11-17'
   recorded_by: harness
 log:
-- '2026-11-17 developer: görev açıldı; T-13 sonrası sıradaki iş. Tasarım sapması: çerez +
-  Origin yerine fragment + fetch akışı (CSRF yüzeyi yok, sunucu kodu küçük).'
-- '2026-11-17 developer: güvenlik başlıkları middleware (host kontrolünün dışında, 403 de
-  kapsanır), --ui ile StaticFiles (en sonda mount, symlink izlenmez), check_ui, CLI --ui,
-  README bölümü; 24 yeni test; 7 mutation (başlık yok, no-store yok, symlink izleme, check_ui
-  yok, cli ui düşürür, middleware sırası, mount sırası) hepsi yakalandı; bağımsız review bekleniyor.'
-- '2026-11-17 reviewer round 1: CHANGES_REQUESTED, bulgular doğrulandı ve düzeltildi: başlık
-  değerleri literal ile sabitlendi (sabiti içe aktaran test düzenlemeyi yakalamıyordu), 500
-  de başlık taşır (middleware''de yakalanır, ayrıntı sızmaz), CSP''ye img/font data: ve form-action
-  ''none'', UI klasöründeki api/ asla sunulmaz, README''deki eski ''henüz tasarlanmadı'' satırı
-  ve fazla iddialar düzeltildi, CORS yok testi; 5 yeni mutation yakalandı. Gözlem: --ui açıkken
-  HEAD /api/health, yanlış yöntem ve sondaki eğik çizgi 404 (UI''sız 405/405/307), README''de
-  belgeli.'
-- '2026-11-17 Sourcery (8 bulgu, eski commit): çoğu a3e6eea''da zaten düzeltilmişti (500 başlıkları,
-  UI''daki api/, başlık literalleri). Yeni düzeltmeler: symlink''li index.html reddedilir
-  (test + mutation), README /api/health açık ve yeniden bağlanma tamponu (2000 olay) ve history-modu
-  yedeği yok, HANDOFF''taki eski ''çerez + Origin'' satırı güncellendi. Reddedilen: SPA fallback
-  (arayüz hash yönlendirme kullanacak, sunucu yüzeyi küçük kalsın); olay boşluğu algılama
-  (T-12 davranışı, README''de sınır olarak yazıldı).'
-- '2026-11-17 reviewer round 2: APPROVED, 3 düşük bulgu. Alınan: api koruması büyük/küçük
-  harf, ters eğik çizgi ve sondaki nokta/boşluğa karşı is_api_path ile sağlamlaştırıldı (parametreli
-  test + mutation yakaladı), README''deki 404/405 ''gözlendi'' iddiası teste bağlandı. Alınmayan:
-  istemci kopunca RuntimeError''un ERROR olarak loglanması (kozmetik). Onaydan sonra gözden
-  geçirilmeyen delta: symlink''li index.html reddi ve is_api_path (ikisi de testli ve mutation''la
-  kanıtlı).'
+- '2026-11-17 developer: görev açıldı; T-13 sonrası sıradaki iş. Tasarım sapması: çerez + Origin yerine
+  fragment + fetch akışı (CSRF yüzeyi yok, sunucu kodu küçük).'
+- '2026-11-17 developer: güvenlik başlıkları middleware (host kontrolünün dışında, 403 de kapsanır), --ui
+  ile StaticFiles (en sonda mount, symlink izlenmez), check_ui, CLI --ui, README bölümü; 24 yeni test;
+  7 mutation (başlık yok, no-store yok, symlink izleme, check_ui yok, cli ui düşürür, middleware sırası,
+  mount sırası) hepsi yakalandı; bağımsız review bekleniyor.'
+- '2026-11-17 reviewer round 1: CHANGES_REQUESTED, bulgular doğrulandı ve düzeltildi: başlık değerleri
+  literal ile sabitlendi (sabiti içe aktaran test düzenlemeyi yakalamıyordu), 500 de başlık taşır (middleware''de
+  yakalanır, ayrıntı sızmaz), CSP''ye img/font data: ve form-action ''none'', UI klasöründeki api/ asla
+  sunulmaz, README''deki eski ''henüz tasarlanmadı'' satırı ve fazla iddialar düzeltildi, CORS yok testi;
+  5 yeni mutation yakalandı. Gözlem: --ui açıkken HEAD /api/health, yanlış yöntem ve sondaki eğik çizgi
+  404 (UI''sız 405/405/307), README''de belgeli.'
+- '2026-11-17 Sourcery (8 bulgu, eski commit): çoğu a3e6eea''da zaten düzeltilmişti (500 başlıkları, UI''daki
+  api/, başlık literalleri). Yeni düzeltmeler: symlink''li index.html reddedilir (test + mutation), README
+  /api/health açık ve yeniden bağlanma tamponu (2000 olay) ve history-modu yedeği yok, HANDOFF''taki eski
+  ''çerez + Origin'' satırı güncellendi. Reddedilen: SPA fallback (arayüz hash yönlendirme kullanacak,
+  sunucu yüzeyi küçük kalsın); olay boşluğu algılama (T-12 davranışı, README''de sınır olarak yazıldı).'
+- '2026-11-17 reviewer round 2: APPROVED, 3 düşük bulgu. Alınan: api koruması büyük/küçük harf, ters eğik
+  çizgi ve sondaki nokta/boşluğa karşı is_api_path ile sağlamlaştırıldı (parametreli test + mutation yakaladı),
+  README''deki 404/405 ''gözlendi'' iddiası teste bağlandı. Alınmayan: istemci kopunca RuntimeError''un
+  ERROR olarak loglanması (kozmetik). Onaydan sonra gözden geçirilmeyen delta: symlink''li index.html
+  reddi ve is_api_path (ikisi de testli ve mutation''la kanıtlı).'
+review:
+  by: reviewer
+  status: approved
+  notes: 'Round 2 (fresh read-only reviewer): APPROVED, no blocking defect. Round 1 CHANGES_REQUESTED,
+    all findings verified and fixed: header values pinned to literals (a test importing the constant could
+    not catch an edit), 500 responses carry the headers, CSP gained img/font data: and form-action, a
+    folder named api inside the UI is never served, stale README and HANDOFF lines (old ''cookie + Origin'')
+    corrected, no-CORS test. Round 2 low findings taken: is_api_path (case, backslash, trailing dot) and
+    the 404-under---ui test. Not taken: the ERROR log on a client disconnect (cosmetic). After the approval
+    two small changes were NOT separately re-reviewed (symlinked index.html refused, is_api_path); both
+    have tests and mutation checks. Design deviation from my earlier proposal: URL fragment + fetch streaming
+    instead of cookie + Origin (no ambient credential, so no CSRF surface). Not verified: any real browser
+    or React build (no UI exists yet), so the CSP is reasoned, not observed. Accepted limits: anyone holding
+    the token can start agents, no TLS, event buffer of 2000 per job with unreported gaps, no history-mode
+    fallback (UI must use hash routing), 404 instead of 405 under /api with --ui.'
