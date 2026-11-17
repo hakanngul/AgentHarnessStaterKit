@@ -18,6 +18,7 @@ acceptance:
   verified_by:
   - E1
   - E6
+  - E8
 - id: AC2
   text: Normal TMPDIR ile pytest, ruff check ve ruff format --check geçer.
   verified_by:
@@ -79,7 +80,7 @@ evidence:
     -q'
   cwd: .
   exit_code: 0
-  summary: 'TMPDIR=/tmp/l16 symlink -> /tmp/r16: 989 passed'
+  summary: 'yanlış kaydedildi: TMPDIR verilmedi; yerine E6 geçer'
   commit: ca28a9ac479e629e8fbd46c4e1ed1aaf99c86c2d
   output: .harness/evidence/T-16/E5.txt
   output_sha256: 4162ad67d4967b227bc0556c4bd3961844ae267ae7e18ef7c933f0639e0c3cb1
@@ -108,6 +109,18 @@ evidence:
   output_sha256: 2c19190b3314a129c7d926edc5da3db6ad878d99fa73b8ebfde81bdad085f081
   recorded_at: '2026-11-17'
   recorded_by: harness
+- id: E8
+  kind: command
+  command: sh -c 'export TMPDIR=/tmp/l16; echo "TMPDIR=$TMPDIR -> $(readlink -f "$TMPDIR")";
+    uv run --frozen pytest -q'
+  cwd: .
+  exit_code: 0
+  summary: 'HEAD''de TMPDIR=/tmp/l16 symlink -> /tmp/r16: 989 passed'
+  commit: 30fdc92fb944c6f3866fba8b3747722fc5fec980
+  output: .harness/evidence/T-16/E8.txt
+  output_sha256: 649882adeed9b04ce77365585d6366c50c7a278c62f14b106046439158b35c77
+  recorded_at: '2026-11-17'
+  recorded_by: harness
 log:
 - '2026-11-17 developer: sahibi Mac''te 1 failed, 987 passed bildirdi. Linux''ta TMPDIR symlink''e
   yönlendirilince düzeltme öncesi kırıldığı, sonrası geçtiği görüldü.'
@@ -118,7 +131,10 @@ log:
   dosyaya yazıyor (TMPDIR=/tmp/l16 -> /tmp/r16, 989 passed). E5 yanlış kaydedildi: TMPDIR
   verilmeden koştu, AC''ye bağlanmadı. Sahibinin Mac sayısı 1 failed + 987 passed + 1 skipped
   = 989, tutarlı.'
-- '2026-11-17 developer: Sonar ayrı macOS işindeki yeni satırları güvenlik bulgusu saydı (setup-uv SHA ile
-  sabitlenmemiş, uv sync --no-build yok; --no-build projenin kendisini kuramadığı için denendi ve elendi).
-  macOS ayrı iş yerine test matrisine include olarak eklendi; adımlar Linux ile aynı (ruff, pytest, harness
-  check, build da macOS''ta koşar). İş adları test (ubuntu-latest, 3.11) biçimine değişti.'
+- '2026-11-17 developer: Sonar ayrı macOS işindeki yeni satırları güvenlik bulgusu saydı (setup-uv
+  SHA ile sabitlenmemiş, uv sync --no-build yok; --no-build projenin kendisini kuramadığı
+  için denendi ve elendi). macOS ayrı iş yerine test matrisine include olarak eklendi; adımlar
+  Linux ile aynı (ruff, pytest, harness check, build da macOS''ta koşar). İş adları test (ubuntu-latest,
+  3.11) biçimine değişti.'
+- '2026-11-17 reviewer round 2: APPROVED. Düşük bulgular alındı: E5 özeti düzeltildi, symlink''li koşu son
+  kodda tekrarlandı (E8). AC3 (macOS CI yeşil) CI sonucunu bekliyor.'
