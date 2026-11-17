@@ -1,0 +1,243 @@
+schema_version: 1
+id: T-13
+title: 'Proje çalışma kilidi: CLI ve sunucu aynı projede aynı anda wave, review ya da commit
+  çalıştırmasın'
+owner: developer
+status: IN_REVIEW
+goal: 'T-12 incelemesinde bulunan üç gerçek riski kapatmak: (1) run_wave kaybettiği claim''de
+  kazananın görevini READY''ye bırakıyor, (2) CLI ve sunucu aynı git index''ini paylaşabiliyor,
+  (3) git alt süreçlerinin zaman aşımı yok. Çözüm: bir proje başına tek çalışma kilidi (flock,
+  süreç ölünce kendiliğinden düşer), kilidin giriş noktalarında alınması, run_wave''in yalnız
+  kendi aldığı görevleri bırakması ve git çağrılarına zaman aşımı.'
+scope:
+- src/agent_harness/runlock.py
+- src/agent_harness/cli.py
+- src/agent_harness/jobs.py
+- src/agent_harness/orchestrator.py
+- src/agent_harness/commit.py
+- tests/test_runlock.py
+- tests/test_orchestrator.py
+- tests/test_jobs.py
+- tests/test_commit.py
+- tests/test_cli.py
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: 'Proje kilidi dışlayıcı ve beklemesizdir: ikinci alma (aynı süreçte başka dosya tanıtıcısıyla
+    ve başka süreçte) HarnessError verir ve tutanı (tür, pid, başlangıç) söyler; bırakma,
+    istisna ve süreç ölümü (SIGKILL) kilidi düşürür; bırakma tekrar çağrılabilir; sembolik
+    bağlantı reddedilir; kilit dosyası commit denetiminde stray sayılmaz.'
+- id: AC2
+  text: CLI run, wave (--review dahil, tek kilit altında), review ve commit komutları kilidi
+    tüm işlem boyunca tutar; tutulmuşsa 1 ile çıkar ve tutanı söyler; evidence run ve salt
+    okunur komutlar kilit almaz (ajan bir wave içinden evidence run çağırır).
+- id: AC3
+  text: 'Sunucu işi kilidi başlangıçtan son duruma kadar tutar: bitiş, hata, iptal, ilk adımdan
+    önce iptal ve kapanışta bırakır; başka bir aktör tutuyorsa POST /api/jobs 409 verir ve
+    mesajda tutan görünür; iş yokken kilit tutulmaz.'
+- id: AC4
+  text: 'run_wave yalnız kendi başarıyla aldığı görevleri bırakır: claim''i reddedilen (başkasının)
+    görev READY''ye düşürülmez; claim sırasında kesilen görev ve daha önce alınanlar yine
+    bırakılır.'
+- id: AC5
+  text: Git alt süreçleri zaman aşımına uğrarsa HarnessError verir ve komutu söyler. Testler
+    unit testtir (gerçek dosyalar ve gerçek flock; çapraz süreç testi bir alt süreç açar);
+    pytest, ruff check ve ruff format --check geçer.
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 947 passed in 32.53s
+  commit: 06c362a8b7e4bb002d3b8de9bd9262bf226cab0c
+  output: .harness/evidence/T-13/E1.txt
+  output_sha256: cc2ec56654f849130863f90cafbae842f9711e68db70ac26278c8034b0546929
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 06c362a8b7e4bb002d3b8de9bd9262bf226cab0c
+  output: .harness/evidence/T-13/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 06c362a8b7e4bb002d3b8de9bd9262bf226cab0c
+  output: .harness/evidence/T-13/E3.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 947 passed in 32.81s
+  commit: 7dbb998eed81cab199a33aeb021ebc5218c39493
+  output: .harness/evidence/T-13/E4.txt
+  output_sha256: 106f1ebc481827c70ef4a78de2fdedae4e9f8abfce853d405ffe86bb38072744
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 7dbb998eed81cab199a33aeb021ebc5218c39493
+  output: .harness/evidence/T-13/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 7dbb998eed81cab199a33aeb021ebc5218c39493
+  output: .harness/evidence/T-13/E6.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 947 passed in 35.98s
+  commit: 265406c31748235acaa160016b780f93cc8dcd9f
+  output: .harness/evidence/T-13/E7.txt
+  output_sha256: 5543dbfb5d38fc10cc2abc6d74a86e2e1c9330c3ca919d4797b58db723eee4f1
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 265406c31748235acaa160016b780f93cc8dcd9f
+  output: .harness/evidence/T-13/E8.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 265406c31748235acaa160016b780f93cc8dcd9f
+  output: .harness/evidence/T-13/E9.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-16'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 949 passed in 40.76s
+  commit: 2c4eedf5460abcc8e39d8f5ecfbc6a094cd746a8
+  output: .harness/evidence/T-13/E10.txt
+  output_sha256: 70b369cfccd335fa080161aca74ea3c43c066431bb511e5e7a3d6c6a18df8d81
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 2c4eedf5460abcc8e39d8f5ecfbc6a094cd746a8
+  output: .harness/evidence/T-13/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 2c4eedf5460abcc8e39d8f5ecfbc6a094cd746a8
+  output: .harness/evidence/T-13/E12.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E13
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 949 passed in 38.79s
+  commit: a46ac99d90d868018edc58aaf8d128020055511e
+  output: .harness/evidence/T-13/E13.txt
+  output_sha256: 6d800828f3283c1a5da8609bf2e52edb68b8a9c123bd2d9ab0cc7b273127421d
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E14
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: a46ac99d90d868018edc58aaf8d128020055511e
+  output: .harness/evidence/T-13/E14.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E15
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: a46ac99d90d868018edc58aaf8d128020055511e
+  output: .harness/evidence/T-13/E15.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+log:
+- '2026-11-16 developer: task opened; follows the T-12 review findings (wave claim race, shared
+  git index, git without timeout); flock chosen over an O_EXCL file because a crash must not
+  leave a lock behind'
+- '2026-11-16 developer: runlock.py, CLI and server integration, run_wave claim fix, git timeout;
+  24 new tests; every fix mutation-checked; waiting for independent review'
+- '2026-11-16 reviewer: CHANGES_REQUESTED. #1 (one-lock test could not fail; the review never
+  ran) FIXED: test now asserts the review phase ran locked, mutation (review dedented out
+  of the lock) caught. #2 (cancel releases lock while a to_thread write may finish) ACCEPTED,
+  documented in README. #3 (git timeout vs grandchild holding the pipe) REFUTED: measured
+  1.0 s for a 1 s timeout with a sleeping grandchild on POSIX. #4 (claim ownership keyed on
+  exception type) ACCEPTED, very unlikely behind the entry-point lock. #5 (holder note window)
+  ACCEPTED, cosmetic, documented.'
+- '2026-11-16 reviewer round 2: APPROVED. Codex P2 (git timeout kills only git, descendants
+  outlive the lock) verified real for hooks that fork: fixed with a process group kill (POSIX),
+  test with a hook whose background child must not survive; mutation (kill only git) caught.'
+- '2026-11-16 Sourcery (9 findings on e1e8dc7) triaged. FIXED: git descendants (process group),
+  job left running when create_task fails (job removed, test + mutation), one-lock test (already
+  fixed). ACCEPTED and documented: git clean deleting the lock file, orphan git after kill
+  -9, post-commit hook timeout reported as blocked, holder-note window. DECLINED: evidence
+  run must not take the lock (an agent calls it inside a wave that holds it; would deadlock);
+  symlink swap of .harness between check and open (needs an attacker who can already write
+  the project; reported to the user as an open security-labelled finding).'
+- '2026-11-17 reviewer round 3 (commit.py process group): APPROVED. Taken: post-kill communicate
+  bounded (REAP_TIMEOUT 5 s) because a helper that escapes the group via setsid could hold
+  the pipes and hang under the lock; test + mutation caught. Documented: git loses its controlling
+  tty (gpgsign pinentry on tty). Tests are skipped on non-POSIX.'
+- '2026-11-17 reviewer round 4 (delta: _reap bound, create_task cleanup): APPROVED. Sourcery
+  check failed on subprocess.CompletedProcess(...) in commit.py (dangerous-subprocess-use-audit):
+  false positive (a data holder, fixed argv, no shell), but avoidable without behaviour change,
+  so _run now returns a small GitResult dataclass.'

@@ -135,15 +135,23 @@ async def run_wave(
     report = plan(root)
     if report.errors:
         raise HarnessError("the ledger has errors; run `harness check`: " + report.errors[0])
-    chosen: list[str] = []
+    chosen: list[str] = []  # only tasks this run really claimed
     before: dict[str, set[str]] = {}
+    claiming: str | None = None
     try:
         for task in report.start[:max_parallel]:
-            chosen.append(task.id)  # before the claim, so an interrupt in it still releases it
+            claiming = task.id
             set_status(root, task.id, "IN_PROGRESS", note="started", expect=("READY",))
+            chosen.append(task.id)
+            claiming = None
             before[task.id] = _evidence_ids(root, task.id)
-    except BaseException:
-        for task_id in chosen:  # all or nothing: do not strand tasks that will never run
+    except BaseException as exc:
+        owned = list(chosen)
+        if claiming is not None and not isinstance(exc, HarnessError):
+            owned.append(claiming)  # an interrupt may have come right after the write
+        # A refused claim (HarnessError) means the task is not ours: it may be another run's
+        # IN_PROGRESS task, and releasing it would let a third run start it a second time.
+        for task_id in owned:  # all or nothing: do not strand tasks that will never run
             _release(root, task_id, "READY", "start aborted before any task ran")
         raise
 

@@ -289,6 +289,63 @@ def test_a_failed_start_releases_the_tasks_already_claimed(tmp_path, monkeypatch
     assert status_of(root, "T-1")["status"] == status_of(root, "T-2")["status"] == "READY"
 
 
+def racing_claims(monkeypatch, thief_takes):
+    """Another run takes the listed tasks between the plan and our claim of them."""
+    import agent_harness.orchestrator as orchestrator
+
+    real = orchestrator.set_status
+    stolen = set()
+
+    def racing(root, task_id, status, **kw):
+        if task_id in thief_takes and status == "IN_PROGRESS" and task_id not in stolen:
+            stolen.add(task_id)
+            real(root, task_id, "IN_PROGRESS", note="another run started it", expect=("READY",))
+        return real(root, task_id, status, **kw)
+
+    monkeypatch.setattr(orchestrator, "set_status", racing)
+
+
+def test_a_claim_that_loses_the_race_does_not_release_the_winners_task(tmp_path, monkeypatch):
+    racing_claims(monkeypatch, {"T-1"})
+    root = project(tmp_path, task("T-1", scope=["src/a/"]), task("T-2", scope=["src/b/"]))
+    engine = ByTask({})
+    with pytest.raises(HarnessError, match="expected READY"):
+        wave(root, engine)
+    assert status_of(root, "T-1")["status"] == "IN_PROGRESS"  # the other run keeps its task
+    assert status_of(root, "T-2")["status"] == "READY"
+    assert engine.started == []
+
+
+def test_losing_a_later_claim_releases_ours_but_not_the_winners(tmp_path, monkeypatch):
+    racing_claims(monkeypatch, {"T-2"})
+    root = project(tmp_path, task("T-1", scope=["src/a/"]), task("T-2", scope=["src/b/"]))
+    with pytest.raises(HarnessError, match="expected READY"):
+        wave(root, ByTask({}))
+    assert status_of(root, "T-1")["status"] == "READY"  # we claimed it, so we give it back
+    assert status_of(root, "T-2")["status"] == "IN_PROGRESS"  # the other run's task stays
+
+
+class Halt(BaseException):
+    """Not an Exception: stands for an interrupt arriving mid-claim."""
+
+
+def test_an_interrupt_right_after_a_claim_write_still_gives_that_task_back(tmp_path, monkeypatch):
+    import agent_harness.orchestrator as orchestrator
+
+    real = orchestrator.set_status
+
+    def interrupted(root, task_id, status, **kw):
+        real(root, task_id, status, **kw)  # the write happened
+        if task_id == "T-2" and status == "IN_PROGRESS":
+            raise Halt
+
+    monkeypatch.setattr(orchestrator, "set_status", interrupted)
+    root = project(tmp_path, task("T-1", scope=["src/a/"]), task("T-2", scope=["src/b/"]))
+    with pytest.raises(Halt):
+        wave(root, ByTask({}))
+    assert status_of(root, "T-1")["status"] == status_of(root, "T-2")["status"] == "READY"
+
+
 def test_set_status_refuses_a_task_that_is_no_longer_in_the_expected_status(tmp_path):
     root = project(tmp_path, task(status="CANCELLED", reason="dropped"))
     before = (root / ".harness/tasks/T-1.yaml").read_text()

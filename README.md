@@ -340,6 +340,43 @@ Sınırlar:
 - Kimlik git ayarından gelir; eksik olan `user.name`/`user.email` için `Agent Harness
   <harness@localhost>` kullanılır.
 
+## Proje çalışma kilidi
+
+Wave, review ve commit ledger'ı ve çalışma ağacını yazar, commit ise git'in tek index'ini
+kullanır. İki aktör (CLI ve sunucu ya da iki sunucu) aynı projede birlikte çalışırsa
+birbirinin görevini bırakabilir ya da dosyalarını birbirinin commit'ine katabilir. Bu yüzden
+`harness run`, `wave`, `review` ve `commit` (ve sunucudaki işler) başlarken
+`.harness/.run.lock` üzerinde `flock` alır; kilit tutuluyorsa beklemeden durur, tutanı söyler
+ve 1 ile çıkar (sunucuda 409).
+
+- `wave --review` wave ve review'ı tek kilit altında çalıştırır.
+- Kilit süreç ölünce (`kill -9` dahil) çekirdek tarafından düşer; geride temizlenecek bir şey
+  kalmaz. Dosya kalır ve zararsızdır; `harness commit` onu stray saymaz. İstersen
+  `.gitignore`'a ekle.
+- `harness evidence run` ve salt okunur komutlar (`check`, `next`, `validate`, ...) kilit
+  almaz: ajan bir wave'in içinden `evidence run` çağırır.
+- Kilit giriş noktalarındadır, kütüphane fonksiyonlarında değil. `run_wave`'i doğrudan çağıran
+  kod kilidi kendisi almalıdır (`agent_harness.runlock`). Yine de `run_wave` yalnız kendi
+  aldığı görevleri bırakır, başkasının IN_PROGRESS görevine dokunmaz.
+- Git komutları 120 saniyede zaman aşımına uğrar (takılan bir hook kilidi sonsuza kadar
+  tutmasın).
+- Sınırlar: `flock` ağ dosya sistemlerinde (NFS) güvenilir olmayabilir. Windows'ta
+  `msvcrt.locking` kullanılır; orada denenmedi.
+- Sınırlar (review bulgusu): sunucuda bir wave iptal edilirse kilit hemen bırakılır, ama o an
+  defteri yazan bir `to_thread` işi bitene kadar sürebilir; yazımlar görev başına `O_EXCL`
+  kilidiyle sıralı kalır, pencere küçüktür. İptal edilemeyen `commit` job'ı ise kilit
+  bırakıldıktan sonra git çağrısını (en çok 120 sn) sürdürebilir; eşzamanlı ikinci commit'i
+  git'in `index.lock`'u reddeder. Zaman aşımında git ve başlattığı hook'lar (süreç grubu) öldürülür; Windows'ta yalnız git.
+  Bir çalıştırma sürerken `git clean -fd` kilit dosyasını silebilir (sonraki çalıştırma yeni bir
+  dosyayı kilitler); çalışma sürerken projede `git clean` yapmayın. `kill -9` ile ölen bir
+  harness'in o an çalışan git'i yetim kalıp kilit bırakıldıktan sonra index'e dokunabilir.
+  Git kendi oturumunda çalışır: kontrol eden terminali yoktur, bu yüzden tty isteyen bir
+  `commit.gpgsign` pinentry'si çalışmaz (agent/GUI pinentry kullanın). Grubu terk eden bir
+  yardımcı süreç öldürülemez; çıktı beklenmez (5 sn), kilit yine bırakılır.
+  `post-commit` hook'u zaman aşımına uğrarsa commit zaten oluşmuş olsa da görev "blocked"
+  raporlanır (ledger ve git'i `git log` ile karşılaştırın). Tutucu notu (kim, pid) kilit alındıktan hemen
+  sonra yazılır; o anda okuyan biri "holder unknown" görebilir, hata yine doğrudur.
+
 ## Yerel sunucu
 
 `harness serve [PATH] [--port 8765]`: defteri JSON olarak sunan FastAPI sunucusu. Ek bağımlılık
@@ -370,6 +407,7 @@ bir karar mantığı eklemez.
   kaldığı yerden devam eder, iş bitince kapanır. İş başına en çok 2000 olay ve olay başına 500
   karakter tutulur; `after` eski kalırsa akış en eski tutulan olaydan sürer. Tarayıcıda
   `EventSource` Authorization başlığı gönderemez; `fetch` ile akış okunur.
+- Bir iş, çalıştığı sürece proje kilidini tutar ve her bitişte (hata, iptal, kapanış dahil) bırakır.
 - `POST /api/jobs/{id}/cancel`: wave ya da review'ı iptal eder. Wave'in yarım kalan görevleri
   READY'ye döner; review görevleri sahiplenmediği için iptal edilen review'ın görevleri
   IN_REVIEW'da kalır. Commit işi kısa bir iş parçacığında koşar, iptal edilemez (409). Sunucu kapanırken
@@ -386,8 +424,8 @@ Sınırlar:
   sürece karşı koruma değildir; token'ı bilen her süreç erişir.
 - Hata mesajları yetkili istemciye dosya yolu ya da git çıktısı içerebilir (okunamayan görev
   dosyalarında yol gizlenir).
-- Kilit yok: CLI ve sunucu aynı projede aynı anda wave ya da commit çalıştırırsa birbirinin
-  görevini ya da git index'ini bozabilir. Aynı anda yalnız tek aktör (CLI ya da sunucu) kullan.
+- Aynı projede aynı anda tek çalışma olur (proje çalışma kilidi, aşağıda): sunucu başka bir
+  aktör çalışırken iş başlatmaz (409, mesajda tutan görünür).
 - Bir iptal, defter yazımı sürerken gelirse o yazım tamamlanabilir; iş `cancelled` görünür ama
   görev gerçekten bitmiş durumda kalır (defter tutarlı kalır).
 - Takılan bir engine işi çalışıyor gösterir ve yeni işi 409 ile engeller; iptal uç noktası yuvayı

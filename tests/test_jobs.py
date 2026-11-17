@@ -495,7 +495,7 @@ def test_only_a_few_finished_jobs_are_kept_and_a_running_one_never_dropped(monke
     monkeypatch.setattr(jobs_module, "commit_done_tasks", lambda *a, **k: [])
 
     async def run():
-        manager = JobManager(tmp_path, lambda: None)
+        manager = JobManager(project(tmp_path, task("T-1")), lambda: None)
         ids = []
         for _ in range(MAX_JOBS + 7):
             job = manager.start(JobParams.model_validate({"kind": "commit"}))
@@ -515,7 +515,7 @@ def test_only_a_few_finished_jobs_are_kept_and_a_running_one_never_dropped(monke
 
 def test_cancelling_before_the_first_step_still_ends_the_job(tmp_path):
     async def run():
-        manager = JobManager(tmp_path, lambda: None)
+        manager = JobManager(project(tmp_path, task("T-1")), lambda: None)
         job = manager.start(JobParams.model_validate({"kind": "wave"}))
         await manager.cancel(job)  # the task has not run a single step yet
         return job
@@ -567,8 +567,7 @@ def test_an_error_thrown_into_the_lifespan_still_stops_the_running_job(tmp_path)
 
 def test_a_cancelled_job_task_ends_cancelled_after_its_bookkeeping(tmp_path):
     async def run():
-        manager = JobManager(tmp_path, lambda: Blocking())
-        project(tmp_path, task("T-1"))
+        manager = JobManager(project(tmp_path, task("T-1")), lambda: Blocking())
         job = manager.start(JobParams.model_validate({"kind": "wave"}))
         await asyncio.sleep(0.2)
         assert job.status == "running"
@@ -665,7 +664,7 @@ def test_shutdown_lets_a_running_commit_finish_instead_of_cancelling_it(monkeypa
     monkeypatch.setattr(jobs_module, "commit_done_tasks", slow_commit)
 
     async def run():
-        manager = JobManager(tmp_path, lambda: None)
+        manager = JobManager(project(tmp_path, task("T-1")), lambda: None)
         job = manager.start(JobParams.model_validate({"kind": "commit"}))
         await asyncio.sleep(0.1)
         asyncio.get_running_loop().call_later(0.3, gate.set)
@@ -687,7 +686,7 @@ def test_a_base_exception_does_not_leave_a_job_running(monkeypatch, tmp_path):
     monkeypatch.setattr(jobs_module, "commit_done_tasks", interrupted)
 
     async def run():
-        manager = JobManager(tmp_path, lambda: None)
+        manager = JobManager(project(tmp_path, task("T-1")), lambda: None)
         job = manager.start(JobParams.model_validate({"kind": "commit"}))
         await asyncio.gather(job.task, return_exceptions=True)
         return job, manager.active()
@@ -818,3 +817,27 @@ def test_a_content_length_with_thousands_of_digits_is_413_not_a_crash(tmp_path):
     huge = (b"content-length", b"9" * 5000)
     status, handed, _ = asgi_post(app, chunks=[b"{}"], extra_headers=(huge,))
     assert status == 413 and handed == 0  # refused before any body byte was read
+
+
+def test_a_job_whose_task_cannot_be_created_leaves_no_running_job_and_no_lock(
+    monkeypatch, tmp_path
+):
+    from agent_harness.runlock import acquire
+
+    root = project(tmp_path, task("T-1"))
+
+    async def scenario():
+        manager = JobManager(root, lambda: None)
+
+        def broken(coroutine, **kwargs):
+            coroutine.close()
+            raise RuntimeError("no task for you")
+
+        monkeypatch.setattr(jobs_module.asyncio, "create_task", broken)
+        with pytest.raises(RuntimeError):
+            manager.start(JobParams(kind="commit"))
+        monkeypatch.undo()
+        assert manager.active() is None and manager.jobs == {}  # a later start is not refused
+        acquire(root, "probe").release()  # and the project lock was given back
+
+    asyncio.run(scenario())

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -665,3 +666,53 @@ def test_a_failed_commit_still_names_git_commit_when_the_identity_options_are_ad
     (result,) = commit_done_tasks(root)
     assert result.status == "blocked" and "git commit failed" in result.note
     assert "git -c failed" not in result.note
+
+
+@pytest.mark.skipif(os.name != "posix", reason="needs /bin/sh hooks and process groups")
+def test_a_git_command_that_times_out_is_a_clear_error_and_leaves_no_survivors(
+    monkeypatch, tmp_path
+):
+    import time
+
+    from agent_harness import commit
+
+    root = repo(tmp_path, task("T-1", "DONE"))
+    marker = tmp_path / "late"
+    hook = root / ".git/hooks/pre-commit"
+    hook.parent.mkdir(exist_ok=True)
+    # a grandchild that would touch the marker after the timeout, and a hook that hangs
+    hook.write_text(f"#!/bin/sh\n(sleep 2; touch {marker}) &\nsleep 30\n")
+    hook.chmod(0o755)
+    write(root, "src/a/one.py")
+    git(root, "add", "-A")
+    monkeypatch.setattr(commit, "GIT_TIMEOUT", 1)
+    started = time.monotonic()
+    with pytest.raises(HarnessError, match=r"git commit timed out after 1 s"):
+        commit._run(root, "-c", "user.name=x", "-c", "user.email=x@x", "commit", "-m", "m")
+    assert time.monotonic() - started < 10
+    time.sleep(2.5)
+    assert not marker.exists()  # the hook's background child was stopped with git
+
+
+@pytest.mark.skipif(os.name != "posix", reason="needs setsid and process groups")
+def test_a_helper_that_escapes_the_group_cannot_hang_the_timeout(monkeypatch, tmp_path):
+    import shutil
+    import time
+
+    from agent_harness import commit
+
+    if shutil.which("setsid") is None:
+        pytest.skip("no setsid")
+    root = repo(tmp_path, done("T-1", ["src/a/"]))
+    hook = root / ".git/hooks/pre-commit"
+    hook.parent.mkdir(exist_ok=True)
+    hook.write_text("#!/bin/sh\nsetsid sleep 20 &\nsleep 30\n")  # the helper keeps the pipes
+    hook.chmod(0o755)
+    write(root, "src/a/one.py")
+    git(root, "add", "-A")
+    monkeypatch.setattr(commit, "GIT_TIMEOUT", 1)
+    monkeypatch.setattr(commit, "REAP_TIMEOUT", 1)
+    started = time.monotonic()
+    with pytest.raises(HarnessError, match="timed out"):
+        commit._run(root, "-c", "user.name=x", "-c", "user.email=x@x", "commit", "-m", "m")
+    assert time.monotonic() - started < 8  # not the 20 s the escaped helper lives

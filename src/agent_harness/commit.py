@@ -6,6 +6,8 @@ account for blocks every commit, because with parallel tasks nobody can say whos
 Only the files a task owns are staged, by literal path; nothing is pushed.
 """
 
+import os
+import signal
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -14,8 +16,11 @@ from agent_harness.check import TASKS_DIR, inspect_ledger
 from agent_harness.evidence import EVIDENCE_DIR
 from agent_harness.filesystem import HarnessError, project_root
 from agent_harness.models import Task
+from agent_harness.runlock import LOCK_FILE as RUN_LOCK
 from agent_harness.schedule import _fold, _prefix
 
+REAP_TIMEOUT = 5  # seconds to collect git's output after it was killed
+GIT_TIMEOUT = 120  # seconds one git command may take before the commit gives up
 GENERATED_DIRS = ("__pycache__",)  # produced by allowed test commands, never a task's work
 FALLBACK_NAME = "Agent Harness"
 FALLBACK_EMAIL = "harness@localhost"
@@ -32,20 +37,65 @@ class CommitResult:
     files: list[str] = field(default_factory=list)
 
 
-def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    """git with literal pathspecs: a file named `*.py` or `:(top)x` is just a file name."""
+@dataclass(frozen=True)
+class GitResult:
+    """What a finished git command left behind (the part of CompletedProcess callers read)."""
+
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+def _kill_group(process: subprocess.Popen) -> None:
+    """Stop git and everything it started; the project lock is released right after."""
     try:
-        done = subprocess.run(
-            ["git", "--literal-pathspecs", *args],
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        else:  # pragma: no cover - Windows: only git itself
+            process.kill()
+    except OSError:
+        pass  # already gone
+
+
+def _reap(process: subprocess.Popen) -> None:
+    """Kill git's group, then collect it. A helper that left the group (setsid) may still hold
+    the pipes open: give up on the output after a few seconds rather than hang under the lock."""
+    _kill_group(process)
+    try:
+        process.communicate(timeout=REAP_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        for pipe in (process.stdout, process.stderr):
+            if pipe is not None:
+                pipe.close()
+        process.wait()  # git itself is dead, so this returns at once
+
+
+def _run(root: Path, *args: str, check: bool = True) -> GitResult:
+    """git with literal pathspecs: a file named `*.py` or `:(top)x` is just a file name."""
+    name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
+    command = ["git", "--literal-pathspecs", *args]
+    try:
+        # own process group on POSIX, so a timeout can stop hooks and helpers too
+        process = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
+            command,
             cwd=root,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=False,
+            start_new_session=os.name == "posix",
         )
     except OSError as exc:
         raise HarnessError(f"git is not available: {exc}") from exc
+    try:
+        stdout, stderr = process.communicate(timeout=GIT_TIMEOUT)
+    except subprocess.TimeoutExpired as exc:  # e.g. a hook that never returns
+        _reap(process)
+        raise HarnessError(f"git {name} timed out after {GIT_TIMEOUT} s") from exc
+    except BaseException:
+        _reap(process)
+        raise
+    done = GitResult(process.returncode, stdout, stderr)
     if check and done.returncode != 0:
-        name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
         raise HarnessError(f"git {name} failed: {(done.stderr or done.stdout).strip()[:300]}")
     return done
 
@@ -71,7 +121,12 @@ def _is_generated(path: str) -> bool:
         and name.startswith(".")
         and name.endswith(".lock")
     )  # .harness/tasks/.T-1.yaml.lock
-    return path.endswith(".pyc") or ledger_lock or any(part in GENERATED_DIRS for part in parts)
+    return (
+        path.endswith(".pyc")
+        or ledger_lock
+        or path == RUN_LOCK  # the project run lock file, kept after a run
+        or any(part in GENERATED_DIRS for part in parts)
+    )
 
 
 def changed_files(root: Path) -> list[str]:
