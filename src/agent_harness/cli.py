@@ -397,16 +397,19 @@ def serve(
     path: ProjectPath = Path("."),
     host: Annotated[str, typer.Option(help="Loopback address to bind.")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on.")] = 8765,
+    ui: Annotated[
+        Path | None, typer.Option("--ui", help="Folder with a built UI to serve at /.")
+    ] = None,
 ) -> None:
     """Serve the ledger and background jobs (wave, review, commit) as a JSON API on loopback.
 
-    Every request needs the token; a job can start agents, so keep the token private.
+    Every API request needs the token; a job can start agents, so keep the token private.
     """
     import os
     import secrets
 
     try:
-        from agent_harness.server import check_port, check_token, require_loopback
+        from agent_harness.server import check_port, check_token, check_ui, require_loopback
         from agent_harness.server import serve as run_server
     except ImportError:
         return fail(HarnessError(SERVER_HINT), False)
@@ -417,10 +420,11 @@ def serve(
         require_loopback(host)
         check_port(port)
         check_token(token)
+        ui = check_ui(ui)
         typer.echo(f"listening on {host}:{port}")
         if not given:  # a token the user supplied is never echoed back
             typer.echo(f"token: {token}")
-        run_server(path, host=host, port=port, token=token)
+        run_server(path, host=host, port=port, token=token, ui=ui)
     except HarnessError as exc:
         fail(exc, False)
 

@@ -1,0 +1,198 @@
+schema_version: 1
+id: T-14
+title: 'Tarayıcı için sunucu hazırlığı: güvenlik başlıkları, --ui ile statik arayüz, token
+  devri'
+owner: developer
+status: IN_REVIEW
+goal: 'React arayüzü yazılmadan önce sunucuyu tarayıcıya hazırlamak. Karar (kendi görüşüm,
+  önceki ''çerez + Origin'' önerimi değiştirdim): token URL fragment''inde taşınır (sunucuya
+  hiç gitmez), arayüz onu bellekte tutar ve REST ile SSE için Authorization başlıklı fetch
+  kullanır; EventSource kullanılmaz. Ortam kimlik bilgisi (çerez) olmadığı için CSRF yüzeyi
+  yoktur ve sunucudaki Bearer doğrulaması aynen kalır. Sunucu yalnız (1) her yanıta güvenlik
+  başlıkları ekler, (2) `--ui DIR` verilirse derlenmiş arayüzü salt okunur ve token''sız sunar.
+  Arayüzün kendisi bu görevin dışında.'
+scope:
+- src/agent_harness/server.py
+- src/agent_harness/cli.py
+- tests/test_server.py
+- tests/test_cli.py
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: 'Her yanıt (200, 401, 403 geçersiz Host, 404, 405, 413, SSE akışı) nosniff, DENY çerçeve,
+    no-referrer, CSP (default-src ''self'', connect-src ''self'', frame-ancestors ''none'',
+    base-uri ''none'', object-src ''none'') ve /api için Cache-Control: no-store taşır.'
+- id: AC2
+  text: '`--ui DIR` ile index.html ve varlıklar token''sız sunulur, /api rotaları gölgelenmez
+    (health açık, diğerleri 401); POST ve diğer yöntemler statik yolda 405; `..` ile çıkış
+    ve dizin dışına işaret eden sembolik bağlantı 404; ui verilmezse `/` bugünkü gibi 404.'
+- id: AC3
+  text: Statik yol da Host denetiminden geçer (geçersiz Host 403); `serve` eksik dizin ya
+    da index.html'i dinlemeye başlamadan HarnessError ile reddeder.
+- id: AC4
+  text: README token devrini anlatır (fragment, history.replaceState ile silme, fetch akışı
+    ve `after` ile devam, çerez bilinçli olarak yok) ve sınırları söyler (token'ı bilen herkes
+    iş başlatabilir, TLS yok).
+- id: AC5
+  text: pytest, ruff check, ruff format --check ve harness check geçer; yeni davranışın her
+    biri mutation ile kanıtlanır (düzeltmeyi geri al, bir test kırılmalı).
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 973 passed in 38.39s
+  commit: f4631df121a9855142d17e51660a6fc390ebea94
+  output: .harness/evidence/T-14/E1.txt
+  output_sha256: cefdcc1f2872e75ad2e1eff9a597931b1a047c65d75763fcd2a5328e8581b9e9
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: f4631df121a9855142d17e51660a6fc390ebea94
+  output: .harness/evidence/T-14/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: f4631df121a9855142d17e51660a6fc390ebea94
+  output: .harness/evidence/T-14/E3.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 976 passed in 38.27s
+  commit: a3e6eea68b484c12a1c1664e829e9634535af239
+  output: .harness/evidence/T-14/E4.txt
+  output_sha256: ff10ff57513c9915de9a7c6d28a91906ab3a3b3adc8d23d20636a3cd8a7670cb
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: a3e6eea68b484c12a1c1664e829e9634535af239
+  output: .harness/evidence/T-14/E5.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: a3e6eea68b484c12a1c1664e829e9634535af239
+  output: .harness/evidence/T-14/E6.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 976 passed in 40.48s
+  commit: bb2af7fdad29430458b5e4feae3e0e482ea81b1a
+  output: .harness/evidence/T-14/E7.txt
+  output_sha256: b0296564f5f1620cd24aa40d88476dcadf5b569d1df75673645a298f8f2a0e7f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: bb2af7fdad29430458b5e4feae3e0e482ea81b1a
+  output: .harness/evidence/T-14/E8.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: bb2af7fdad29430458b5e4feae3e0e482ea81b1a
+  output: .harness/evidence/T-14/E9.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 989 passed in 39.31s
+  commit: f3d73108b1fbd7fb9d09494e14d26cd41b92c0ce
+  output: .harness/evidence/T-14/E10.txt
+  output_sha256: 8604a85cc10c6f1cff7a2aa3128b35cbc2f09e4a9ed2b6829d252c14658ab764
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: f3d73108b1fbd7fb9d09494e14d26cd41b92c0ce
+  output: .harness/evidence/T-14/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: f3d73108b1fbd7fb9d09494e14d26cd41b92c0ce
+  output: .harness/evidence/T-14/E12.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+log:
+- '2026-11-17 developer: görev açıldı; T-13 sonrası sıradaki iş. Tasarım sapması: çerez +
+  Origin yerine fragment + fetch akışı (CSRF yüzeyi yok, sunucu kodu küçük).'
+- '2026-11-17 developer: güvenlik başlıkları middleware (host kontrolünün dışında, 403 de
+  kapsanır), --ui ile StaticFiles (en sonda mount, symlink izlenmez), check_ui, CLI --ui,
+  README bölümü; 24 yeni test; 7 mutation (başlık yok, no-store yok, symlink izleme, check_ui
+  yok, cli ui düşürür, middleware sırası, mount sırası) hepsi yakalandı; bağımsız review bekleniyor.'
+- '2026-11-17 reviewer round 1: CHANGES_REQUESTED, bulgular doğrulandı ve düzeltildi: başlık
+  değerleri literal ile sabitlendi (sabiti içe aktaran test düzenlemeyi yakalamıyordu), 500
+  de başlık taşır (middleware''de yakalanır, ayrıntı sızmaz), CSP''ye img/font data: ve form-action
+  ''none'', UI klasöründeki api/ asla sunulmaz, README''deki eski ''henüz tasarlanmadı'' satırı
+  ve fazla iddialar düzeltildi, CORS yok testi; 5 yeni mutation yakalandı. Gözlem: --ui açıkken
+  HEAD /api/health, yanlış yöntem ve sondaki eğik çizgi 404 (UI''sız 405/405/307), README''de
+  belgeli.'
+- '2026-11-17 Sourcery (8 bulgu, eski commit): çoğu a3e6eea''da zaten düzeltilmişti (500 başlıkları,
+  UI''daki api/, başlık literalleri). Yeni düzeltmeler: symlink''li index.html reddedilir
+  (test + mutation), README /api/health açık ve yeniden bağlanma tamponu (2000 olay) ve history-modu
+  yedeği yok, HANDOFF''taki eski ''çerez + Origin'' satırı güncellendi. Reddedilen: SPA fallback
+  (arayüz hash yönlendirme kullanacak, sunucu yüzeyi küçük kalsın); olay boşluğu algılama
+  (T-12 davranışı, README''de sınır olarak yazıldı).'
+- '2026-11-17 reviewer round 2: APPROVED, 3 düşük bulgu. Alınan: api koruması büyük/küçük
+  harf, ters eğik çizgi ve sondaki nokta/boşluğa karşı is_api_path ile sağlamlaştırıldı (parametreli
+  test + mutation yakaladı), README''deki 404/405 ''gözlendi'' iddiası teste bağlandı. Alınmayan:
+  istemci kopunca RuntimeError''un ERROR olarak loglanması (kozmetik). Onaydan sonra gözden
+  geçirilmeyen delta: symlink''li index.html reddi ve is_api_path (ikisi de testli ve mutation''la
+  kanıtlı).'

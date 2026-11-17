@@ -602,7 +602,7 @@ def test_a_git_log_failure_is_an_error_not_an_unborn_branch(tmp_path, monkeypatc
     def broken_log(root_, *args, check=True):
         if args[0] != "log":
             return real(root_, *args, check=check)
-        failed = subprocess.CompletedProcess(args, 128, "", "fatal: bad object")
+        failed = commit_module.GitResult(128, "", "fatal: bad object")
         if check:  # what the real helper does for a failing command
             raise HarnessError("git log failed: fatal: bad object")
         return failed

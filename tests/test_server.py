@@ -18,8 +18,9 @@ TOKEN = "t" * 32
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 
-def client(root: Path, token: str = TOKEN):
-    return fastapi_testclient.TestClient(create_app(root, token), base_url="http://localhost")
+def client(root: Path, token: str = TOKEN, **options):
+    app = create_app(root, token, **options)
+    return fastapi_testclient.TestClient(app, base_url="http://localhost")
 
 
 def snapshot(root: Path) -> dict[str, tuple]:
@@ -462,3 +463,234 @@ def test_an_undecodable_config_does_not_crash_the_api(tmp_path):
         response = api.get(url, headers=AUTH)
         assert response.status_code in (200, 422), url
         assert str(root) not in response.text or response.status_code == 200
+
+
+# --- browser readiness (T-14) -------------------------------------------------------------
+
+from agent_harness.server import CSP, SECURITY_HEADERS, check_ui, is_api_path  # noqa: E402
+
+
+def ui_folder(tmp_path: Path) -> Path:
+    folder = tmp_path / "ui"
+    (folder / "assets").mkdir(parents=True)
+    (folder / "index.html").write_text("<!doctype html><title>harness</title>")
+    (folder / "assets/app.js").write_text("console.log('ui')")
+    (tmp_path / "secret.txt").write_text("SECRET-OUTSIDE")
+    return folder
+
+
+EXPECTED_CSP = (
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+    "font-src 'self' data:; connect-src 'self'; form-action 'none'; "
+    "frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+)
+EXPECTED_HEADERS = {  # literals on purpose: a test that imports the constant cannot catch an edit
+    "content-security-policy": EXPECTED_CSP,
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer",
+}
+
+
+def has_security_headers(response) -> bool:
+    return all(response.headers.get(k) == v for k, v in EXPECTED_HEADERS.items())
+
+
+@pytest.mark.parametrize(
+    ("method", "url", "kwargs", "status"),
+    [
+        ("GET", "/api/health", {}, 200),
+        ("GET", "/api/plan", {"headers": AUTH}, 200),
+        ("GET", "/api/plan", {}, 401),
+        ("GET", "/api/plan", {"headers": {**AUTH, "Host": "evil.example"}}, 403),
+        ("GET", "/api/tasks/nope", {"headers": AUTH}, 404),
+        ("DELETE", "/api/health", {}, 405),
+        ("POST", "/api/jobs", {"headers": {**AUTH, "Content-Type": "text/plain"}}, 415),
+        (
+            "POST",
+            "/api/jobs",
+            {"headers": {**AUTH, "Content-Type": "application/json"}, "content": b"x" * 10_001},
+            413,
+        ),
+    ],
+)
+def test_every_response_carries_the_security_headers(tmp_path, method, url, kwargs, status):
+    api = client(project(tmp_path, task("T-1")))
+    response = api.request(method, url, **kwargs)
+    assert response.status_code == status
+    assert has_security_headers(response), dict(response.headers)
+    assert response.headers["cache-control"] == "no-store"  # nothing under /api is cached
+
+
+def test_the_policy_and_header_values_are_pinned_to_literals():
+    assert CSP == EXPECTED_CSP
+    assert {k.lower(): v for k, v in SECURITY_HEADERS.items()} == EXPECTED_HEADERS
+    assert "unsafe-eval" not in CSP and "*" not in CSP.replace("'self'", "")
+    assert "script-src" not in CSP  # scripts fall back to default-src 'self': no inline script
+
+
+def test_an_unhandled_error_is_a_500_that_still_carries_the_headers(monkeypatch, tmp_path):
+    from agent_harness import server
+
+    def boom(_root):
+        raise RuntimeError("secret internal detail")
+
+    monkeypatch.setattr(server, "plan", boom)
+    api = client(project(tmp_path, task("T-1")))
+    response = api.get("/api/plan", headers=AUTH)
+    assert response.status_code == 500 and response.json() == {"detail": "internal error"}
+    assert has_security_headers(response) and response.headers["cache-control"] == "no-store"
+    assert "secret internal detail" not in response.text
+
+
+def test_there_is_no_cors_so_no_other_origin_may_read_or_preflight(tmp_path):
+    api = client(project(tmp_path, task("T-1")))
+    foreign = {"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"}
+    preflight = api.options("/api/jobs", headers=foreign)
+    reply = api.get("/api/plan", headers={**AUTH, "Origin": "https://evil.example"})
+    for response in (preflight, reply):
+        assert not [k for k in response.headers if k.lower().startswith("access-control-")]
+    assert preflight.status_code == 405
+
+
+def test_the_built_ui_is_served_without_a_token_and_the_api_still_needs_one(tmp_path):
+    root = project(tmp_path, task("T-1"))
+    api = client(root, ui=ui_folder(tmp_path))
+    page = api.get("/")
+    assert page.status_code == 200 and "<title>harness</title>" in page.text
+    assert api.get("/assets/app.js").text == "console.log('ui')"
+    assert has_security_headers(page)
+    assert "no-store" not in page.headers.get("cache-control", "")  # only the API is no-store
+    assert api.get("/api/health").json() == {"ok": True}  # not shadowed by the UI
+    assert api.get("/api/plan").status_code == 401
+    assert api.get("/api/plan", headers=AUTH).status_code == 200
+    assert api.get("/api/nothing-here", headers=AUTH).status_code == 404
+
+
+def test_a_folder_called_api_inside_the_ui_is_never_served(tmp_path):
+    folder = ui_folder(tmp_path)
+    (folder / "api").mkdir()
+    (folder / "api/leak.txt").write_text("TOKENLESS-LEAK")
+    api = client(project(tmp_path, task("T-1")), ui=folder)
+    for url in ("/api/leak.txt", "/api/", "/api"):
+        for headers in ({}, AUTH):
+            response = api.get(url, headers=headers)
+            assert "TOKENLESS-LEAK" not in response.text, url
+    assert api.get("/api/leak.txt", headers=AUTH).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("api", True),
+        ("api/x", True),
+        ("API/x", True),
+        ("Api/leak.txt", True),
+        ("api./x", True),
+        ("api /x", True),
+        ("api\\leak.txt", True),
+        ("apix", False),
+        ("api-docs/x", False),
+        ("assets/api.js", False),
+        ("x/api/y", False),
+        ("", False),
+    ],
+)
+def test_the_api_folder_guard_sees_case_separator_and_dot_variants(path, expected):
+    assert is_api_path(path) is expected
+
+
+def test_with_a_ui_the_api_paths_without_a_route_are_404_not_405_or_a_redirect(tmp_path):
+    api = client(project(tmp_path, task("T-1")), ui=ui_folder(tmp_path))
+    assert api.delete("/api/health").status_code == 404  # without --ui this is 405
+    assert api.head("/api/health").status_code == 404
+    assert api.get("/api/plan/", headers=AUTH, follow_redirects=False).status_code == 404
+
+
+def test_without_a_ui_the_root_is_still_404(tmp_path):
+    assert client(project(tmp_path, task("T-1"))).get("/").status_code == 404
+
+
+def test_the_ui_is_read_only(tmp_path):
+    api = client(project(tmp_path, task("T-1")), ui=ui_folder(tmp_path))
+    for method in ("POST", "PUT", "DELETE", "PATCH"):
+        assert api.request(method, "/").status_code == 405, method
+        assert api.request(method, "/assets/app.js").status_code == 405, method
+    assert (tmp_path / "ui/assets/app.js").read_text() == "console.log('ui')"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/../secret.txt",
+        "/%2e%2e/secret.txt",
+        "/assets/../../secret.txt",
+        "/assets/%2e%2e/%2e%2e/secret.txt",
+        "/..%2fsecret.txt",
+        "/assets/..%5c..%5csecret.txt",
+        "/%00",
+    ],
+)
+def test_the_ui_never_serves_a_file_outside_its_folder(tmp_path, url):
+    api = client(project(tmp_path, task("T-1")), ui=ui_folder(tmp_path))
+    response = api.get(url)
+    assert "SECRET-OUTSIDE" not in response.text
+    assert response.status_code in (400, 404)
+
+
+def test_a_symlink_that_leaves_the_ui_folder_is_not_followed(tmp_path):
+    folder = ui_folder(tmp_path)
+    try:
+        (folder / "leak.txt").symlink_to(tmp_path / "secret.txt")
+    except OSError:
+        pytest.skip("symlinks are not available")
+    api = client(project(tmp_path, task("T-1")), ui=folder)
+    response = api.get("/leak.txt")
+    assert response.status_code == 404 and "SECRET-OUTSIDE" not in response.text
+
+
+def test_the_ui_goes_through_the_host_check_too(tmp_path):
+    api = client(project(tmp_path, task("T-1")), ui=ui_folder(tmp_path))
+    for url in ("/", "/assets/app.js"):
+        response = api.get(url, headers={"Host": "evil.example"})
+        assert response.status_code == 403 and has_security_headers(response), url
+
+
+def test_a_folder_that_is_not_a_built_ui_is_refused(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    (tmp_path / "file").write_text("x")
+    (tmp_path / "dirindex").mkdir()
+    (tmp_path / "dirindex/index.html").mkdir()
+    root = project(tmp_path / "proj", task("T-1"))
+    for bad in (tmp_path / "missing", empty, tmp_path / "file", tmp_path / "dirindex"):
+        with pytest.raises(HarnessError, match="not a built UI"):
+            check_ui(bad)
+        with pytest.raises(HarnessError, match="not a built UI"):
+            create_app(root, TOKEN, ui=bad)
+    outside = tmp_path / "outside.html"
+    outside.write_text("<title>elsewhere</title>")
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    try:
+        (linked / "index.html").symlink_to(outside)
+    except OSError:
+        pass  # no symlinks here: the case cannot occur
+    else:
+        with pytest.raises(HarnessError, match="not a built UI"):
+            check_ui(linked)
+    assert check_ui(None) is None
+    assert check_ui(ui_folder(tmp_path)) == (tmp_path / "ui").resolve()
+
+
+def test_serve_passes_the_ui_folder_on_and_refuses_a_bad_one_before_listening(
+    monkeypatch, tmp_path
+):
+    folder = ui_folder(tmp_path)
+    good, calls = run_serve(monkeypatch, tmp_path, "--ui", str(folder))
+    assert good.exit_code == 0 and calls[0][1]["ui"] == folder.resolve()
+    bad, more = run_serve(monkeypatch, tmp_path, "--ui", str(tmp_path / "missing"))
+    assert bad.exit_code == 1 and "not a built UI" in bad.output
+    assert more == [] and "listening" not in bad.output and "token:" not in bad.output
+    plain, last = run_serve(monkeypatch, tmp_path)
+    assert plain.exit_code == 0 and last[0][1]["ui"] is None

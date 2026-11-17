@@ -99,7 +99,7 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
 - Known: no lock between CLI and server (wave claim race in `run_wave`: a run that loses a claim
   releases the winner's task; shared git index in commit; git subprocesses have no timeout).
   Plan T-13: one project run lock held for the whole wave/review/commit, plus a git timeout.
-- Not done: token hand-off for a browser UI (cookie + Origin check design), real-session trial
+- Not done: browser UI client (token hand-off is designed in T-14: URL fragment + fetch streaming, no cookie), real-session trial
   through the server, job deadline for a stalled engine.
 
 ## T-13 (proje çalışma kilidi)
@@ -108,4 +108,4 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
 `evidence run` ve salt-okunur komutlar almaz (bir wave'in içindeki agent onu çağırır). Bilinen sınırlar README'de
 "Proje çalışma kilidi": `git clean -fd` kilit dosyasını silebilir, `kill -9` sonrası yetim git, iptalde çalışan
 to_thread yazımı, post-commit hook zaman aşımı "blocked" raporlar, flock NFS'te güvenilmez, Windows yolu denenmedi.
-Sıradaki iş: tarayıcı arayüzü için token devri (EventSource başlık gönderemez; çerez + Origin kontrolü gerekir).
+Sıradaki iş: React arayüzü. Token devri T-14'te karara bağlandı: URL fragment + Authorization başlıklı fetch akışı (EventSource başlık gönderemez, çerez yok). Arayüz hash yönlendirme kullanmalı (sunucuda history fallback yok).

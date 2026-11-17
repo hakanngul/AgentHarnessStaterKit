@@ -265,7 +265,7 @@ review:
     and documented. Round 2 and 3 approved the fixes and the process-group kill for git timeouts (Codex
     P2, real, mutation-proven), the bounded wait after the kill (setsid escape) and the create_task cleanup.
     After the last review only _run''s result type changed (GitResult instead of CompletedProcess, to
-    clear a Sourcery false positive); tests unchanged and green, not reviewed again. Evidence E13-E15
+    clear a Sourcery false positive); tests unchanged and green; that change was reviewed afterwards by a fresh read-only reviewer (APPROVED, no missing attribute, every _run caller checked). Evidence E13-E15
     was recorded one evidence/doc-only commit before the merged head. Open: Sourcery''s security-labelled
     symlink swap of .harness between check and open (declined: needs a writer on the project dir; owner
     to decide). Accepted limits: git clean -fd deleting the lock file, orphan git after kill -9, post-commit

@@ -841,3 +841,20 @@ def test_a_job_whose_task_cannot_be_created_leaves_no_running_job_and_no_lock(
         acquire(root, "probe").release()  # and the project lock was given back
 
     asyncio.run(scenario())
+
+
+def test_the_event_stream_carries_the_security_headers_too(tmp_path):
+    from agent_harness.server import SECURITY_HEADERS
+
+    root = project(tmp_path, task("T-1"))
+    with make_client(root) as api:
+        job_id = start(api, {"kind": "commit"}).json()["id"]
+        with api.stream("GET", f"/api/jobs/{job_id}/events", headers=AUTH) as response:
+            assert response.status_code == 200
+            assert response.headers["x-content-type-options"] == "nosniff"
+            assert response.headers["x-frame-options"] == "DENY"
+            assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+            for name, value in SECURITY_HEADERS.items():
+                assert response.headers[name.lower()] == value, name
+            assert response.headers["cache-control"] == "no-store"
+            list(response.iter_lines())  # read to the end: the job finishes and the stream closes
