@@ -2,7 +2,7 @@ schema_version: 1
 id: T-14
 title: 'Tarayıcı için sunucu hazırlığı: güvenlik başlıkları, --ui ile statik arayüz, token devri'
 owner: developer
-status: IN_PROGRESS
+status: IN_REVIEW
 goal: 'React arayüzü yazılmadan önce sunucuyu tarayıcıya hazırlamak. Karar (kendi görüşüm, önceki ''çerez
   + Origin'' önerimi değiştirdim): token URL fragment''inde taşınır (sunucuya hiç gitmez), arayüz onu
   bellekte tutar ve REST ile SSE için Authorization başlıklı fetch kullanır; EventSource kullanılmaz.
@@ -39,3 +39,7 @@ evidence: []
 log:
 - '2026-11-17 developer: görev açıldı; T-13 sonrası sıradaki iş. Tasarım sapması: çerez + Origin yerine
   fragment + fetch akışı (CSRF yüzeyi yok, sunucu kodu küçük).'
+- '2026-11-17 developer: güvenlik başlıkları middleware (host kontrolünün dışında, 403 de kapsanır), --ui
+  ile StaticFiles (en sonda mount, symlink izlenmez), check_ui, CLI --ui, README bölümü; 24 yeni test;
+  7 mutation (başlık yok, no-store yok, symlink izleme, check_ui yok, cli ui düşürür, middleware sırası,
+  mount sırası) hepsi yakalandı; bağımsız review bekleniyor.'

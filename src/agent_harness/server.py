@@ -17,6 +17,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from agent_harness.check import TASKS_DIR
@@ -32,6 +33,18 @@ MIN_TOKEN = 16
 MAX_BODY = 10_000
 MAX_ID_DIGITS = 18
 GRACEFUL_SHUTDOWN = 3  # seconds uvicorn waits for open connections before it cancels them
+UI_INDEX = "index.html"
+# the built UI is the only page that may load: same-origin scripts, no framing, no plugins
+CSP = (
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; "
+    "frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+)
+SECURITY_HEADERS = {
+    "Content-Security-Policy": CSP,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+}
 TASK_ID = re.compile(r"T-[0-9]+")
 HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE | re.ASCII)
 
@@ -74,6 +87,16 @@ def check_port(port: int) -> None:
         raise HarnessError("the port must be between 1 and 65535")
 
 
+def check_ui(ui: Path | None) -> Path | None:
+    """The folder of a built UI, or None; refuses a folder that cannot be served."""
+    if ui is None:
+        return None
+    folder = Path(ui).resolve()
+    if not folder.is_dir() or not (folder / UI_INDEX).is_file():
+        raise HarnessError(f"{folder} is not a built UI: it needs a {UI_INDEX}")
+    return folder
+
+
 def default_engine() -> object:
     """The engine the CLI uses; resolved late so tests and the CLI can replace it."""
     from agent_harness import cli
@@ -82,10 +105,19 @@ def default_engine() -> object:
 
 
 def create_app(
-    project: Path, token: str, *, engine_factory: Callable[[], object] | None = None
+    project: Path,
+    token: str,
+    *,
+    engine_factory: Callable[[], object] | None = None,
+    ui: Path | None = None,
 ) -> FastAPI:
-    """The app for one project; `token` is the shared secret every request must carry."""
+    """The app for one project; `token` is the shared secret every request must carry.
+
+    `ui` is a folder with a built UI, served read-only and without a token (it holds no
+    secret); the API keeps requiring the token.
+    """
     check_token(token)
+    ui_folder = check_ui(ui)
     root = project_root(project)
     jobs = JobManager(root, engine_factory or default_engine)
 
@@ -118,6 +150,14 @@ def create_app(
         if not is_loopback_host(request.headers.get("host", "")):
             return JSONResponse({"detail": "host not allowed"}, status_code=403)
         return await call_next(request)
+
+    @app.middleware("http")  # added last, so it wraps the host check and its 403 too
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.update(SECURITY_HEADERS)
+        if request.url.path.startswith("/api"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.exception_handler(HarnessError)
     async def harness_error(_: Request, exc: HarnessError) -> JSONResponse:
@@ -247,6 +287,8 @@ def create_app(
             raise HTTPException(409, str(exc)) from exc
         return job.view()
 
+    if ui_folder is not None:  # last, so it never shadows an /api route
+        app.mount("/", StaticFiles(directory=ui_folder, html=True), name="ui")
     return app
 
 
@@ -260,11 +302,11 @@ def uvicorn_options(host: str, port: int) -> dict:
     }
 
 
-def serve(project: Path, *, host: str, port: int, token: str) -> None:
+def serve(project: Path, *, host: str, port: int, token: str, ui: Path | None = None) -> None:
     """Run the server until interrupted. Needs the `server` extra."""
     require_loopback(host)
     check_port(port)
-    app = create_app(project, token)
+    app = create_app(project, token, ui=ui)
     try:
         import uvicorn
     except ImportError as exc:
