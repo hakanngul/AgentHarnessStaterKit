@@ -14,17 +14,14 @@
 
 ## Current work
 
-T-13 (proje çalışma kilidi, PR #7) birleştirildi: `flock` ile CLI ve sunucu işleri tek çalıştırma, `run_wave` yalnız kendi claim'lerini bırakır, git zaman aşımında süreç grubu öldürülür. 949 test. Açık: Sourcery'nin güvenlik etiketli `.harness` symlink bulgusu (sahibi karar verecek).
-
-T-6 is DONE in PR #4, awaiting merge. Three open threads from PR #2 remain for the
-maintainer (subprocess audit finding, credential redaction scope, settings.json
-concurrency).
+T-13 (proje çalışma kilidi, PR #7) birleştirildi: `flock` ile CLI ve sunucu işleri tek çalıştırma, `run_wave` yalnız
+kendi claim'lerini bırakır, git zaman aşımında süreç grubu öldürülür. 949 test. T-14 (tarayıcı için sunucu hazırlığı)
+başladı. PR #2'den üç konu bakımcıda açık: subprocess audit bulgusu, credential redaction kapsamı, settings.json eşzamanlılığı.
 
 ## Next step
 
-L2: default workflow (discovery, spec, design, implement, qa, release, fix) and phase
-roles in `init`, with model and effort per role. Then L4: engine adapter and background
-agents. The user must first choose the branch layout for parallel work.
+T-14, sonra React arayüzü ve masaüstü kabuğu (pywebview denemesi, Electron yedek). Sonra: `init` varsayılan workflow ve faz
+rolleri, faz kapısını orkestra döngüsünde işletmek, gerçek Claude oturumuyla sunucudan deneme.
 
 ## 2026-11-16 T-7 engine adapter
 
