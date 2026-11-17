@@ -24,6 +24,7 @@ acceptance:
   verified_by:
   - E4
   - E8
+  - E11
 - id: AC2
   text: 'API istemcisi: her istek Authorization: Bearer taşır, yalnız /api/ ile başlayan göreli
     yola gider (başka kökene token gitmez), JSON gövdede Content-Type ayarlar, hatada sunucunun
@@ -31,6 +32,7 @@ acceptance:
   verified_by:
   - E4
   - E8
+  - E11
 - id: AC3
   text: 'SSE ayrıştırıcı: parçalara bölünmüş çerçeveleri, bölünmüş çok baytlı UTF-8''i, CRLF''yi,
     yorum satırlarını (keepalive) ve çok satırlı data''yı doğru çözer; id''yi izler. followJob
@@ -38,12 +40,14 @@ acceptance:
   verified_by:
   - E4
   - E8
+  - E11
 - id: AC4
   text: 'Arayüz: görev listesi (id, başlık, durum, kapsam, review), iş paneli (wave/review/commit
     başlat, canlı olaylar, iptal, 409''da tutan işi göster); render testleri sahte API ile.'
   verified_by:
   - E4
   - E8
+  - E11
 - id: AC5
   text: vitest, tsc --noEmit ve vite build geçer; CI'da ayrı bir ui işi koşar; pytest, ruff
     ve harness check yeşil kalır.
@@ -55,6 +59,9 @@ acceptance:
   - E5
   - E6
   - E7
+  - E11
+  - E12
+  - E13
 evidence:
 - id: E1
   kind: command
@@ -164,6 +171,39 @@ evidence:
   commit: 1701ccf145dabcd124c70d371ab931fa9f2a1fa5
   output: .harness/evidence/T-15/E10.txt
   output_sha256: 4b83cc8055f30c5c4bffe28f3e5c95e761d1c4aecad60b0b916e4dd841c205d1
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: npm --prefix ui test
+  cwd: .
+  exit_code: 0
+  summary: 'vitest: 7 files, 68 tests passed (review round 2); 5 mutations each fail one test'
+  commit: 5d9324bf3664e67ce6a0604c865492385ec65067
+  output: .harness/evidence/T-15/E11.txt
+  output_sha256: d2ef25d9fcb9bab96279474f9165c30b49b7266a4b4fb0c09d635d24be14fd0e
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: npm --prefix ui run typecheck
+  cwd: .
+  exit_code: 0
+  summary: 'tsc --noEmit: no errors'
+  commit: 5d9324bf3664e67ce6a0604c865492385ec65067
+  output: .harness/evidence/T-15/E12.txt
+  output_sha256: 0de190a1b717d16f6eac63f1e1b0282a46b4a1f92da6d05e7aa9d0675611f9f5
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E13
+  kind: command
+  command: npm --prefix ui run build
+  cwd: .
+  exit_code: 0
+  summary: vite build ok
+  commit: 5d9324bf3664e67ce6a0604c865492385ec65067
+  output: .harness/evidence/T-15/E13.txt
+  output_sha256: e3aef298a6e55bffb19baf811889d1ee96d2676f6402eff828dbf52c50762ab3
   recorded_at: '2026-11-17'
   recorded_by: harness
 log:
