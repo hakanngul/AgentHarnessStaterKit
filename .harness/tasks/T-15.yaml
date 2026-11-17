@@ -1,0 +1,47 @@
+schema_version: 1
+id: T-15
+title: 'React arayüzü, ilk dikey dilim: token, API istemcisi, SSE akışı, görev listesi ve iş paneli'
+owner: developer
+status: IN_REVIEW
+goal: '`ui/` altında Vite + React + TypeScript arayüzünün ilk dilimi: token''ı URL fragment''inden alıp
+  bellekte tutan ve adresten silen kod, Authorization başlıklı fetch istemcisi, EventSource''suz SSE ayrıştırıcı
+  (kopmada ?after ile devam), görev listesi ve iş paneli (wave, review, commit başlat, canlı olaylar,
+  iptal). `harness serve --ui ui/dist` ile sunulur (T-14). Yalnız birim testleri (vitest). Kapsam dışı:
+  masaüstü kabuğu, tam arayüz (faz kapısı, karar kuyruğu, kanıt görünümü), Python paketine gömme, gerçek
+  tarayıcıda deneme.'
+scope:
+- ui/
+- .github/workflows/
+- .gitignore
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: 'Token: `#token=...` fragment''inden okunur, adres çubuğundan hemen silinir (history.replaceState),
+    bellekte tutulur; sorgu dizgisindeki token kabul edilmez; token yoksa arayüz bunu söyler ve istek
+    atmaz.'
+- id: AC2
+  text: 'API istemcisi: her istek Authorization: Bearer taşır, yalnız /api/ ile başlayan göreli yola gider
+    (başka kökene token gitmez), JSON gövdede Content-Type ayarlar, hatada sunucunun detail''ini taşıyan
+    ApiError verir.'
+- id: AC3
+  text: 'SSE ayrıştırıcı: parçalara bölünmüş çerçeveleri, bölünmüş çok baytlı UTF-8''i, CRLF''yi, yorum
+    satırlarını (keepalive) ve çok satırlı data''yı doğru çözer; id''yi izler. followJob kopan akışı son
+    id ile (?after=) sürdürür, iş bitince ve iptalde durur.'
+- id: AC4
+  text: 'Arayüz: görev listesi (id, başlık, durum, kapsam, review), iş paneli (wave/review/commit başlat,
+    canlı olaylar, iptal, 409''da tutan işi göster); render testleri sahte API ile.'
+- id: AC5
+  text: vitest, tsc --noEmit ve vite build geçer; CI'da ayrı bir ui işi koşar; pytest, ruff ve harness
+    check yeşil kalır.
+evidence: []
+log:
+- '2026-11-17 developer: görev açıldı. Bilinen sınır: arayüz hiçbir gerçek tarayıcıda denenmedi, CSP ve
+  SSE akışı yalnız jsdom ve sahte fetch ile sınanır.'
+- '2026-11-17 developer: ui/ (Vite 8, React 19, TypeScript, vitest), token/api/sse/follow modülleri, TaskList,
+  JobsPanel, App; CI''ya ui işi. Test sırasında gerçek bir SSE ayrıştırıcı hatası bulundu (akış sonunda
+  tutulan son CR satır sonu sayılmıyordu): düzeltildi, test kaldırınca kırılıyor. followJob''da sonsuz
+  döngü riski (bitmiş işte akış boş) ilerleme korumasıyla kapatıldı, testli. Gerçek Chromium (Playwright)
+  ile elle uçtan uca deneme: fragment devri ve adres temizleme, görev tablosu (işaretli başlık metin olarak),
+  commit işi canlı akış, yanlış token 401, 0 çerez, 0 storage, CSP ihlali yok, tüm API istekleri Bearer
+  taşıdı. Bu deneme komut dosyası olarak depoda değil, otomatik testle kanıtlanmış sayılmaz.'

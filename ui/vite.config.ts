@@ -1,0 +1,10 @@
+/// <reference types="vitest/config" />
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+// base "./": the built UI is served by `harness serve --ui` from "/" and also works from a file
+export default defineConfig({
+  base: "./",
+  plugins: [react()],
+  test: { environment: "jsdom", globals: true, setupFiles: ["./src/test-setup.ts"] },
+});

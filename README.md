@@ -452,6 +452,27 @@ Token tarayıcıya şöyle verilir (tasarım kararı: çerez kullanılmaz). Aşa
 Sınırlar: token'ı bilen herkes iş (ve dolayısıyla ajan) başlatabilir; TLS yoktur, trafik loopback'te açık metindir;
 CSP `style-src` için `'unsafe-inline'` içerir (React stil nitelikleri için), `img-src` ve `font-src` için `data:` kabul eder (Vite küçük varlıkları böyle gömer); arayüzün kendisi bu depoda henüz yok.
 
+### Arayüz (`ui/`)
+
+`ui/` Vite + React + TypeScript arayüzünün ilk dilimidir: görev listesi (id, başlık, durum, kabul, review, kapsam) ve iş paneli
+(wave, review, commit başlat; canlı olaylar; iptal; başka bir çalıştırma projeyi tutuyorsa 409 ayrıntısı). Yönlendirme hash ile
+yapılır (`#/tasks`, `#/jobs`); sunucuda history yedeği yoktur.
+
+```
+cd ui && npm ci && npm run build        # ui/dist
+harness serve --ui ui/dist              # token: satırını yazar
+# tarayıcıda: <adres>/#token=<token>
+```
+
+Token yalnız fragment'ten okunur ve hemen adresten silinir; bellekte tutulur, çerez ya da storage kullanılmaz. İstekler
+`fetch` ve `Authorization` başlığıyla yapılır; canlı olaylar `EventSource` yerine `fetch` akışı olarak okunur (kopunca `?after=`
+ile sürer, sunucu iş başına son 2000 olayı tuttuğu için çok uzun kopuşlarda olay kaçabilir).
+
+Doğrulama: `npm test` (vitest, jsdom, sahte API ve sahte akışlarla), `npm run typecheck`, `npm run build` ve CI'da ayrı `ui` işi.
+Gerçek Chromium ile bir kez elle denendi (Playwright; ayrı bir demo projede fragment devri, görev tablosu, commit işinin canlı
+akışı, yanlış token, CSP ihlali yok); bu deneme otomatik teste bağlı değildir. Henüz yok: faz kapısı, karar kuyruğu ve kanıt
+görünümleri, kimlik doğrulaması yenileme, `ui/dist`'in Python paketine gömülmesi, masaüstü kabuğu.
+
 ## Roller ve yazma kapsamı
 
 `.harness/config.yaml` içindeki `roles`, her rolün yazabileceği yolları tanımlar.
