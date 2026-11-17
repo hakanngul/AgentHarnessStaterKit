@@ -50,4 +50,9 @@ describe("takeToken", () => {
     expect(takeToken(win)).toBeNull();
     expect(replaceState).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps a literal + in the token (not turned into a space)", () => {
+    const { win } = fakeWindow("#token=ab+cd%2Bef");
+    expect(takeToken(win)).toBe("ab+cd+ef");
+  });
 });

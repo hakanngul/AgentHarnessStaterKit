@@ -13,6 +13,7 @@ export function JobsPanel({ api }: { api: Api }) {
   const [events, setEvents] = useState<JobEvent[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
 
   const refresh = useCallback(async () => {
     setJobs(await api.get<JobView[]>("/api/jobs"));
@@ -20,6 +21,7 @@ export function JobsPanel({ api }: { api: Api }) {
 
   const follow = useCallback(
     (jobId: string) => {
+      if (!mounted.current) return; // the panel went away while a request was in flight
       abort.current?.abort();
       const controller = new AbortController();
       abort.current = controller;
@@ -28,6 +30,7 @@ export function JobsPanel({ api }: { api: Api }) {
       void (async () => {
         try {
           for await (const event of followJob(api, jobId, { signal: controller.signal })) {
+            if (controller.signal.aborted) break; // a stale event must not land in another job's log
             setEvents((old) => [...old, event].slice(-MAX_SHOWN));
           }
         } catch (error) {
@@ -40,8 +43,12 @@ export function JobsPanel({ api }: { api: Api }) {
   );
 
   useEffect(() => {
+    mounted.current = true;
     refresh().catch((e: Error) => setMessage(e.message));
-    return () => abort.current?.abort();
+    return () => {
+      mounted.current = false;
+      abort.current?.abort();
+    };
   }, [refresh]);
 
   async function start() {
@@ -50,8 +57,8 @@ export function JobsPanel({ api }: { api: Api }) {
     if (kind === "wave" && withReview) body.review = true;
     try {
       const job = await api.post<{ id: string }>("/api/jobs", body);
+      follow(job.id); // follow first: a failing list refresh must not hide a running job
       await refresh();
-      follow(job.id);
     } catch (error) {
       // 409: another run (a job here, the CLI, another server) holds the project
       setMessage(error instanceof ApiError ? error.detail : (error as Error).message);
@@ -118,7 +125,7 @@ export function JobsPanel({ api }: { api: Api }) {
           <h3>
             Olaylar {active ? `(${active.kind}, ${active.status})` : ""}
           </h3>
-          <pre className="log" aria-label="Canlı olaylar">
+          <pre className="log" role="log" aria-label="Canlı olaylar">
             {events.map((e) => `${e.task ? e.task + ": " : ""}${e.text}`).join("\n")}
           </pre>
         </div>

@@ -4,8 +4,15 @@
 
 export function takeToken(win: Pick<Window, "location" | "history">): string | null {
   const hash = win.location.hash.startsWith("#") ? win.location.hash.slice(1) : win.location.hash;
-  const token = new URLSearchParams(hash).get("token");
-  if (token === null) return null;
+  const pair = hash.split("&").find((part) => part.startsWith("token="));
+  if (pair === undefined) return null;
+  // percent-decoding only: URLSearchParams would turn a literal `+` into a space
+  let token = pair.slice("token=".length);
+  try {
+    token = decodeURIComponent(token);
+  } catch {
+    // not valid percent-encoding: use it as typed
+  }
   // drop the whole fragment, also when the token is empty, so nothing secret stays in the history
   win.history.replaceState(null, "", win.location.pathname + win.location.search);
   return token.length > 0 ? token : null;

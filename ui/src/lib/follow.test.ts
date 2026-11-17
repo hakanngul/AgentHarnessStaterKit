@@ -94,3 +94,43 @@ describe("followJob", () => {
     expect(open).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("followJob error handling", () => {
+  it("skips a malformed or odd frame instead of retrying or ending", async () => {
+    const open = vi.fn().mockResolvedValue(
+      responseOf(streamOf(["data: {broken\n\n", "data: null\n\n", 'data: {"text":"no id"}\n\n', frame(1, "ok")])),
+    );
+    const api = fakeApi({ open, get: () => Promise.resolve(job("done", 1)) as never });
+    const events = await collect(followJob(api, "j"));
+    expect(events.map((e) => e.text)).toEqual(["ok"]);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries when the status read hits a network blip", async () => {
+    const open = vi
+      .fn()
+      .mockResolvedValueOnce(responseOf(streamOf([frame(1, "a")])))
+      .mockResolvedValue(responseOf(streamOf([]))); // the server sends nothing after id 1
+    const reads = [new TypeError("blip"), job("done", 1)];
+    const get = vi.fn().mockImplementation(() => {
+      const next = reads.shift();
+      return next instanceof Error ? Promise.reject(next) : Promise.resolve(next);
+    });
+    const pause = vi.fn().mockResolvedValue(undefined);
+    const events = await collect(followJob(fakeApi({ open, get: get as never }), "j", { pause }));
+    expect(events.map((e) => e.id)).toEqual([1]);
+    expect(pause).toHaveBeenCalledTimes(1);
+  });
+
+  it("ends quietly when the finished job was pruned (404)", async () => {
+    const open = vi.fn().mockResolvedValue(responseOf(streamOf([frame(1, "a")])));
+    const api = fakeApi({ open, get: () => Promise.reject(new ApiError(404, "unknown job")) as never });
+    expect((await collect(followJob(api, "j"))).map((e) => e.id)).toEqual([1]);
+  });
+
+  it("does not hide a non-network error from the status read", async () => {
+    const open = vi.fn().mockResolvedValue(responseOf(streamOf([])));
+    const api = fakeApi({ open, get: () => Promise.reject(new ApiError(401, "no token")) as never });
+    await expect(collect(followJob(api, "j"))).rejects.toThrow("no token");
+  });
+});
