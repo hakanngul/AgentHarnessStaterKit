@@ -430,7 +430,7 @@ Sınırlar:
   görev gerçekten bitmiş durumda kalır (defter tutarlı kalır).
 - Takılan bir engine işi çalışıyor gösterir ve yeni işi 409 ile engeller; iptal uç noktası yuvayı
   boşaltır. İş süresi sınırı yok.
-- Tarayıcı arayüzü için token devri aşağıda tasarlandı; arayüzün kendisi (ve bu akışın istemci tarafı) henüz yazılmadı, sunucu tarafı test edildi.
+- Tarayıcı arayüzü için token devri aşağıda tasarlandı; arayüzün ilk dilimi `ui/` altındadır (aşağıdaki "Arayüz" bölümü).
 
 ### Tarayıcı arayüzü için token devri
 
@@ -439,7 +439,7 @@ sunar; içinde sır yoktur. API (`/api/...`) token istemeye devam eder (yalnız 
 dinlemeye başlamadan reddeder. Her yanıt `Content-Security-Policy` (yalnız aynı kaynak, çerçeve ve eklenti yok),
 `X-Content-Type-Options`, `X-Frame-Options` ve `Referrer-Policy` taşır (yakalanmamış bir hata da 500 olarak bu başlıklarla döner); UI klasöründeki `api/` adlı bir klasör `/api` altında asla sunulmaz (404). `--ui` açıkken `/api` altında yanlış yöntemle gelen istek ve `HEAD` 405 yerine 404 alır, sondaki eğik çizgi yönlendirmesi de yoktur (gözlendi); sunucuda history-modu yedeği (`index.html`'e düşme) yoktur, arayüz hash yönlendirme kullanmalı; `/api` yanıtları ayrıca `Cache-Control: no-store`.
 
-Token tarayıcıya şöyle verilir (tasarım kararı: çerez kullanılmaz). Aşağıdaki fragment, `replaceState` ve akış maddeleri arayüzün uyacağı sözleşmedir; arayüz henüz yok, burada yalnız sunucu tarafı (başlıklar, Bearer, CORS yok) test edilir. `serve` yalnız `token:` satırını yazar; adresi (`<adres>/#token=<token>`) kullanıcı ya da kabuk kurar:
+Token tarayıcıya şöyle verilir (tasarım kararı: çerez kullanılmaz). Aşağıdaki fragment, `replaceState` ve akış maddeleri arayüzün uyacağı sözleşmedir; istemci tarafı `ui/` altında, sunucu tarafı (başlıklar, Bearer, CORS yok) `tests/test_server.py` içinde test edilir. Kendi `--token` değerinizde `&`, `%` veya `+` varsa adrese yüzdeyle kodlanmış yazın (`&`→`%26`, `+`→`%2B`); `serve`'ün ürettiği token'lar buna ihtiyaç duymaz. `serve` yalnız `token:` satırını yazar; adresi (`<adres>/#token=<token>`) kullanıcı ya da kabuk kurar:
 
 - Adres `<adres>/#token=<token>` biçimindedir. Fragment sunucuya hiç gitmez ve günlüğe girmez. Arayüz onu okur,
   bellekte tutar ve hemen `history.replaceState` ile adresten siler.
@@ -450,7 +450,28 @@ Token tarayıcıya şöyle verilir (tasarım kararı: çerez kullanılmaz). Aşa
 - Masaüstü kabuğu token'ı sayfaya doğrudan verebilir; aynı kural geçerli: yalnız bellekte.
 
 Sınırlar: token'ı bilen herkes iş (ve dolayısıyla ajan) başlatabilir; TLS yoktur, trafik loopback'te açık metindir;
-CSP `style-src` için `'unsafe-inline'` içerir (React stil nitelikleri için), `img-src` ve `font-src` için `data:` kabul eder (Vite küçük varlıkları böyle gömer); arayüzün kendisi bu depoda henüz yok.
+CSP `style-src` için `'unsafe-inline'` içerir (React stil nitelikleri için), `img-src` ve `font-src` için `data:` kabul eder (Vite küçük varlıkları böyle gömer).
+
+### Arayüz (`ui/`)
+
+`ui/` Vite + React + TypeScript arayüzünün ilk dilimidir: görev listesi (id, başlık, durum, kabul, review, kapsam) ve iş paneli
+(wave, review, commit başlat; canlı olaylar; iptal; başka bir çalıştırma projeyi tutuyorsa 409 ayrıntısı). Yönlendirme hash ile
+yapılır (`#/tasks`, `#/jobs`); sunucuda history yedeği yoktur.
+
+```
+cd ui && npm ci && npm run build        # ui/dist
+harness serve --ui ui/dist              # token: satırını yazar
+# tarayıcıda: <adres>/#token=<token>
+```
+
+Token yalnız fragment'ten okunur ve hemen adresten silinir; bellekte tutulur, çerez ya da storage kullanılmaz. İstekler
+`fetch` ve `Authorization` başlığıyla yapılır; canlı olaylar `EventSource` yerine `fetch` akışı olarak okunur (kopunca `?after=`
+ile sürer, sunucu iş başına son 2000 olayı tuttuğu için çok uzun kopuşlarda olay kaçabilir).
+
+Doğrulama: `npm test` (vitest, jsdom, sahte API ve sahte akışlarla), `npm run typecheck`, `npm run build` ve CI'da ayrı `ui` işi.
+Gerçek Chromium ile bir kez elle denendi (Playwright; ayrı bir demo projede fragment devri, görev tablosu, commit işinin canlı
+akışı, yanlış token, CSP ihlali yok); bu deneme otomatik teste bağlı değildir. Henüz yok: faz kapısı, karar kuyruğu ve kanıt
+görünümleri, kimlik doğrulaması yenileme, `ui/dist`'in Python paketine gömülmesi, masaüstü kabuğu.
 
 ## Roller ve yazma kapsamı
 

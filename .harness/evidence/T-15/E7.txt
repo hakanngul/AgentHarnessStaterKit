@@ -1,0 +1,9 @@
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+ok: true
+errors: []
+warnings: []
+modified_files: []
+checks: ["15 task(s) and 0 decision(s) checked", "Evidence is checked for 
+consistency only; commands were not rerun"]
+summary: {"tasks_done": 14, "tasks_in_review": 1, "tasks": 15, "decisions": 0, 
+"decisions_pending": 0}

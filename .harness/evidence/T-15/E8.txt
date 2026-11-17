@@ -1,0 +1,17 @@
+
+> agent-harness-ui@0.0.0 test
+> vitest run
+
+
+ RUN  v5.1.0 /home/user/AgentHarnessStaterKit/ui
+
+
+ Test Files  7 passed (7)
+      Tests  54 passed (54)
+   Start at  00:40:27
+   Duration  2.34s (environment 67%, setup 16%, tests 11%, import 3%, transform 2%, worker 1%)
+
+Environment  jsdom was created 7 times · 3.35s total, 67% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

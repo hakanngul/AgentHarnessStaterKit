@@ -1,0 +1,219 @@
+schema_version: 1
+id: T-15
+title: 'React arayüzü, ilk dikey dilim: token, API istemcisi, SSE akışı, görev listesi ve
+  iş paneli'
+owner: developer
+status: IN_REVIEW
+goal: '`ui/` altında Vite + React + TypeScript arayüzünün ilk dilimi: token''ı URL fragment''inden
+  alıp bellekte tutan ve adresten silen kod, Authorization başlıklı fetch istemcisi, EventSource''suz
+  SSE ayrıştırıcı (kopmada ?after ile devam), görev listesi ve iş paneli (wave, review, commit
+  başlat, canlı olaylar, iptal). `harness serve --ui ui/dist` ile sunulur (T-14). Yalnız birim
+  testleri (vitest). Kapsam dışı: masaüstü kabuğu, tam arayüz (faz kapısı, karar kuyruğu,
+  kanıt görünümü), Python paketine gömme, gerçek tarayıcıda deneme.'
+scope:
+- ui/
+- .github/workflows/
+- .gitignore
+- README.md
+- .harness/
+acceptance:
+- id: AC1
+  text: 'Token: `#token=...` fragment''inden okunur, adres çubuğundan hemen silinir (history.replaceState),
+    bellekte tutulur; sorgu dizgisindeki token kabul edilmez; token yoksa arayüz bunu söyler
+    ve istek atmaz.'
+  verified_by:
+  - E4
+  - E8
+  - E11
+- id: AC2
+  text: 'API istemcisi: her istek Authorization: Bearer taşır, yalnız /api/ ile başlayan göreli
+    yola gider (başka kökene token gitmez), JSON gövdede Content-Type ayarlar, hatada sunucunun
+    detail''ini taşıyan ApiError verir.'
+  verified_by:
+  - E4
+  - E8
+  - E11
+- id: AC3
+  text: 'SSE ayrıştırıcı: parçalara bölünmüş çerçeveleri, bölünmüş çok baytlı UTF-8''i, CRLF''yi,
+    yorum satırlarını (keepalive) ve çok satırlı data''yı doğru çözer; id''yi izler. followJob
+    kopan akışı son id ile (?after=) sürdürür, iş bitince ve iptalde durur.'
+  verified_by:
+  - E4
+  - E8
+  - E11
+- id: AC4
+  text: 'Arayüz: görev listesi (id, başlık, durum, kapsam, review), iş paneli (wave/review/commit
+    başlat, canlı olaylar, iptal, 409''da tutan işi göster); render testleri sahte API ile.'
+  verified_by:
+  - E4
+  - E8
+  - E11
+- id: AC5
+  text: vitest, tsc --noEmit ve vite build geçer; CI'da ayrı bir ui işi koşar; pytest, ruff
+    ve harness check yeşil kalır.
+  verified_by:
+  - E1
+  - E2
+  - E3
+  - E4
+  - E5
+  - E6
+  - E7
+  - E11
+  - E12
+  - E13
+evidence:
+- id: E1
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 989 passed in 37.73s
+  commit: 27ba16d4712921b5a1416a0e2ab2a9c7b7b1c619
+  output: .harness/evidence/T-15/E1.txt
+  output_sha256: 5214bfbd0963371b4c29470e4fc51ea3a667ff7fa8034e4c8b954ea6c21963c4
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E2
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 27ba16d4712921b5a1416a0e2ab2a9c7b7b1c619
+  output: .harness/evidence/T-15/E2.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E3
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 27ba16d4712921b5a1416a0e2ab2a9c7b7b1c619
+  output: .harness/evidence/T-15/E3.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E4
+  kind: command
+  command: npm --prefix ui test
+  cwd: .
+  exit_code: 0
+  summary: 'learn more: https://vitest.dev/guide/improving-performance#test-environments'
+  commit: 27ba16d4712921b5a1416a0e2ab2a9c7b7b1c619
+  output: .harness/evidence/T-15/E4.txt
+  output_sha256: ac26323df8189df23f854742ce1fba733a761137e85eecdfa1e89febc202dbe5
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E5
+  kind: command
+  command: npm --prefix ui run typecheck
+  cwd: .
+  exit_code: 0
+  summary: '> tsc --noEmit'
+  commit: 27ba16d4712921b5a1416a0e2ab2a9c7b7b1c619
+  output: .harness/evidence/T-15/E5.txt
+  output_sha256: 0de190a1b717d16f6eac63f1e1b0282a46b4a1f92da6d05e7aa9d0675611f9f5
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: npm --prefix ui run build
+  cwd: .
+  exit_code: 0
+  summary: ✓ built in 158ms
+  commit: 27ba16d4712921b5a1416a0e2ab2a9c7b7b1c619
+  output: .harness/evidence/T-15/E6.txt
+  output_sha256: 4655677978b49a88227d5588c77045bac128db39c8aeefaa86a06f22ef8ac3f4
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen harness check .
+  cwd: .
+  exit_code: 0
+  summary: '"decisions_pending": 0}'
+  commit: 27ba16d4712921b5a1416a0e2ab2a9c7b7b1c619
+  output: .harness/evidence/T-15/E7.txt
+  output_sha256: dfea5592d24a677932d9f5de43123e147939d21a4ba535359604b64d9617b5af
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E8
+  kind: command
+  command: npm --prefix ui test
+  cwd: .
+  exit_code: 0
+  summary: 'vitest: 7 files, 54 tests passed (after review round 1)'
+  commit: 1701ccf145dabcd124c70d371ab931fa9f2a1fa5
+  output: .harness/evidence/T-15/E8.txt
+  output_sha256: bf731225b0848716f41d818ee395d6affdaba06c03aeb7fc9de9cdc323827470
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: npm --prefix ui run typecheck
+  cwd: .
+  exit_code: 0
+  summary: 'tsc --noEmit: no errors'
+  commit: 1701ccf145dabcd124c70d371ab931fa9f2a1fa5
+  output: .harness/evidence/T-15/E9.txt
+  output_sha256: 0de190a1b717d16f6eac63f1e1b0282a46b4a1f92da6d05e7aa9d0675611f9f5
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: npm --prefix ui run build
+  cwd: .
+  exit_code: 0
+  summary: vite build ok
+  commit: 1701ccf145dabcd124c70d371ab931fa9f2a1fa5
+  output: .harness/evidence/T-15/E10.txt
+  output_sha256: 4b83cc8055f30c5c4bffe28f3e5c95e761d1c4aecad60b0b916e4dd841c205d1
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: npm --prefix ui test
+  cwd: .
+  exit_code: 0
+  summary: 'vitest: 7 files, 68 tests passed (review round 2); 5 mutations each fail one test'
+  commit: 5d9324bf3664e67ce6a0604c865492385ec65067
+  output: .harness/evidence/T-15/E11.txt
+  output_sha256: d2ef25d9fcb9bab96279474f9165c30b49b7266a4b4fb0c09d635d24be14fd0e
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: npm --prefix ui run typecheck
+  cwd: .
+  exit_code: 0
+  summary: 'tsc --noEmit: no errors'
+  commit: 5d9324bf3664e67ce6a0604c865492385ec65067
+  output: .harness/evidence/T-15/E12.txt
+  output_sha256: 0de190a1b717d16f6eac63f1e1b0282a46b4a1f92da6d05e7aa9d0675611f9f5
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E13
+  kind: command
+  command: npm --prefix ui run build
+  cwd: .
+  exit_code: 0
+  summary: vite build ok
+  commit: 5d9324bf3664e67ce6a0604c865492385ec65067
+  output: .harness/evidence/T-15/E13.txt
+  output_sha256: e3aef298a6e55bffb19baf811889d1ee96d2676f6402eff828dbf52c50762ab3
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+log:
+- '2026-11-17 developer: görev açıldı. Bilinen sınır: arayüz hiçbir gerçek tarayıcıda denenmedi,
+  CSP ve SSE akışı yalnız jsdom ve sahte fetch ile sınanır.'
+- '2026-11-17 developer: ui/ (Vite 8, React 19, TypeScript, vitest), token/api/sse/follow
+  modülleri, TaskList, JobsPanel, App; CI''ya ui işi. Test sırasında gerçek bir SSE ayrıştırıcı
+  hatası bulundu (akış sonunda tutulan son CR satır sonu sayılmıyordu): düzeltildi, test kaldırınca
+  kırılıyor. followJob''da sonsuz döngü riski (bitmiş işte akış boş) ilerleme korumasıyla
+  kapatıldı, testli. Gerçek Chromium (Playwright) ile elle uçtan uca deneme: fragment devri
+  ve adres temizleme, görev tablosu (işaretli başlık metin olarak), commit işi canlı akış,
+  yanlış token 401, 0 çerez, 0 storage, CSP ihlali yok, tüm API istekleri Bearer taşıdı. Bu
+  deneme komut dosyası olarak depoda değil, otomatik testle kanıtlanmış sayılmaz.'
