@@ -27,8 +27,8 @@ acceptance:
   - E4
   - E7
 - id: AC3
-  text: CI test matrisinde macos-latest vardır (kanıt E9) ve PR'da yeşildir (CI sonucu harness
-    kanıtı olamaz; çalıştırma bağlantısı log'da).
+  text: CI test matrisinde macos-latest vardır (E9) ve PR head'inde yeşildir (E10, GitHub check-run
+    API'si).
   verified_by:
   - E9
   - E10
@@ -149,8 +149,6 @@ evidence:
   output_sha256: 7b56d48c92ae1458c1b8dba74f96a0d487838ff010b4de67afd13d311bd4cf4f
   recorded_at: '2026-11-17'
   recorded_by: harness
-- '2026-11-17 developer: Codex P2 (PR #14): AC3''ün yeşil CI kısmı kanıtta değildi. E10 GitHub check-run
-  API''sinden macOS işinin sonucunu okur, success değilse 1 ile çıkar.'
 review:
   status: approved
   by: reviewer
@@ -179,3 +177,5 @@ log:
   koşu son kodda tekrarlandı (E8). AC3 (macOS CI yeşil) CI sonucunu bekliyor.'
 - '2026-11-17 developer: PR #13 sahibi tarafından merge edildi (e46759b). Head 5206bf3 üzerinde
   CI yeşil: test (macos-latest, 3.13) dahil tüm işler, Sonar geçti. macOS işi: https://github.com/hakanngul/AgentHarnessStaterKit/actions/runs/44019265979/job/133824569528'
+- '2026-11-17 developer: Codex P2 (PR #14): AC3''ün yeşil CI kısmı kanıtta değildi. E10 GitHub check-run
+  API''sinden macOS işinin sonucunu okur, success değilse 1 ile çıkar.'
