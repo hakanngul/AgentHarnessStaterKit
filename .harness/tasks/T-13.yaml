@@ -177,6 +177,39 @@ evidence:
   output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
   recorded_at: '2026-11-17'
   recorded_by: harness
+- id: E13
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 949 passed in 38.79s
+  commit: a46ac99d90d868018edc58aaf8d128020055511e
+  output: .harness/evidence/T-13/E13.txt
+  output_sha256: 6d800828f3283c1a5da8609bf2e52edb68b8a9c123bd2d9ab0cc7b273127421d
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E14
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: a46ac99d90d868018edc58aaf8d128020055511e
+  output: .harness/evidence/T-13/E14.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E15
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: a46ac99d90d868018edc58aaf8d128020055511e
+  output: .harness/evidence/T-13/E15.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
 log:
 - '2026-11-16 developer: task opened; follows the T-12 review findings (wave claim race, shared
   git index, git without timeout); flock chosen over an O_EXCL file because a crash must not
@@ -204,7 +237,7 @@ log:
   bounded (REAP_TIMEOUT 5 s) because a helper that escapes the group via setsid could hold
   the pipes and hang under the lock; test + mutation caught. Documented: git loses its controlling
   tty (gpgsign pinentry on tty). Tests are skipped on non-POSIX.'
-- '2026-11-17 reviewer round 4 (delta: _reap bound, create_task cleanup): APPROVED. Sourcery check
-  failed on subprocess.CompletedProcess(...) in commit.py (dangerous-subprocess-use-audit): false
-  positive (a data holder, fixed argv, no shell), but avoidable without behaviour change, so _run
-  now returns a small GitResult dataclass.'
+- '2026-11-17 reviewer round 4 (delta: _reap bound, create_task cleanup): APPROVED. Sourcery
+  check failed on subprocess.CompletedProcess(...) in commit.py (dangerous-subprocess-use-audit):
+  false positive (a data holder, fixed argv, no shell), but avoidable without behaviour change,
+  so _run now returns a small GitResult dataclass.'
