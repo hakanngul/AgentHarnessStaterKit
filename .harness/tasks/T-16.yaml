@@ -1,0 +1,24 @@
+schema_version: 1
+id: T-16
+title: macOS'ta symlink'li geçici dizinde kırılan testler
+owner: developer
+status: IN_PROGRESS
+goal: 'Sahibinin Mac''inde `pytest` 1 testte kırıldı: test_review_requests_are_read_only
+  tempfile.TemporaryDirectory kullanıyordu; macOS''ta bu dizin /var symlink''i altında
+  ve project_root symlink''li yolu bilerek reddeder. Test pytest''in çözülmüş tmp_path''ine
+  taşındı. Aynı koşulu Linux''ta symlink''li TMPDIR ile üretirken uzun yolda satır kırılan
+  bir CLI çıktısı assertion''ı da bulundu; boşluklar normalize edildi. Üretim kodu değişmez.'
+scope:
+- tests/
+- .harness/
+acceptance:
+- id: AC1
+  text: Symlink'li TMPDIR ile tüm pytest suite'i geçer (macOS /var koşulunun Linux karşılığı).
+  verified_by: []
+- id: AC2
+  text: Normal TMPDIR ile pytest, ruff check ve ruff format --check geçer.
+  verified_by: []
+evidence: []
+log:
+- '2026-11-17 developer: sahibi Mac''te 1 failed, 987 passed bildirdi. Linux''ta TMPDIR symlink''e
+  yönlendirilince düzeltme öncesi kırıldığı, sonrası geçtiği görüldü.'

@@ -374,7 +374,7 @@ def test_a_review_run_is_read_only_whatever_the_reviewers_write_scope():
     assert check_tool(config, "reviewer", root, "Read", target, read_only=True).allowed
 
 
-def test_review_requests_are_read_only():
+def test_review_requests_are_read_only(tmp_path):
     seen = []
 
     class Spy(Reviewer):
@@ -383,11 +383,10 @@ def test_review_requests_are_read_only():
             async for event in super().run(request, root):
                 yield event
 
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as tmp:
-        root = project(Path(tmp), in_review())
-        review(root, Spy(APPROVE))
+    # tmp_path, not tempfile: on macOS the temp dir sits under the /var symlink, which
+    # project_root refuses on purpose; pytest's tmp_path is already resolved
+    root = project(tmp_path, in_review())
+    review(root, Spy(APPROVE))
     assert seen == [True]
 
 
