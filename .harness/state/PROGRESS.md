@@ -14,6 +14,8 @@
 
 ## Current work
 
+T-13 (proje çalışma kilidi, PR #7) birleştirildi: `flock` ile CLI ve sunucu işleri tek çalıştırma, `run_wave` yalnız kendi claim'lerini bırakır, git zaman aşımında süreç grubu öldürülür. 949 test. Açık: Sourcery'nin güvenlik etiketli `.harness` symlink bulgusu (sahibi karar verecek).
+
 T-6 is DONE in PR #4, awaiting merge. Three open threads from PR #2 remain for the
 maintainer (subprocess audit finding, credential redaction scope, settings.json
 concurrency).

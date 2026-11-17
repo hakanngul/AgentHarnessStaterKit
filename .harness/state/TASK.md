@@ -1,6 +1,6 @@
 # Current task
 
-Status: T-7..T-12 DONE (motor, dalga, reviewer, commit, sunucu, sunucuda işler ve canlı olaylar). Sıradaki: proje çalışma kilidi (T-13), sonra arayüz.
+Status: T-7..T-13 DONE (motor, dalga, reviewer, commit, sunucu, sunucuda işler, proje çalışma kilidi). Sıradaki: tarayıcı için token devri tasarımı (çerez + Origin), sonra React arayüzü ve masaüstü kabuğu.
 
 ## Goal and scope
 
