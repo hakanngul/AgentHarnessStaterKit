@@ -37,6 +37,15 @@ class CommitResult:
     files: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class GitResult:
+    """What a finished git command left behind (the part of CompletedProcess callers read)."""
+
+    returncode: int
+    stdout: str
+    stderr: str
+
+
 def _kill_group(process: subprocess.Popen) -> None:
     """Stop git and everything it started; the project lock is released right after."""
     try:
@@ -61,7 +70,7 @@ def _reap(process: subprocess.Popen) -> None:
         process.wait()  # git itself is dead, so this returns at once
 
 
-def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+def _run(root: Path, *args: str, check: bool = True) -> GitResult:
     """git with literal pathspecs: a file named `*.py` or `:(top)x` is just a file name."""
     name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
     command = ["git", "--literal-pathspecs", *args]
@@ -85,7 +94,7 @@ def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
     except BaseException:
         _reap(process)
         raise
-    done = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    done = GitResult(process.returncode, stdout, stderr)
     if check and done.returncode != 0:
         raise HarnessError(f"git {name} failed: {(done.stderr or done.stdout).strip()[:300]}")
     return done

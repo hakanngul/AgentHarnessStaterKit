@@ -204,3 +204,7 @@ log:
   bounded (REAP_TIMEOUT 5 s) because a helper that escapes the group via setsid could hold
   the pipes and hang under the lock; test + mutation caught. Documented: git loses its controlling
   tty (gpgsign pinentry on tty). Tests are skipped on non-POSIX.'
+- '2026-11-17 reviewer round 4 (delta: _reap bound, create_task cleanup): APPROVED. Sourcery check
+  failed on subprocess.CompletedProcess(...) in commit.py (dangerous-subprocess-use-audit): false
+  positive (a data holder, fixed argv, no shell), but avoidable without behaviour change, so _run
+  now returns a small GitResult dataclass.'
