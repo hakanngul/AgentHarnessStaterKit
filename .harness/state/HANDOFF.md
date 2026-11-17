@@ -101,3 +101,11 @@ generated files show as `validate` warnings; do not refresh hashes to hide them.
   Plan T-13: one project run lock held for the whole wave/review/commit, plus a git timeout.
 - Not done: token hand-off for a browser UI (cookie + Origin check design), real-session trial
   through the server, job deadline for a stalled engine.
+
+## T-13 (proje çalışma kilidi)
+
+`.harness/.run.lock` üzerinde `flock` (runlock.py); CLI run/wave/review/commit ve her sunucu işi alır,
+`evidence run` ve salt-okunur komutlar almaz (bir wave'in içindeki agent onu çağırır). Bilinen sınırlar README'de
+"Proje çalışma kilidi": `git clean -fd` kilit dosyasını silebilir, `kill -9` sonrası yetim git, iptalde çalışan
+to_thread yazımı, post-commit hook zaman aşımı "blocked" raporlar, flock NFS'te güvenilmez, Windows yolu denenmedi.
+Sıradaki iş: tarayıcı arayüzü için token devri (EventSource başlık gönderemez; çerez + Origin kontrolü gerekir).
