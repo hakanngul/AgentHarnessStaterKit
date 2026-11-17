@@ -22,6 +22,17 @@ jobs:
       - run: uv run --frozen pytest
       - run: uv run --frozen harness check .
       - run: uv run --frozen python -m build --no-isolation
+  macos:
+    # macOS differs where Linux CI cannot see it: the temp dir sits under the /var symlink
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --group dev
+      - run: uv run --frozen pytest
   ui:
     runs-on: ubuntu-latest
     defaults:

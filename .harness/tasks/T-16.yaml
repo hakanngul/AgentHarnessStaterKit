@@ -11,6 +11,7 @@ goal: 'Sahibinin Mac''inde `pytest` 1 testte kırıldı: test_review_requests_ar
 scope:
 - tests/
 - .harness/
+- .github/workflows/
 acceptance:
 - id: AC1
   text: Symlink'li TMPDIR ile tüm pytest suite'i geçer (macOS /var koşulunun Linux karşılığı).
@@ -21,6 +22,9 @@ acceptance:
   - E2
   - E3
   - E4
+- id: AC3
+  text: CI'da macOS'ta pytest koşan ayrı bir iş vardır ve PR'da yeşildir.
+  verified_by: []
 evidence:
 - id: E1
   kind: command
