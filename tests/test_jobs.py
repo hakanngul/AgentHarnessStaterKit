@@ -817,3 +817,27 @@ def test_a_content_length_with_thousands_of_digits_is_413_not_a_crash(tmp_path):
     huge = (b"content-length", b"9" * 5000)
     status, handed, _ = asgi_post(app, chunks=[b"{}"], extra_headers=(huge,))
     assert status == 413 and handed == 0  # refused before any body byte was read
+
+
+def test_a_job_whose_task_cannot_be_created_leaves_no_running_job_and_no_lock(
+    monkeypatch, tmp_path
+):
+    from agent_harness.runlock import acquire
+
+    root = project(tmp_path, task("T-1"))
+
+    async def scenario():
+        manager = JobManager(root, lambda: None)
+
+        def broken(coroutine, **kwargs):
+            coroutine.close()
+            raise RuntimeError("no task for you")
+
+        monkeypatch.setattr(jobs_module.asyncio, "create_task", broken)
+        with pytest.raises(RuntimeError):
+            manager.start(JobParams(kind="commit"))
+        monkeypatch.undo()
+        assert manager.active() is None and manager.jobs == {}  # a later start is not refused
+        acquire(root, "probe").release()  # and the project lock was given back
+
+    asyncio.run(scenario())

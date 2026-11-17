@@ -366,7 +366,15 @@ ve 1 ile çıkar (sunucuda 409).
   defteri yazan bir `to_thread` işi bitene kadar sürebilir; yazımlar görev başına `O_EXCL`
   kilidiyle sıralı kalır, pencere küçüktür. İptal edilemeyen `commit` job'ı ise kilit
   bırakıldıktan sonra git çağrısını (en çok 120 sn) sürdürebilir; eşzamanlı ikinci commit'i
-  git'in `index.lock`'u reddeder. Zaman aşımında git ve başlattığı hook'lar (süreç grubu) öldürülür; Windows'ta yalnız git. Tutucu notu (kim, pid) kilit alındıktan hemen
+  git'in `index.lock`'u reddeder. Zaman aşımında git ve başlattığı hook'lar (süreç grubu) öldürülür; Windows'ta yalnız git.
+  Bir çalıştırma sürerken `git clean -fd` kilit dosyasını silebilir (sonraki çalıştırma yeni bir
+  dosyayı kilitler); çalışma sürerken projede `git clean` yapmayın. `kill -9` ile ölen bir
+  harness'in o an çalışan git'i yetim kalıp kilit bırakıldıktan sonra index'e dokunabilir.
+  Git kendi oturumunda çalışır: kontrol eden terminali yoktur, bu yüzden tty isteyen bir
+  `commit.gpgsign` pinentry'si çalışmaz (agent/GUI pinentry kullanın). Grubu terk eden bir
+  yardımcı süreç öldürülemez; çıktı beklenmez (5 sn), kilit yine bırakılır.
+  `post-commit` hook'u zaman aşımına uğrarsa commit zaten oluşmuş olsa da görev "blocked"
+  raporlanır (ledger ve git'i `git log` ile karşılaştırın). Tutucu notu (kim, pid) kilit alındıktan hemen
   sonra yazılır; o anda okuyan biri "holder unknown" görebilir, hata yine doğrudur.
 
 ## Yerel sunucu

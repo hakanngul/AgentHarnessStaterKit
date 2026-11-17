@@ -160,3 +160,15 @@ log:
 - '2026-11-16 reviewer round 2: APPROVED. Codex P2 (git timeout kills only git, descendants
   outlive the lock) verified real for hooks that fork: fixed with a process group kill (POSIX),
   test with a hook whose background child must not survive; mutation (kill only git) caught.'
+
+- '2026-11-16 Sourcery (9 findings on e1e8dc7) triaged. FIXED: git descendants (process group),
+  job left running when create_task fails (job removed, test + mutation), one-lock test (already
+  fixed). ACCEPTED and documented: git clean deleting the lock file, orphan git after kill -9,
+  post-commit hook timeout reported as blocked, holder-note window. DECLINED: evidence run must
+  not take the lock (an agent calls it inside a wave that holds it; would deadlock); symlink swap
+  of .harness between check and open (needs an attacker who can already write the project;
+  reported to the user as an open security-labelled finding).'
+- '2026-11-17 reviewer round 3 (commit.py process group): APPROVED. Taken: post-kill communicate
+  bounded (REAP_TIMEOUT 5 s) because a helper that escapes the group via setsid could hold the pipes
+  and hang under the lock; test + mutation caught. Documented: git loses its controlling tty
+  (gpgsign pinentry on tty). Tests are skipped on non-POSIX.'

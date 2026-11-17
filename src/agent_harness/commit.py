@@ -19,6 +19,7 @@ from agent_harness.models import Task
 from agent_harness.runlock import LOCK_FILE as RUN_LOCK
 from agent_harness.schedule import _fold, _prefix
 
+REAP_TIMEOUT = 5  # seconds to collect git's output after it was killed
 GIT_TIMEOUT = 120  # seconds one git command may take before the commit gives up
 GENERATED_DIRS = ("__pycache__",)  # produced by allowed test commands, never a task's work
 FALLBACK_NAME = "Agent Harness"
@@ -47,6 +48,19 @@ def _kill_group(process: subprocess.Popen) -> None:
         pass  # already gone
 
 
+def _reap(process: subprocess.Popen) -> None:
+    """Kill git's group, then collect it. A helper that left the group (setsid) may still hold
+    the pipes open: give up on the output after a few seconds rather than hang under the lock."""
+    _kill_group(process)
+    try:
+        process.communicate(timeout=REAP_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        for pipe in (process.stdout, process.stderr):
+            if pipe is not None:
+                pipe.close()
+        process.wait()  # git itself is dead, so this returns at once
+
+
 def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
     """git with literal pathspecs: a file named `*.py` or `:(top)x` is just a file name."""
     name = next((arg for arg in args if not arg.startswith("-") and "=" not in arg), args[0])
@@ -66,12 +80,10 @@ def _run(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
     try:
         stdout, stderr = process.communicate(timeout=GIT_TIMEOUT)
     except subprocess.TimeoutExpired as exc:  # e.g. a hook that never returns
-        _kill_group(process)
-        process.communicate()
+        _reap(process)
         raise HarnessError(f"git {name} timed out after {GIT_TIMEOUT} s") from exc
     except BaseException:
-        _kill_group(process)
-        process.communicate()
+        _reap(process)
         raise
     done = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     if check and done.returncode != 0:

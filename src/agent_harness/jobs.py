@@ -182,6 +182,7 @@ class JobManager:
         try:
             job.task = asyncio.create_task(self._run(job, params))
         except BaseException:
+            del self.jobs[job.id]  # no task will ever finish it: it must not stay 'running'
             job.release_lock()
             raise
         return job
