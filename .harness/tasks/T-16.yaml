@@ -118,3 +118,7 @@ log:
   dosyaya yazıyor (TMPDIR=/tmp/l16 -> /tmp/r16, 989 passed). E5 yanlış kaydedildi: TMPDIR
   verilmeden koştu, AC''ye bağlanmadı. Sahibinin Mac sayısı 1 failed + 987 passed + 1 skipped
   = 989, tutarlı.'
+- '2026-11-17 developer: Sonar ayrı macOS işindeki yeni satırları güvenlik bulgusu saydı (setup-uv SHA ile
+  sabitlenmemiş, uv sync --no-build yok; --no-build projenin kendisini kuramadığı için denendi ve elendi).
+  macOS ayrı iş yerine test matrisine include olarak eklendi; adımlar Linux ile aynı (ruff, pytest, harness
+  check, build da macOS''ta koşar). İş adları test (ubuntu-latest, 3.11) biçimine değişti.'
