@@ -96,12 +96,24 @@ evidence:
   output_sha256: ec9b4b28fc7f6cc1deda28bf13e44cb1a78c7d3065ca6ccfd6dfbbda9a409083
   recorded_at: '2026-11-17'
   recorded_by: harness
+- id: E7
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 989 passed (after review round 1)
+  commit: 6ba250b0577fa924228a20bc81308d1bd8770a18
+  output: .harness/evidence/T-16/E7.txt
+  output_sha256: 2c19190b3314a129c7d926edc5da3db6ad878d99fa73b8ebfde81bdad085f081
+  recorded_at: '2026-11-17'
+  recorded_by: harness
 log:
 - '2026-11-17 developer: sahibi Mac''te 1 failed, 987 passed bildirdi. Linux''ta TMPDIR symlink''e
   yönlendirilince düzeltme öncesi kırıldığı, sonrası geçtiği görüldü.'
 - '2026-11-17 developer: E1 TMPDIR=/tmp/l16 (/tmp/r16''ya symlink) ile koşuldu; ortam değişkeni
   kanıt dosyasına yazılmaz, bu satır onu kayda geçirir.'
-- '2026-11-17 developer: review round 1 CHANGES_REQUESTED: AC1 kanıta bağlı değildi (önceki düzenleme
-  uygulanmamıştı) ve E1 symlink koşulunu kanıt dosyasında göstermiyordu. E6 koşulu dosyaya yazıyor
-  (TMPDIR=/tmp/l16 -> /tmp/r16, 989 passed). E5 yanlış kaydedildi: TMPDIR verilmeden koştu, AC''ye
-  bağlanmadı. Sahibinin Mac sayısı 1 failed + 987 passed + 1 skipped = 989, tutarlı.'
+- '2026-11-17 developer: review round 1 CHANGES_REQUESTED: AC1 kanıta bağlı değildi (önceki
+  düzenleme uygulanmamıştı) ve E1 symlink koşulunu kanıt dosyasında göstermiyordu. E6 koşulu
+  dosyaya yazıyor (TMPDIR=/tmp/l16 -> /tmp/r16, 989 passed). E5 yanlış kaydedildi: TMPDIR
+  verilmeden koştu, AC''ye bağlanmadı. Sahibinin Mac sayısı 1 failed + 987 passed + 1 skipped
+  = 989, tutarlı.'
