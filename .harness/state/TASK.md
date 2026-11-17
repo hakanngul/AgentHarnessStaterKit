@@ -1,6 +1,6 @@
 # Current task
 
-Status: T-7..T-14 DONE (T-14: tarayıcı için sunucu hazırlığı). Sıradaki: React arayüzü (ayrı görev), sonra masaüstü kabuğu.
+Status: T-7..T-15 DONE (T-15: React arayüzünün ilk dilimi). Sıradaki: masaüstü kabuğu denemesi (pywebview, yedek Electron), init varsayılan workflow, faz kapısı.
 
 ## Goal and scope
 
