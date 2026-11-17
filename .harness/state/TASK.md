@@ -1,20 +1,12 @@
 # Current task
 
-Status: T-7..T-15 DONE (T-15: React arayüzünün ilk dilimi). Sıradaki: masaüstü kabuğu denemesi (pywebview, yedek Electron), init varsayılan workflow, faz kapısı.
+Status: T-7..T-15 DONE. Aktif görev yok; sıradaki görev henüz açılmadı (görev dosyası `.harness/tasks/` altında açılacak).
 
-## Goal and scope
+## Önerilen sıradaki odak
 
-Sunucuyu React arayüzüne hazırlamak: her yanıta güvenlik başlıkları, `harness serve --ui DIR` ile derlenmiş
-arayüzü salt okunur sunmak, token devrini belgelemek. Token URL fragment'inde taşınır, arayüz fetch + Authorization
-başlığıyla konuşur (EventSource yok, çerez yok). Kapsam dışı: React arayüzünün kendisi, masaüstü kabuğu, TLS.
-
-## Acceptance criteria
-
-AC1-AC5 in `.harness/tasks/T-14.yaml`.
-
-## Required checks
-
-Unit tests only (owner decision): pytest, ruff check, ruff format --check, harness check.
+Gerçek bir Claude oturumuyla sunucu ve arayüz üzerinden uçtan uca deneme: şimdiye kadarki her sınır sahte motorla ya da
+yalnız commit işiyle sınandı. Sonra masaüstü kabuğu (pywebview denemesi, yedek Electron), `init` varsayılan workflow ve
+faz rolleri, orkestratör döngüsünde faz kapısı.
 
 ## Product decisions and blockers
 

@@ -19,8 +19,7 @@ kendi claim'lerini bırakır, git zaman aşımında süreç grubu öldürülür.
 
 ## Next step
 
-React arayüzü (kendi görevi: Vite + React, hash yönlendirme, fetch akışı) ve masaüstü kabuğu (pywebview denemesi, Electron yedek). Sonra: `init` varsayılan workflow ve faz
-rolleri, faz kapısını orkestra döngüsünde işletmek, gerçek Claude oturumuyla sunucudan deneme.
+Gerçek bir Claude oturumuyla sunucu/arayüz üzerinden uçtan uca deneme (changes_requested rework, kullanım limiti bekleme), masaüstü kabuğu (pywebview denemesi, Electron yedek). Sonra: `init` varsayılan workflow ve faz rolleri, faz kapısını orkestra döngüsünde işletmek.
 
 ## 2026-11-16 T-7 engine adapter
 
