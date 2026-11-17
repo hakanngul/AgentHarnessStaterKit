@@ -1,6 +1,6 @@
 # Current task
 
-Status: T-7..T-15 DONE. Aktif görev yok; sıradaki görev henüz açılmadı (görev dosyası `.harness/tasks/` altında açılacak).
+Status: T-7..T-16 DONE (T-16: macOS'ta symlink'li geçici dizin testleri, CI'da macOS). Aktif görev yok; sıradaki görev henüz açılmadı (görev dosyası `.harness/tasks/` altında açılacak).
 
 ## Önerilen sıradaki odak
 

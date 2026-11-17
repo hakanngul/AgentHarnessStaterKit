@@ -2,7 +2,7 @@ schema_version: 1
 id: T-16
 title: macOS'ta symlink'li geçici dizinde kırılan testler
 owner: developer
-status: IN_REVIEW
+status: DONE
 goal: 'Sahibinin Mac''inde `pytest` 1 testte kırıldı: test_review_requests_are_read_only tempfile.TemporaryDirectory
   kullanıyordu; macOS''ta bu dizin /var symlink''i altında ve project_root symlink''li yolu
   bilerek reddeder. Test pytest''in çözülmüş tmp_path''ine taşındı. Aynı koşulu Linux''ta
@@ -27,8 +27,11 @@ acceptance:
   - E4
   - E7
 - id: AC3
-  text: CI'da macOS'ta pytest koşan ayrı bir iş vardır ve PR'da yeşildir.
-  verified_by: []
+  text: CI test matrisinde macos-latest vardır (E9) ve PR head'inde yeşildir (E10, GitHub check-run
+    API'si).
+  verified_by:
+  - E9
+  - E10
 evidence:
 - id: E1
   kind: command
@@ -121,6 +124,40 @@ evidence:
   output_sha256: 649882adeed9b04ce77365585d6366c50c7a278c62f14b106046439158b35c77
   recorded_at: '2026-11-17'
   recorded_by: harness
+- id: E9
+  kind: command
+  command: grep -n macos-latest .github/workflows/ci.yml
+  cwd: .
+  exit_code: 0
+  summary: ci.yml test matrisinde macos-latest var
+  commit: e46759b33e60bdc6248d9247681677469ca1d34a
+  output: .harness/evidence/T-16/E9.txt
+  output_sha256: cdeba3b9520eba65208c1ff258a76fb78fd36c12ca289eb807a35372b1f485bf
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: python3 -c 'import json,sys,urllib.request as u; r=json.load(u.urlopen('"'"'https://api.github.com/repos/hakanngul/AgentHarnessStaterKit/check-runs/133824569528'"'"'));
+    print(r['"'"'name'"'"'], r['"'"'head_sha'"'"'], r['"'"'status'"'"'], r['"'"'conclusion'"'"'],
+    r['"'"'html_url'"'"']); sys.exit(0 if r['"'"'conclusion'"'"']=='"'"'success'"'"' else
+    1)'
+  cwd: .
+  exit_code: 0
+  summary: 'GitHub: test (macos-latest, 3.13) success on 5206bf3'
+  commit: 2249f2201a293a82c1331cd0481857a35e21abe9
+  output: .harness/evidence/T-16/E10.txt
+  output_sha256: 7b56d48c92ae1458c1b8dba74f96a0d487838ff010b4de67afd13d311bd4cf4f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+review:
+  status: approved
+  by: reviewer
+  notes: 'Round 2 (fresh read-only reviewer): APPROVED. Round 1 CHANGES_REQUESTED: AC1 kanıta
+    bağlı değildi ve symlink koşulu kanıt dosyasında görünmüyordu; E6/E8 koşulu dosyaya yazıyor.
+    Round 2 düşük bulguları alındı (E5 özeti düzeltildi, symlink''li koşu son kodda E8). Sonar,
+    ayrı macOS işindeki yeni satırları güvenlik bulgusu saydı; macOS test matrisine include
+    olarak taşındı. Reviewer''ın macOS''ta yavaş makinede zamanlamadan kırılabilir dediği
+    5 test CI''da geçti. Kör nokta: Windows CI yok.'
 log:
 - '2026-11-17 developer: sahibi Mac''te 1 failed, 987 passed bildirdi. Linux''ta TMPDIR symlink''e
   yönlendirilince düzeltme öncesi kırıldığı, sonrası geçtiği görüldü.'
@@ -136,5 +173,9 @@ log:
   için denendi ve elendi). macOS ayrı iş yerine test matrisine include olarak eklendi; adımlar
   Linux ile aynı (ruff, pytest, harness check, build da macOS''ta koşar). İş adları test (ubuntu-latest,
   3.11) biçimine değişti.'
-- '2026-11-17 reviewer round 2: APPROVED. Düşük bulgular alındı: E5 özeti düzeltildi, symlink''li koşu son
-  kodda tekrarlandı (E8). AC3 (macOS CI yeşil) CI sonucunu bekliyor.'
+- '2026-11-17 reviewer round 2: APPROVED. Düşük bulgular alındı: E5 özeti düzeltildi, symlink''li
+  koşu son kodda tekrarlandı (E8). AC3 (macOS CI yeşil) CI sonucunu bekliyor.'
+- '2026-11-17 developer: PR #13 sahibi tarafından merge edildi (e46759b). Head 5206bf3 üzerinde
+  CI yeşil: test (macos-latest, 3.13) dahil tüm işler, Sonar geçti. macOS işi: https://github.com/hakanngul/AgentHarnessStaterKit/actions/runs/44019265979/job/133824569528'
+- '2026-11-17 developer: Codex P2 (PR #14): AC3''ün yeşil CI kısmı kanıtta değildi. E10 GitHub check-run
+  API''sinden macOS işinin sonucunu okur, success değilse 1 ile çıkar.'
