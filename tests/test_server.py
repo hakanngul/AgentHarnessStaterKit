@@ -692,6 +692,6 @@ def test_serve_passes_the_ui_folder_on_and_refuses_a_bad_one_before_listening(
     bad, more = run_serve(monkeypatch, tmp_path, "--ui", str(tmp_path / "missing"))
     flat = " ".join(bad.output.split())  # the console wraps long paths mid-sentence
     assert bad.exit_code == 1 and "not a built UI" in flat
-    assert more == [] and "listening" not in bad.output and "token:" not in bad.output
+    assert more == [] and "listening" not in flat and "token:" not in flat
     plain, last = run_serve(monkeypatch, tmp_path)
     assert plain.exit_code == 0 and last[0][1]["ui"] is None

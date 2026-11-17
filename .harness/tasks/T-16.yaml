@@ -15,7 +15,9 @@ scope:
 acceptance:
 - id: AC1
   text: Symlink'li TMPDIR ile tüm pytest suite'i geçer (macOS /var koşulunun Linux karşılığı).
-  verified_by: []
+  verified_by:
+  - E1
+  - E6
 - id: AC2
   text: Normal TMPDIR ile pytest, ruff check ve ruff format --check geçer.
   verified_by:
@@ -70,8 +72,36 @@ evidence:
   output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
   recorded_at: '2026-11-17'
   recorded_by: harness
+- id: E5
+  kind: command
+  command: sh -c 'echo "TMPDIR=$TMPDIR -> $(readlink -f "$TMPDIR")"; uv run --frozen pytest
+    -q'
+  cwd: .
+  exit_code: 0
+  summary: 'TMPDIR=/tmp/l16 symlink -> /tmp/r16: 989 passed'
+  commit: ca28a9ac479e629e8fbd46c4e1ed1aaf99c86c2d
+  output: .harness/evidence/T-16/E5.txt
+  output_sha256: 4162ad67d4967b227bc0556c4bd3961844ae267ae7e18ef7c933f0639e0c3cb1
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E6
+  kind: command
+  command: sh -c 'export TMPDIR=/tmp/l16; echo "TMPDIR=$TMPDIR -> $(readlink -f "$TMPDIR")";
+    uv run --frozen pytest -q'
+  cwd: .
+  exit_code: 0
+  summary: 'TMPDIR=/tmp/l16 symlink -> /tmp/r16: 989 passed'
+  commit: ca28a9ac479e629e8fbd46c4e1ed1aaf99c86c2d
+  output: .harness/evidence/T-16/E6.txt
+  output_sha256: ec9b4b28fc7f6cc1deda28bf13e44cb1a78c7d3065ca6ccfd6dfbbda9a409083
+  recorded_at: '2026-11-17'
+  recorded_by: harness
 log:
 - '2026-11-17 developer: sahibi Mac''te 1 failed, 987 passed bildirdi. Linux''ta TMPDIR symlink''e
   yönlendirilince düzeltme öncesi kırıldığı, sonrası geçtiği görüldü.'
 - '2026-11-17 developer: E1 TMPDIR=/tmp/l16 (/tmp/r16''ya symlink) ile koşuldu; ortam değişkeni
   kanıt dosyasına yazılmaz, bu satır onu kayda geçirir.'
+- '2026-11-17 developer: review round 1 CHANGES_REQUESTED: AC1 kanıta bağlı değildi (önceki düzenleme
+  uygulanmamıştı) ve E1 symlink koşulunu kanıt dosyasında göstermiyordu. E6 koşulu dosyaya yazıyor
+  (TMPDIR=/tmp/l16 -> /tmp/r16, 989 passed). E5 yanlış kaydedildi: TMPDIR verilmeden koştu, AC''ye
+  bağlanmadı. Sahibinin Mac sayısı 1 failed + 987 passed + 1 skipped = 989, tutarlı.'
