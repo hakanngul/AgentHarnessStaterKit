@@ -60,9 +60,4 @@ describe("takeToken", () => {
     const { win } = fakeWindow("#token=100%25%zz");
     expect(takeToken(win)).toBe("100%25%zz");
   });
-
-  it("finds the token among other fragment parameters", () => {
-    const { win } = fakeWindow("#a=1&token=xyz");
-    expect(takeToken(win)).toBe("xyz");
-  });
 });

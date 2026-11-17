@@ -18,13 +18,16 @@ export interface Api {
 
 // A fixed allowlist, not a blacklist: letters, digits and a few separators after `/api/`. No `%`,
 // `\`, `:` or `//`, so nothing can encode a host, a scheme or a way out of /api/.
-const API_PATH = /^\/api\/[A-Za-z0-9_\-/?=&]*$/;
+const API_PATH = /^\/api\/([A-Za-z0-9_\-/?=&]*)$/;
 
-function checkPath(path: string): void {
+/** The request target, rebuilt from the part the allowlist matched (never the caller's string). */
+function apiTarget(path: string): string {
   // only same-origin API paths: a token must never be sent anywhere else
-  if (!API_PATH.test(path) || path.includes("//") || path.split(/[/?]/).includes("..")) {
+  const match = API_PATH.exec(path);
+  if (match === null || path.includes("//") || path.split(/[/?]/).includes("..")) {
     throw new Error(`not an API path: ${path}`);
   }
+  return `/api/${match[1] ?? ""}`;
 }
 
 async function detailOf(response: Response): Promise<string> {
@@ -43,8 +46,7 @@ export function createApi(token: string, fetchImpl: Fetch = (...a) => fetch(...a
   const auth = { Authorization: `Bearer ${token}` };
 
   async function request(path: string, init: RequestInit): Promise<Response> {
-    checkPath(path);
-    const response = await fetchImpl(path, { ...init, credentials: "omit", cache: "no-store" });
+    const response = await fetchImpl(apiTarget(path), { ...init, credentials: "omit", cache: "no-store" });
     if (!response.ok) throw new ApiError(response.status, await detailOf(response));
     return response;
   }

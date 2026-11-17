@@ -11,10 +11,6 @@ export interface FollowOptions {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** Yields the events of a job in order, and again from the last id when the stream drops while
- * the job still runs. The server keeps only the last 2000 events per job, so after a long gap
- * some events may be missing; that is not reported by the server either. Ends when the job is
- * no longer running and its stream has been read to the end. */
 function parseEvent(data: string): JobEvent | null {
   try {
     const value: unknown = JSON.parse(data);
@@ -27,6 +23,10 @@ function parseEvent(data: string): JobEvent | null {
   }
 }
 
+/** Yields the events of a job in order, and again from the last id when the stream drops while
+ * the job still runs. The server keeps only the last 2000 events per job, so after a long gap
+ * some events may be missing; that is not reported by the server either. Ends when the job is
+ * no longer running and its stream has been read to the end. */
 export async function* followJob(
   api: Api,
   jobId: string,
