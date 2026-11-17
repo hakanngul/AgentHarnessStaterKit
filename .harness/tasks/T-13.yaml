@@ -144,6 +144,39 @@ evidence:
   output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
   recorded_at: '2026-11-16'
   recorded_by: harness
+- id: E10
+  kind: command
+  command: uv run --frozen pytest -q
+  cwd: .
+  exit_code: 0
+  summary: 949 passed in 40.76s
+  commit: 2c4eedf5460abcc8e39d8f5ecfbc6a094cd746a8
+  output: .harness/evidence/T-13/E10.txt
+  output_sha256: 70b369cfccd335fa080161aca74ea3c43c066431bb511e5e7a3d6c6a18df8d81
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E11
+  kind: command
+  command: uv run --frozen ruff check .
+  cwd: .
+  exit_code: 0
+  summary: All checks passed!
+  commit: 2c4eedf5460abcc8e39d8f5ecfbc6a094cd746a8
+  output: .harness/evidence/T-13/E11.txt
+  output_sha256: 7d332fc26ad11d67e832b027adb4c7ed5b9e82a2fbc550e5a59e17533416ddb0
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E12
+  kind: command
+  command: uv run --frozen ruff format --check .
+  cwd: .
+  exit_code: 0
+  summary: 64 files already formatted
+  commit: 2c4eedf5460abcc8e39d8f5ecfbc6a094cd746a8
+  output: .harness/evidence/T-13/E12.txt
+  output_sha256: 175841f5ca042c47e5cd1078917882c62566527c42cc97a24ffaf3213a36d87f
+  recorded_at: '2026-11-17'
+  recorded_by: harness
 log:
 - '2026-11-16 developer: task opened; follows the T-12 review findings (wave claim race, shared
   git index, git without timeout); flock chosen over an O_EXCL file because a crash must not
@@ -160,15 +193,14 @@ log:
 - '2026-11-16 reviewer round 2: APPROVED. Codex P2 (git timeout kills only git, descendants
   outlive the lock) verified real for hooks that fork: fixed with a process group kill (POSIX),
   test with a hook whose background child must not survive; mutation (kill only git) caught.'
-
 - '2026-11-16 Sourcery (9 findings on e1e8dc7) triaged. FIXED: git descendants (process group),
   job left running when create_task fails (job removed, test + mutation), one-lock test (already
-  fixed). ACCEPTED and documented: git clean deleting the lock file, orphan git after kill -9,
-  post-commit hook timeout reported as blocked, holder-note window. DECLINED: evidence run must
-  not take the lock (an agent calls it inside a wave that holds it; would deadlock); symlink swap
-  of .harness between check and open (needs an attacker who can already write the project;
-  reported to the user as an open security-labelled finding).'
+  fixed). ACCEPTED and documented: git clean deleting the lock file, orphan git after kill
+  -9, post-commit hook timeout reported as blocked, holder-note window. DECLINED: evidence
+  run must not take the lock (an agent calls it inside a wave that holds it; would deadlock);
+  symlink swap of .harness between check and open (needs an attacker who can already write
+  the project; reported to the user as an open security-labelled finding).'
 - '2026-11-17 reviewer round 3 (commit.py process group): APPROVED. Taken: post-kill communicate
-  bounded (REAP_TIMEOUT 5 s) because a helper that escapes the group via setsid could hold the pipes
-  and hang under the lock; test + mutation caught. Documented: git loses its controlling tty
-  (gpgsign pinentry on tty). Tests are skipped on non-POSIX.'
+  bounded (REAP_TIMEOUT 5 s) because a helper that escapes the group via setsid could hold
+  the pipes and hang under the lock; test + mutation caught. Documented: git loses its controlling
+  tty (gpgsign pinentry on tty). Tests are skipped on non-POSIX.'
