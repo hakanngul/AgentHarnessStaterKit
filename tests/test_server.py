@@ -640,6 +640,17 @@ def test_a_folder_that_is_not_a_built_ui_is_refused(tmp_path):
             check_ui(bad)
         with pytest.raises(HarnessError, match="not a built UI"):
             create_app(root, TOKEN, ui=bad)
+    outside = tmp_path / "outside.html"
+    outside.write_text("<title>elsewhere</title>")
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    try:
+        (linked / "index.html").symlink_to(outside)
+    except OSError:
+        pass  # no symlinks here: the case cannot occur
+    else:
+        with pytest.raises(HarnessError, match="not a built UI"):
+            check_ui(linked)
     assert check_ui(None) is None
     assert check_ui(ui_folder(tmp_path)) == (tmp_path / "ui").resolve()
 

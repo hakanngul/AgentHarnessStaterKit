@@ -104,8 +104,10 @@ def check_ui(ui: Path | None) -> Path | None:
     if ui is None:
         return None
     folder = Path(ui).resolve()
-    if not folder.is_dir() or not (folder / UI_INDEX).is_file():
-        raise HarnessError(f"{folder} is not a built UI: it needs a {UI_INDEX}")
+    index = folder / UI_INDEX
+    # an index.html that is a link out of the folder would start the server and then 404
+    if not folder.is_dir() or not index.is_file() or not index.resolve().is_relative_to(folder):
+        raise HarnessError(f"{folder} is not a built UI: it needs a {UI_INDEX} inside it")
     return folder
 
 
