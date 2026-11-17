@@ -1,14 +1,15 @@
 schema_version: 1
 id: T-15
-title: 'React arayüzü, ilk dikey dilim: token, API istemcisi, SSE akışı, görev listesi ve iş paneli'
+title: 'React arayüzü, ilk dikey dilim: token, API istemcisi, SSE akışı, görev listesi ve
+  iş paneli'
 owner: developer
 status: IN_REVIEW
-goal: '`ui/` altında Vite + React + TypeScript arayüzünün ilk dilimi: token''ı URL fragment''inden alıp
-  bellekte tutan ve adresten silen kod, Authorization başlıklı fetch istemcisi, EventSource''suz SSE ayrıştırıcı
-  (kopmada ?after ile devam), görev listesi ve iş paneli (wave, review, commit başlat, canlı olaylar,
-  iptal). `harness serve --ui ui/dist` ile sunulur (T-14). Yalnız birim testleri (vitest). Kapsam dışı:
-  masaüstü kabuğu, tam arayüz (faz kapısı, karar kuyruğu, kanıt görünümü), Python paketine gömme, gerçek
-  tarayıcıda deneme.'
+goal: '`ui/` altında Vite + React + TypeScript arayüzünün ilk dilimi: token''ı URL fragment''inden
+  alıp bellekte tutan ve adresten silen kod, Authorization başlıklı fetch istemcisi, EventSource''suz
+  SSE ayrıştırıcı (kopmada ?after ile devam), görev listesi ve iş paneli (wave, review, commit
+  başlat, canlı olaylar, iptal). `harness serve --ui ui/dist` ile sunulur (T-14). Yalnız birim
+  testleri (vitest). Kapsam dışı: masaüstü kabuğu, tam arayüz (faz kapısı, karar kuyruğu,
+  kanıt görünümü), Python paketine gömme, gerçek tarayıcıda deneme.'
 scope:
 - ui/
 - .github/workflows/
@@ -18,30 +19,34 @@ scope:
 acceptance:
 - id: AC1
   text: 'Token: `#token=...` fragment''inden okunur, adres çubuğundan hemen silinir (history.replaceState),
-    bellekte tutulur; sorgu dizgisindeki token kabul edilmez; token yoksa arayüz bunu söyler ve istek
-    atmaz.'
+    bellekte tutulur; sorgu dizgisindeki token kabul edilmez; token yoksa arayüz bunu söyler
+    ve istek atmaz.'
   verified_by:
   - E4
+  - E8
 - id: AC2
-  text: 'API istemcisi: her istek Authorization: Bearer taşır, yalnız /api/ ile başlayan göreli yola gider
-    (başka kökene token gitmez), JSON gövdede Content-Type ayarlar, hatada sunucunun detail''ini taşıyan
-    ApiError verir.'
+  text: 'API istemcisi: her istek Authorization: Bearer taşır, yalnız /api/ ile başlayan göreli
+    yola gider (başka kökene token gitmez), JSON gövdede Content-Type ayarlar, hatada sunucunun
+    detail''ini taşıyan ApiError verir.'
   verified_by:
   - E4
+  - E8
 - id: AC3
-  text: 'SSE ayrıştırıcı: parçalara bölünmüş çerçeveleri, bölünmüş çok baytlı UTF-8''i, CRLF''yi, yorum
-    satırlarını (keepalive) ve çok satırlı data''yı doğru çözer; id''yi izler. followJob kopan akışı son
-    id ile (?after=) sürdürür, iş bitince ve iptalde durur.'
+  text: 'SSE ayrıştırıcı: parçalara bölünmüş çerçeveleri, bölünmüş çok baytlı UTF-8''i, CRLF''yi,
+    yorum satırlarını (keepalive) ve çok satırlı data''yı doğru çözer; id''yi izler. followJob
+    kopan akışı son id ile (?after=) sürdürür, iş bitince ve iptalde durur.'
   verified_by:
   - E4
+  - E8
 - id: AC4
-  text: 'Arayüz: görev listesi (id, başlık, durum, kapsam, review), iş paneli (wave/review/commit başlat,
-    canlı olaylar, iptal, 409''da tutan işi göster); render testleri sahte API ile.'
+  text: 'Arayüz: görev listesi (id, başlık, durum, kapsam, review), iş paneli (wave/review/commit
+    başlat, canlı olaylar, iptal, 409''da tutan işi göster); render testleri sahte API ile.'
   verified_by:
   - E4
+  - E8
 - id: AC5
-  text: vitest, tsc --noEmit ve vite build geçer; CI'da ayrı bir ui işi koşar; pytest, ruff ve harness
-    check yeşil kalır.
+  text: vitest, tsc --noEmit ve vite build geçer; CI'da ayrı bir ui işi koşar; pytest, ruff
+    ve harness check yeşil kalır.
   verified_by:
   - E1
   - E2
@@ -128,13 +133,47 @@ evidence:
   output_sha256: dfea5592d24a677932d9f5de43123e147939d21a4ba535359604b64d9617b5af
   recorded_at: '2026-11-17'
   recorded_by: harness
+- id: E8
+  kind: command
+  command: npm --prefix ui test
+  cwd: .
+  exit_code: 0
+  summary: 'vitest: 7 files, 54 tests passed (after review round 1)'
+  commit: 1701ccf145dabcd124c70d371ab931fa9f2a1fa5
+  output: .harness/evidence/T-15/E8.txt
+  output_sha256: bf731225b0848716f41d818ee395d6affdaba06c03aeb7fc9de9cdc323827470
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E9
+  kind: command
+  command: npm --prefix ui run typecheck
+  cwd: .
+  exit_code: 0
+  summary: 'tsc --noEmit: no errors'
+  commit: 1701ccf145dabcd124c70d371ab931fa9f2a1fa5
+  output: .harness/evidence/T-15/E9.txt
+  output_sha256: 0de190a1b717d16f6eac63f1e1b0282a46b4a1f92da6d05e7aa9d0675611f9f5
+  recorded_at: '2026-11-17'
+  recorded_by: harness
+- id: E10
+  kind: command
+  command: npm --prefix ui run build
+  cwd: .
+  exit_code: 0
+  summary: vite build ok
+  commit: 1701ccf145dabcd124c70d371ab931fa9f2a1fa5
+  output: .harness/evidence/T-15/E10.txt
+  output_sha256: 4b83cc8055f30c5c4bffe28f3e5c95e761d1c4aecad60b0b916e4dd841c205d1
+  recorded_at: '2026-11-17'
+  recorded_by: harness
 log:
-- '2026-11-17 developer: görev açıldı. Bilinen sınır: arayüz hiçbir gerçek tarayıcıda denenmedi, CSP ve
-  SSE akışı yalnız jsdom ve sahte fetch ile sınanır.'
-- '2026-11-17 developer: ui/ (Vite 8, React 19, TypeScript, vitest), token/api/sse/follow modülleri, TaskList,
-  JobsPanel, App; CI''ya ui işi. Test sırasında gerçek bir SSE ayrıştırıcı hatası bulundu (akış sonunda
-  tutulan son CR satır sonu sayılmıyordu): düzeltildi, test kaldırınca kırılıyor. followJob''da sonsuz
-  döngü riski (bitmiş işte akış boş) ilerleme korumasıyla kapatıldı, testli. Gerçek Chromium (Playwright)
-  ile elle uçtan uca deneme: fragment devri ve adres temizleme, görev tablosu (işaretli başlık metin olarak),
-  commit işi canlı akış, yanlış token 401, 0 çerez, 0 storage, CSP ihlali yok, tüm API istekleri Bearer
-  taşıdı. Bu deneme komut dosyası olarak depoda değil, otomatik testle kanıtlanmış sayılmaz.'
+- '2026-11-17 developer: görev açıldı. Bilinen sınır: arayüz hiçbir gerçek tarayıcıda denenmedi,
+  CSP ve SSE akışı yalnız jsdom ve sahte fetch ile sınanır.'
+- '2026-11-17 developer: ui/ (Vite 8, React 19, TypeScript, vitest), token/api/sse/follow
+  modülleri, TaskList, JobsPanel, App; CI''ya ui işi. Test sırasında gerçek bir SSE ayrıştırıcı
+  hatası bulundu (akış sonunda tutulan son CR satır sonu sayılmıyordu): düzeltildi, test kaldırınca
+  kırılıyor. followJob''da sonsuz döngü riski (bitmiş işte akış boş) ilerleme korumasıyla
+  kapatıldı, testli. Gerçek Chromium (Playwright) ile elle uçtan uca deneme: fragment devri
+  ve adres temizleme, görev tablosu (işaretli başlık metin olarak), commit işi canlı akış,
+  yanlış token 401, 0 çerez, 0 storage, CSP ihlali yok, tüm API istekleri Bearer taşıdı. Bu
+  deneme komut dosyası olarak depoda değil, otomatik testle kanıtlanmış sayılmaz.'
