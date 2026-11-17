@@ -467,7 +467,7 @@ def test_an_undecodable_config_does_not_crash_the_api(tmp_path):
 
 # --- browser readiness (T-14) -------------------------------------------------------------
 
-from agent_harness.server import CSP, SECURITY_HEADERS, check_ui  # noqa: E402
+from agent_harness.server import CSP, SECURITY_HEADERS, check_ui, is_api_path  # noqa: E402
 
 
 def ui_folder(tmp_path: Path) -> Path:
@@ -577,6 +577,34 @@ def test_a_folder_called_api_inside_the_ui_is_never_served(tmp_path):
             response = api.get(url, headers=headers)
             assert "TOKENLESS-LEAK" not in response.text, url
     assert api.get("/api/leak.txt", headers=AUTH).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("api", True),
+        ("api/x", True),
+        ("API/x", True),
+        ("Api/leak.txt", True),
+        ("api./x", True),
+        ("api /x", True),
+        ("api\\leak.txt", True),
+        ("apix", False),
+        ("api-docs/x", False),
+        ("assets/api.js", False),
+        ("x/api/y", False),
+        ("", False),
+    ],
+)
+def test_the_api_folder_guard_sees_case_separator_and_dot_variants(path, expected):
+    assert is_api_path(path) is expected
+
+
+def test_with_a_ui_the_api_paths_without_a_route_are_404_not_405_or_a_redirect(tmp_path):
+    api = client(project(tmp_path, task("T-1")), ui=ui_folder(tmp_path))
+    assert api.delete("/api/health").status_code == 404  # without --ui this is 405
+    assert api.head("/api/health").status_code == 404
+    assert api.get("/api/plan/", headers=AUTH, follow_redirects=False).status_code == 404
 
 
 def test_without_a_ui_the_root_is_still_404(tmp_path):

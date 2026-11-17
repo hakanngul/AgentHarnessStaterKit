@@ -90,11 +90,18 @@ def check_port(port: int) -> None:
         raise HarnessError("the port must be between 1 and 65535")
 
 
+def is_api_path(path: str) -> bool:
+    """True for anything that names the api folder, also on case-folding file systems
+    (`API/x`), with a Windows separator (`api\\x`) or with trailing dots or spaces (`api./x`)."""
+    first = path.replace("\\", "/").split("/", 1)[0]
+    return first.casefold().rstrip(". ") == "api"
+
+
 class UiFiles(StaticFiles):
     """The built UI, which never answers under /api (a folder named api must not leak tokenless)."""
 
     async def get_response(self, path, scope):
-        if path == "api" or path.startswith("api/"):
+        if is_api_path(path):
             raise HTTPException(404)
         return await super().get_response(path, scope)
 
