@@ -851,6 +851,9 @@ def test_the_event_stream_carries_the_security_headers_too(tmp_path):
         job_id = start(api, {"kind": "commit"}).json()["id"]
         with api.stream("GET", f"/api/jobs/{job_id}/events", headers=AUTH) as response:
             assert response.status_code == 200
+            assert response.headers["x-content-type-options"] == "nosniff"
+            assert response.headers["x-frame-options"] == "DENY"
+            assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
             for name, value in SECURITY_HEADERS.items():
                 assert response.headers[name.lower()] == value, name
             assert response.headers["cache-control"] == "no-store"

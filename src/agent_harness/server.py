@@ -7,6 +7,7 @@ that. Job state lives in memory and the ledger stays the source of truth.
 """
 
 import json
+import logging
 import re
 import secrets
 from collections.abc import Callable
@@ -36,7 +37,8 @@ GRACEFUL_SHUTDOWN = 3  # seconds uvicorn waits for open connections before it ca
 UI_INDEX = "index.html"
 # the built UI is the only page that may load: same-origin scripts, no framing, no plugins
 CSP = (
-    "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; "
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+    "font-src 'self' data:; connect-src 'self'; form-action 'none'; "
     "frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
 )
 SECURITY_HEADERS = {
@@ -45,6 +47,7 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
 }
+LOG = logging.getLogger("agent_harness.server")
 TASK_ID = re.compile(r"T-[0-9]+")
 HOST = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?", re.IGNORECASE | re.ASCII)
 
@@ -85,6 +88,15 @@ def check_token(token: str) -> None:
 def check_port(port: int) -> None:
     if not 1 <= port <= 65535:
         raise HarnessError("the port must be between 1 and 65535")
+
+
+class UiFiles(StaticFiles):
+    """The built UI, which never answers under /api (a folder named api must not leak tokenless)."""
+
+    async def get_response(self, path, scope):
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(404)
+        return await super().get_response(path, scope)
 
 
 def check_ui(ui: Path | None) -> Path | None:
@@ -153,7 +165,11 @@ def create_app(
 
     @app.middleware("http")  # added last, so it wraps the host check and its 403 too
     async def security_headers(request: Request, call_next):
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:  # noqa: BLE001 - an unhandled error must still carry the headers
+            LOG.exception("unhandled error on %s %s", request.method, request.url.path)
+            response = JSONResponse({"detail": "internal error"}, status_code=500)
         response.headers.update(SECURITY_HEADERS)
         if request.url.path.startswith("/api"):
             response.headers["Cache-Control"] = "no-store"
@@ -288,7 +304,7 @@ def create_app(
         return job.view()
 
     if ui_folder is not None:  # last, so it never shadows an /api route
-        app.mount("/", StaticFiles(directory=ui_folder, html=True), name="ui")
+        app.mount("/", UiFiles(directory=ui_folder, html=True), name="ui")
     return app
 
 
