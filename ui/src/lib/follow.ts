@@ -35,6 +35,7 @@ export async function* followJob(
   let after = 0;
   while (!signal?.aborted) {
     const before = after;
+    let streamRead = false;
     try {
       const response = await api.open(`/api/jobs/${encodeURIComponent(jobId)}/events?after=${after}`, signal);
       if (response.body) {
@@ -45,6 +46,7 @@ export async function* followJob(
           yield event;
         }
       }
+      streamRead = true;
     } catch (error) {
       if (signal?.aborted) return;
       if (!(error instanceof TypeError)) throw error; // only a network drop is retried
@@ -62,9 +64,9 @@ export async function* followJob(
     }
     if (job.status !== "running") {
       // everything was delivered, or the server has nothing more to give (a gap in its buffer)
-      if (after >= job.last_event || after === before) return;
-    } else {
-      await pause(retryMs);
+      // the no-progress guard applies only when the stream was really read to its end
+      if (after >= job.last_event || (streamRead && after === before)) return;
     }
+    await pause(retryMs);
   }
 }

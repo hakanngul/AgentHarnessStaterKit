@@ -45,7 +45,7 @@ describe("createApi", () => {
     expect(((await html.get("/api/x").catch((e: unknown) => e)) as ApiError).detail).toBe("Bad Gateway");
   });
 
-  it.each(["/other", "api/tasks", "//evil.example/api/x", "https://evil.example/api/x", "/api/../x://y"])(
+  it.each(["/other", "api/tasks", "//evil.example/api/x", "https://evil.example/api/x", "/api/../x://y", "/api/%2e%2e/x", "/api/a/../b", "/api\\evil", "/api//x", "/api/x?u=http://e"])(
     "refuses a path that is not a same-origin API path: %s",
     async (path) => {
       const fetchImpl = vi.fn();

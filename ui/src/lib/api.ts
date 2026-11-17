@@ -16,9 +16,13 @@ export interface Api {
   open(path: string, signal?: AbortSignal): Promise<Response>;
 }
 
+// A fixed allowlist, not a blacklist: letters, digits and a few separators after `/api/`. No `%`,
+// `\`, `:` or `//`, so nothing can encode a host, a scheme or a way out of /api/.
+const API_PATH = /^\/api\/[A-Za-z0-9_\-/?=&]*$/;
+
 function checkPath(path: string): void {
   // only same-origin API paths: a token must never be sent anywhere else
-  if (!path.startsWith("/api/") || path.startsWith("//") || path.includes("://")) {
+  if (!API_PATH.test(path) || path.includes("//") || path.split(/[/?]/).includes("..")) {
     throw new Error(`not an API path: ${path}`);
   }
 }

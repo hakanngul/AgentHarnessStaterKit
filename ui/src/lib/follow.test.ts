@@ -133,4 +133,26 @@ describe("followJob error handling", () => {
     const api = fakeApi({ open, get: () => Promise.reject(new ApiError(401, "no token")) as never });
     await expect(collect(followJob(api, "j"))).rejects.toThrow("no token");
   });
+
+  it("does not end silently when the connection failed and the finished job still has events", async () => {
+    const open = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(responseOf(streamOf([frame(1, "a")])));
+    const api = fakeApi({ open, get: () => Promise.resolve(job("done", 1)) as never });
+    const events = await collect(followJob(api, "j", { pause: () => Promise.resolve() }));
+    expect(events.map((e) => e.text)).toEqual(["a"]);
+    expect(open).toHaveBeenCalledTimes(2);
+  });
+
+  it("never moves the resume point backwards on a lower id", async () => {
+    const open = vi
+      .fn()
+      .mockResolvedValueOnce(responseOf(streamOf([frame(5, "a"), frame(3, "b")])))
+      .mockResolvedValueOnce(responseOf(streamOf([frame(6, "c")])));
+    const statuses = [job("running", 6), job("done", 6)];
+    const api = fakeApi({ open, get: () => Promise.resolve(statuses.shift()) as never });
+    await collect(followJob(api, "j", { pause: () => Promise.resolve() }));
+    expect(open.mock.calls[1]![0]).toBe("/api/jobs/j/events?after=5");
+  });
 });

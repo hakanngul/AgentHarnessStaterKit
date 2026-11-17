@@ -116,6 +116,9 @@ export function JobsPanel({ api }: { api: Api }) {
                 İptal
               </button>
             )}
+            {job.status === "done" && job.result?.ok === false && (
+              <span className="status status-failed"> — bitti ama başarısız (result.ok=false)</span>
+            )}
             {job.error && <span> — {job.error}</span>}
           </li>
         ))}
